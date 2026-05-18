@@ -126,6 +126,19 @@ if ((window as any).electron) {
   if (stored) userName.textContent = JSON.parse(stored).name || 'Player';
 }
 
+// ── Cached MC auth (no login needed) ──────────────────────────────────────────
+if (mc) {
+  mc.onAlreadyAuthed((name: string) => {
+    authed = true;
+    mcAuthBtn.textContent = `✅  Logged in as ${name}`;
+    mcAuthBtn.classList.add('authed');
+    mcIgnSpan.textContent = name;
+    mcIgnBadge.style.display = 'inline-block';
+    mcPlayBtn.disabled = false;
+    setStatus(`Authenticated as ${name}`, 'green');
+  });
+}
+
 // ── Memory slider ──────────────────────────────────────────────────────────────
 mcMemory.addEventListener('input', () => {
   mcMemoryVal.textContent = mcMemory.value;
@@ -271,25 +284,63 @@ if (mc) {
 setStatus('Ready — login with Microsoft to play');
 
 // ── Nav switching ─────────────────────────────────────────────────────────────
-const contentEl  = document.getElementById('content')!;
-const modsPanelEl= document.getElementById('mods-panel')!;
-const navPlay    = document.getElementById('nav-play')!;
-const navMods    = document.getElementById('nav-mods')!;
+const contentEl     = document.getElementById('content')!;
+const modsPanelEl   = document.getElementById('mods-panel')!;
+const settingsPanelEl = document.getElementById('settings-panel')!;
+const navPlay       = document.getElementById('nav-play')!;
+const navMods       = document.getElementById('nav-mods')!;
+const navSettings   = document.getElementById('nav-settings')!;
 
 function showPlay() {
-  contentEl.style.display   = 'flex';
-  modsPanelEl.style.display = 'none';
+  contentEl.style.display      = 'flex';
+  modsPanelEl.style.display    = 'none';
+  settingsPanelEl.style.display= 'none';
   navPlay.classList.add('active');
   navMods.classList.remove('active');
+  navSettings.classList.remove('active');
 }
 function showMods() {
-  contentEl.style.display   = 'none';
-  modsPanelEl.style.display = 'flex';
+  contentEl.style.display      = 'none';
+  modsPanelEl.style.display    = 'flex';
+  settingsPanelEl.style.display= 'none';
   navPlay.classList.remove('active');
   navMods.classList.add('active');
+  navSettings.classList.remove('active');
+}
+function showSettings() {
+  contentEl.style.display      = 'none';
+  modsPanelEl.style.display    = 'none';
+  settingsPanelEl.style.display= 'flex';
+  navPlay.classList.remove('active');
+  navMods.classList.remove('active');
+  navSettings.classList.add('active');
 }
 navPlay.addEventListener('click', showPlay);
 navMods.addEventListener('click', showMods);
+navSettings.addEventListener('click', showSettings);
+
+// ── Reauth button ──────────────────────────────────────────────────────────────
+document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => {
+  if (!mc) return;
+  authed = false;
+  mcPlayBtn.disabled = true;
+  mcAuthBtn.textContent = '🔐  Login with Microsoft to Play';
+  mcAuthBtn.classList.remove('authed');
+  mcIgnBadge.style.display = 'none';
+  setStatus('Opening Microsoft login…', 'yellow');
+  const res = await mc.reauth();
+  if (res?.ok) {
+    authed = true;
+    mcAuthBtn.textContent = `✅  Logged in as ${res.username}`;
+    mcAuthBtn.classList.add('authed');
+    mcIgnSpan.textContent = res.username;
+    mcIgnBadge.style.display = 'inline-block';
+    mcPlayBtn.disabled = false;
+    setStatus(`Authenticated as ${res.username}`, 'green');
+  } else {
+    setStatus(`Auth failed: ${res?.error || 'Unknown error'}`, 'red');
+  }
+});
 
 // ── Build mods list ────────────────────────────────────────────────────────────
 const enabledMods = new Set<string>(MODS.filter(m => m.defaultOn).map(m => m.id));
@@ -332,28 +383,36 @@ renderMods();
 // ── Auto-updater UI ────────────────────────────────────────────────────────────
 const updater = (window as any).updater;
 if (updater) {
-  const banner       = document.getElementById('update-banner')!;
-  const updateText   = document.getElementById('update-text')!;
-  const progressWrap2= document.getElementById('update-progress-wrap')!;
-  const progressBar2 = document.getElementById('update-progress-bar')!;
-  const installBtn   = document.getElementById('update-install-btn')!;
+  const banner        = document.getElementById('update-banner')!;
+  const updateText    = document.getElementById('update-text')!;
+  const progressWrap2 = document.getElementById('update-progress-wrap')!;
+  const progressBar2  = document.getElementById('update-progress-bar')!;
+  const installBtn    = document.getElementById('update-install-btn')!;
+  const checkBtn      = document.getElementById('check-updates-btn') as HTMLButtonElement | null;
 
+  updater.onChecking(() => {
+    if (checkBtn) { checkBtn.textContent = 'Checking…'; checkBtn.disabled = true; }
+  });
+  updater.onNotAvailable(() => {
+    if (checkBtn) { checkBtn.textContent = 'Up to date'; setTimeout(() => { checkBtn.textContent = 'Check for Updates'; checkBtn.disabled = false; }, 2500); }
+  });
   updater.onAvailable((ver: string) => {
     banner.style.display = 'flex';
     updateText.textContent = `⬇ Update v${ver} downloading…`;
     progressWrap2.style.display = 'block';
+    if (checkBtn) { checkBtn.textContent = 'Downloading…'; checkBtn.disabled = true; }
   });
-
   updater.onProgress((pct: number) => {
     progressBar2.style.width = `${pct}%`;
     updateText.textContent = `⬇ Downloading update… ${pct}%`;
   });
-
   updater.onDownloaded(() => {
     progressWrap2.style.display = 'none';
     updateText.textContent = '✅ Update ready — restart to apply';
     installBtn.style.display = 'inline-block';
+    if (checkBtn) { checkBtn.textContent = 'Restart & Update'; checkBtn.disabled = false; checkBtn.onclick = () => updater.install(); }
   });
 
   installBtn.addEventListener('click', () => updater.install());
+  checkBtn?.addEventListener('click', () => updater.check());
 }

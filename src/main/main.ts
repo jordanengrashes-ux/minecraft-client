@@ -1,109 +1,229 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
+import fs from 'fs';
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Client } = require('minecraft-launcher-core');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { Auth } = require('msmc');
 
 let loginWin: BrowserWindow | null = null;
 let gameWin:  BrowserWindow | null = null;
 let mcAuthToken: any = null;
 
 const DEV = !app.isPackaged;
+const AUTH_CACHE = path.join(app.getPath('userData'), 'mc-auth.json');
 
+// ── Load cached MC auth token ─────────────────────────────────────────────────
+function loadCachedAuth() {
+  try {
+    if (fs.existsSync(AUTH_CACHE)) {
+      mcAuthToken = JSON.parse(fs.readFileSync(AUTH_CACHE, 'utf-8'));
+    }
+  } catch { mcAuthToken = null; }
+}
+function saveCachedAuth(token: any) {
+  try { fs.writeFileSync(AUTH_CACHE, JSON.stringify(token), 'utf-8'); } catch {}
+}
+function clearCachedAuth() {
+  try { if (fs.existsSync(AUTH_CACHE)) fs.unlinkSync(AUTH_CACHE); } catch {}
+  mcAuthToken = null;
+}
+
+// ── Microsoft → Xbox → XSTS → Minecraft auth chain ──────────────────────────
+const MS_CLIENT_ID = '00000000402b5328';
+const MS_REDIRECT  = 'https://login.live.com/oauth20_desktop.srf';
+
+function openMicrosoftAuthWindow(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const authUrl =
+      `https://login.live.com/oauth20_authorize.srf` +
+      `?client_id=${MS_CLIENT_ID}` +
+      `&response_type=code` +
+      `&scope=service::user.auth.xboxlive.com::MBI_SSL` +
+      `&redirect_uri=${encodeURIComponent(MS_REDIRECT)}` +
+      `&display=touch&locale=en`;
+
+    const win = new BrowserWindow({
+      width: 500, height: 660,
+      parent: gameWin ?? undefined,
+      modal: true,
+      title: 'Sign in with Microsoft',
+      webPreferences: { nodeIntegration: false, contextIsolation: true },
+    });
+    win.setMenuBarVisibility(false);
+    win.loadURL(authUrl);
+
+    let resolved = false;
+    function done(codeOrErr: string, isErr = false) {
+      if (resolved) return;
+      resolved = true;
+      try { win.close(); } catch {}
+      if (isErr) reject(new Error(codeOrErr));
+      else resolve(codeOrErr);
+    }
+
+    win.webContents.on('will-redirect', (_e, url) => {
+      if (!url.startsWith(MS_REDIRECT)) return;
+      const p = new URL(url);
+      const code = p.searchParams.get('code');
+      const err  = p.searchParams.get('error_description') || p.searchParams.get('error');
+      if (code) done(code);
+      else done(err || 'Cancelled', true);
+    });
+    win.webContents.on('will-navigate', (_e, url) => {
+      if (url.startsWith(MS_REDIRECT)) {
+        const p = new URL(url);
+        const code = p.searchParams.get('code');
+        if (code) done(code);
+      }
+    });
+    win.on('closed', () => done('Window closed', true));
+  });
+}
+
+async function fetchJson(url: string, init?: RequestInit): Promise<any> {
+  const res = await fetch(url, init);
+  if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
+  return res.json();
+}
+
+async function authenticateWithMinecraft(code: string): Promise<any> {
+  // 1. Exchange code → MS access token
+  const msToken = await fetchJson('https://login.live.com/oauth20_token.srf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: MS_CLIENT_ID, code,
+      grant_type: 'authorization_code',
+      redirect_uri: MS_REDIRECT,
+    }).toString(),
+  });
+
+  // 2. Xbox Live
+  const xbl = await fetchJson('https://user.auth.xboxlive.com/user/authenticate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      Properties: { AuthMethod: 'RPS', SiteName: 'user.auth.xboxlive.com', RpsTicket: msToken.access_token },
+      RelyingParty: 'http://auth.xboxlive.com', TokenType: 'JWT',
+    }),
+  });
+
+  // 3. XSTS
+  const xsts = await fetchJson('https://xsts.auth.xboxlive.com/xsts/authorize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      Properties: { SandboxId: 'RETAIL', UserTokens: [xbl.Token] },
+      RelyingParty: 'rp://api.minecraftservices.com/', TokenType: 'JWT',
+    }),
+  });
+
+  const uhs = xsts.DisplayClaims.xui[0].uhs;
+
+  // 4. Minecraft token
+  const mc = await fetchJson('https://api.minecraftservices.com/authentication/login_with_xbox', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identityToken: `XBL3.0 x=${uhs};${xsts.Token}` }),
+  });
+
+  // 5. Profile
+  const profile = await fetchJson('https://api.minecraftservices.com/minecraft/profile', {
+    headers: { Authorization: `Bearer ${mc.access_token}` },
+  });
+
+  return {
+    access_token: mc.access_token,
+    client_token: uhs,
+    uuid: profile.id,
+    name: profile.name,
+    user_properties: '{}',
+    meta: { type: 'msa' },
+  };
+}
+
+// ── Windows ───────────────────────────────────────────────────────────────────
 function createLoginWindow() {
   loginWin = new BrowserWindow({
     width: 480, height: 600,
-    resizable: false,
-    frame: false,
-    titleBarStyle: 'hidden',
+    resizable: false, frame: false, titleBarStyle: 'hidden',
     backgroundColor: '#0a0a0f',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
-  if (DEV) {
-    loginWin.loadURL('http://localhost:5173/login.html');
-  } else {
-    loginWin.loadFile(path.join(__dirname, '../dist/login.html'));
-  }
+  if (DEV) loginWin.loadURL('http://localhost:5173/login.html');
+  else loginWin.loadFile(path.join(__dirname, '../dist/login.html'));
 }
 
 function createGameWindow() {
   gameWin = new BrowserWindow({
-    width: 1100, height: 680,
-    minWidth: 800, minHeight: 500,
-    backgroundColor: '#0d1117',
-    titleBarStyle: 'hidden',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    width: 1100, height: 680, minWidth: 800, minHeight: 500,
+    backgroundColor: '#0d1117', titleBarStyle: 'hidden',
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
-
   if (DEV) {
     gameWin.loadURL('http://localhost:5173/game.html');
     gameWin.webContents.openDevTools({ mode: 'detach' });
   } else {
     gameWin.loadFile(path.join(__dirname, '../dist/game.html'));
   }
-
   gameWin.on('closed', () => { gameWin = null; app.quit(); });
 }
 
-// ── IPC: login succeeded → open launcher ─────────────────────────────────────
+// ── IPC: login / game window ──────────────────────────────────────────────────
 ipcMain.on('login-success', (_e, userData) => {
   createGameWindow();
-  loginWin?.close();
-  loginWin = null;
+  loginWin?.close(); loginWin = null;
   gameWin?.webContents.once('did-finish-load', () => {
     gameWin?.webContents.send('user-data', userData);
+    // Tell launcher if MC auth is already cached
+    if (mcAuthToken) gameWin?.webContents.send('mc-already-authed', mcAuthToken.name);
   });
 });
 
-// ── IPC: Microsoft / Minecraft auth ──────────────────────────────────────────
+// ── IPC: Minecraft auth ───────────────────────────────────────────────────────
 ipcMain.handle('mc-auth', async () => {
+  // Return cached token if valid
+  if (mcAuthToken?.name) return { ok: true, username: mcAuthToken.name, cached: true };
   try {
-    const auth = new Auth('select_account');
-    const xbox = await auth.launch('electron');
-    const mc   = await xbox.getMinecraft();
-    mcAuthToken = mc.mclc();
-    return { ok: true, username: mc.profile.name };
+    const code  = await openMicrosoftAuthWindow();
+    const token = await authenticateWithMinecraft(code);
+    mcAuthToken = token;
+    saveCachedAuth(token);
+    return { ok: true, username: token.name };
   } catch (err: any) {
     return { ok: false, error: err.message };
   }
 });
 
-// ── IPC: launch Minecraft ──────────────────────────────────────────────────────
+ipcMain.handle('mc-reauth', async () => {
+  clearCachedAuth();
+  try {
+    const code  = await openMicrosoftAuthWindow();
+    const token = await authenticateWithMinecraft(code);
+    mcAuthToken = token;
+    saveCachedAuth(token);
+    return { ok: true, username: token.name };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// ── IPC: launch Minecraft ─────────────────────────────────────────────────────
 ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }) => {
   if (!mcAuthToken) return { ok: false, error: 'Not authenticated with Microsoft' };
-
   try {
     const launcher = new Client();
-    const rootPath = path.join(app.getPath('userData'), '.minecraft');
-
     launcher.launch({
       authorization: mcAuthToken,
-      root: rootPath,
-      version: {
-        number: opts.version || '1.21.4',
-        type: 'release',
-      },
-      memory: {
-        max: `${opts.maxMem || 4}G`,
-        min: '2G',
-      },
+      root: path.join(app.getPath('userData'), '.minecraft'),
+      version: { number: opts.version || '1.21.4', type: 'release' },
+      memory:  { max: `${opts.maxMem || 4}G`, min: '2G' },
     });
-
-    launcher.on('data',     (data: string)  => gameWin?.webContents.send('mc-log',      data));
-    launcher.on('progress', (e: any)        => gameWin?.webContents.send('mc-progress', e));
-    launcher.on('close',    (code: number)  => gameWin?.webContents.send('mc-closed',   code));
-    launcher.on('error',    (err: Error)    => gameWin?.webContents.send('mc-error',    err.message));
-
+    launcher.on('data',     (d: string)  => gameWin?.webContents.send('mc-log',      d));
+    launcher.on('progress', (e: any)     => gameWin?.webContents.send('mc-progress', e));
+    launcher.on('close',    (c: number)  => gameWin?.webContents.send('mc-closed',   c));
+    launcher.on('error',    (e: Error)   => gameWin?.webContents.send('mc-error',    e.message));
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: err.message };
@@ -111,40 +231,33 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }
 });
 
 // ── IPC: window controls ──────────────────────────────────────────────────────
-ipcMain.on('win-close',    () => { BrowserWindow.getFocusedWindow()?.close(); });
-ipcMain.on('win-minimize', () => { BrowserWindow.getFocusedWindow()?.minimize(); });
-ipcMain.on('win-maximize', () => {
-  const w = BrowserWindow.getFocusedWindow();
-  if (w?.isMaximized()) w.unmaximize(); else w?.maximize();
-});
+ipcMain.on('win-close',    () => BrowserWindow.getFocusedWindow()?.close());
+ipcMain.on('win-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());
+ipcMain.on('win-maximize', () => { const w = BrowserWindow.getFocusedWindow(); if (w?.isMaximized()) w.unmaximize(); else w?.maximize(); });
 
 // ── Auto-updater ──────────────────────────────────────────────────────────────
 function setupAutoUpdater() {
-  autoUpdater.autoDownload = true;
+  autoUpdater.autoDownload    = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  autoUpdater.on('update-available', (info) => {
-    gameWin?.webContents.send('update-available', info.version);
-  });
-  autoUpdater.on('download-progress', (p) => {
-    gameWin?.webContents.send('update-progress', Math.round(p.percent));
-  });
-  autoUpdater.on('update-downloaded', () => {
-    gameWin?.webContents.send('update-downloaded');
-  });
-  autoUpdater.on('error', () => { /* ignore update errors silently */ });
+  autoUpdater.on('checking-for-update',  () => gameWin?.webContents.send('update-checking'));
+  autoUpdater.on('update-not-available', () => gameWin?.webContents.send('update-not-available'));
+  autoUpdater.on('update-available',   info => gameWin?.webContents.send('update-available',  info.version));
+  autoUpdater.on('download-progress',     p => gameWin?.webContents.send('update-progress',   Math.round(p.percent)));
+  autoUpdater.on('update-downloaded',     () => gameWin?.webContents.send('update-downloaded'));
+  autoUpdater.on('error',               () => {});
 
   autoUpdater.checkForUpdates().catch(() => {});
 }
 
-ipcMain.on('install-update', () => {
-  autoUpdater.quitAndInstall(false, true);
-});
+ipcMain.on('install-update',    () => autoUpdater.quitAndInstall(false, true));
+ipcMain.on('check-for-updates', () => { autoUpdater.checkForUpdates().catch(() => {}); });
 
+// ── App lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
+  loadCachedAuth();
   createLoginWindow();
   if (!DEV) setupAutoUpdater();
 });
-
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (!loginWin && !gameWin) createLoginWindow(); });

@@ -1,28 +1,40 @@
 {
   "name": "minecraft-client",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Voxel game client",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently \"vite\" \"electron .\"",
     "build": "vite build && tsc -p tsconfig.electron.json",
-    "dist:win":   "npm run build && electron-builder --win   --publish never",
-    "dist:mac":   "npm run build && electron-builder --mac   --publish never",
+    "dist:win": "npm run build && electron-builder --win   --publish never",
+    "dist:mac": "npm run build && electron-builder --mac   --publish never",
     "dist:linux": "npm run build && electron-builder --linux --publish never",
-    "release":    "npm run build && electron-builder --win --linux --publish always"
+    "release": "npm run build && electron-builder --win --linux --publish always"
   },
   "build": {
     "appId": "com.voxelclient.app",
     "productName": "Voxel Client",
-    "files": ["dist/**/*", "dist-electron/**/*"],
-    "directories": { "output": "release" },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
     "publish": {
       "provider": "github",
       "owner": "jordanengrashes-ux",
       "repo": "minecraft-client"
     },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }]
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -34,14 +46,32 @@
       "deleteAppDataOnUninstall": false
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "category": "public.app-category.games",
       "artifactName": "VoxelClient-${version}.dmg"
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb",      "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "category": "Game",
       "artifactName": "VoxelClient-${version}-${arch}.${ext}"
@@ -60,7 +90,6 @@
     "electron-updater": "^6.0.0",
     "firebase": "^10.14.0",
     "minecraft-launcher-core": "^3.18.2",
-    "msmc": "^2.2.3",
     "three": "^0.184.0"
   }
 }

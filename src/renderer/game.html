@@ -310,19 +310,48 @@
       </div>
     </div>
 
-    <!-- Mods panel (same level as #content, inside #launcher) -->
+    <!-- Mods panel -->
     <div id="mods-panel">
-    <div id="mods-hero">
-      <h2>🧩 Mods</h2>
-      <p>Toggle mods on/off. Requires Fabric — installed automatically when you play with mods enabled.</p>
-      <div id="mods-loader-row">
-        <span>Mod Loader</span>
-        <span id="fabric-badge">Fabric (auto)</span>
+      <div id="mods-hero">
+        <h2>🧩 Mods</h2>
+        <p>Toggle mods on/off. Requires Fabric — installed automatically when you play with mods enabled.</p>
+        <div id="mods-loader-row">
+          <span>Mod Loader</span>
+          <span id="fabric-badge">Fabric (auto)</span>
+        </div>
+      </div>
+      <div id="mods-list">
+        <!-- Populated by game.ts -->
       </div>
     </div>
-    <div id="mods-list">
-      <!-- Populated by game.ts -->
+
+    <!-- Settings panel -->
+    <div id="settings-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="padding:24px 32px 20px;border-bottom:1px solid #21262d;background:linear-gradient(135deg,#0d1b12,#0a1628)">
+        <h2 style="font-size:20px;font-weight:700;">⚙️ Settings</h2>
+        <p style="font-size:12px;color:#8b949e;margin-top:4px;">Launcher settings and updates</p>
+      </div>
+      <div style="padding:24px 32px;flex:1;overflow-y:auto;">
+        <div class="section-label">Updates</div>
+        <div class="control-card" style="display:flex;align-items:center;gap:16px;">
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;">Auto-update</div>
+            <div style="font-size:12px;color:#8b949e;margin-top:3px;">Updates download automatically in the background</div>
+          </div>
+          <button id="check-updates-btn" style="padding:8px 18px;background:#21262d;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-size:13px;cursor:pointer;white-space:nowrap;">Check for Updates</button>
+        </div>
+
+        <div class="section-label" style="margin-top:24px;">Microsoft Account</div>
+        <div class="control-card" style="display:flex;align-items:center;gap:16px;">
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;">Sign out of Microsoft</div>
+            <div style="font-size:12px;color:#8b949e;margin-top:3px;">Force re-authentication next launch</div>
+          </div>
+          <button id="mc-reauth-btn" style="padding:8px 18px;background:#21262d;border:1px solid #30363d;border-radius:7px;color:#f85149;font-size:13px;cursor:pointer;white-space:nowrap;">Sign Out</button>
+        </div>
+      </div>
     </div>
+
   </div><!-- end #launcher -->
 
   <!-- Log panel (slide up) -->

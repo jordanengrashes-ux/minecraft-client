@@ -9,17 +9,22 @@ contextBridge.exposeInMainWorld('electron', {
 });
 
 contextBridge.exposeInMainWorld('updater', {
-  onAvailable:   (cb: (ver: string) => void)  => ipcRenderer.on('update-available',  (_e, v) => cb(v)),
-  onProgress:    (cb: (pct: number) => void)  => ipcRenderer.on('update-progress',   (_e, p) => cb(p)),
-  onDownloaded:  (cb: () => void)             => ipcRenderer.on('update-downloaded', () => cb()),
+  onChecking:    (cb: () => void)             => ipcRenderer.on('update-checking',      () => cb()),
+  onAvailable:   (cb: (ver: string) => void)  => ipcRenderer.on('update-available',     (_e, v) => cb(v)),
+  onNotAvailable:(cb: () => void)             => ipcRenderer.on('update-not-available', () => cb()),
+  onProgress:    (cb: (pct: number) => void)  => ipcRenderer.on('update-progress',      (_e, p) => cb(p)),
+  onDownloaded:  (cb: () => void)             => ipcRenderer.on('update-downloaded',    () => cb()),
   install:       () => ipcRenderer.send('install-update'),
+  check:         () => ipcRenderer.send('check-for-updates'),
 });
 
 contextBridge.exposeInMainWorld('mc', {
-  auth:       () => ipcRenderer.invoke('mc-auth'),
-  launch:     (opts: { version: string; maxMem: number }) => ipcRenderer.invoke('mc-launch', opts),
-  onLog:      (cb: (line: string) => void)   => ipcRenderer.on('mc-log',      (_e, l) => cb(l)),
-  onProgress: (cb: (e: any) => void)         => ipcRenderer.on('mc-progress', (_e, e) => cb(e)),
-  onClosed:   (cb: (code: number) => void)   => ipcRenderer.on('mc-closed',   (_e, c) => cb(c)),
-  onError:    (cb: (msg: string) => void)    => ipcRenderer.on('mc-error',    (_e, m) => cb(m)),
+  auth:            () => ipcRenderer.invoke('mc-auth'),
+  reauth:          () => ipcRenderer.invoke('mc-reauth'),
+  launch:          (opts: { version: string; maxMem: number }) => ipcRenderer.invoke('mc-launch', opts),
+  onAlreadyAuthed: (cb: (name: string) => void) => ipcRenderer.on('mc-already-authed', (_e, n) => cb(n)),
+  onLog:           (cb: (line: string) => void) => ipcRenderer.on('mc-log',      (_e, l) => cb(l)),
+  onProgress:      (cb: (e: any) => void)       => ipcRenderer.on('mc-progress', (_e, e) => cb(e)),
+  onClosed:        (cb: (code: number) => void) => ipcRenderer.on('mc-closed',   (_e, c) => cb(c)),
+  onError:         (cb: (msg: string) => void)  => ipcRenderer.on('mc-error',    (_e, m) => cb(m)),
 });
