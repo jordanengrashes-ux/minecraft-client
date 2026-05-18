@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, net } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
 import fs from 'fs';
@@ -57,32 +57,30 @@ function openMicrosoftAuthWindow(): Promise<string> {
     function done(codeOrErr: string, isErr = false) {
       if (resolved) return;
       resolved = true;
-      try { win.close(); } catch {}
+      try { if (!win.isDestroyed()) win.close(); } catch {}
       if (isErr) reject(new Error(codeOrErr));
       else resolve(codeOrErr);
     }
 
-    win.webContents.on('will-redirect', (_e, url) => {
+    function tryUrl(url: string) {
       if (!url.startsWith(MS_REDIRECT)) return;
       const p = new URL(url);
       const code = p.searchParams.get('code');
       const err  = p.searchParams.get('error_description') || p.searchParams.get('error');
       if (code) done(code);
       else done(err || 'Cancelled', true);
-    });
-    win.webContents.on('will-navigate', (_e, url) => {
-      if (url.startsWith(MS_REDIRECT)) {
-        const p = new URL(url);
-        const code = p.searchParams.get('code');
-        if (code) done(code);
-      }
-    });
+    }
+
+    win.webContents.on('will-redirect',          (_e, url) => tryUrl(url));
+    win.webContents.on('will-navigate',           (_e, url) => tryUrl(url));
+    win.webContents.on('did-navigate',            (_e, url) => tryUrl(url));
+    win.webContents.on('did-redirect-navigation', (_e, url) => tryUrl(url));
     win.on('closed', () => done('Window closed', true));
   });
 }
 
-async function fetchJson(url: string, init?: RequestInit): Promise<any> {
-  const res = await fetch(url, init);
+async function fetchJson(url: string, init?: Parameters<typeof net.fetch>[1]): Promise<any> {
+  const res = await net.fetch(url, init);
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
   return res.json();
 }
