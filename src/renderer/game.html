@@ -272,15 +272,18 @@
         <div class="section-label">Game Settings</div>
         <div class="control-grid">
           <div class="control-card">
-            <label>Minecraft Version</label>
+            <label style="display:flex;align-items:center;justify-content:space-between;">
+              Minecraft Version
+              <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#8b949e;">
+                Snapshots
+                <label class="toggle" style="width:34px;height:18px;">
+                  <input type="checkbox" id="snapshots-toggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </span>
+            </label>
             <select id="mc-version">
-              <option value="1.21.4">1.21.4 — Latest Release</option>
-              <option value="1.20.4">1.20.4</option>
-              <option value="1.19.4">1.19.4</option>
-              <option value="1.18.2">1.18.2</option>
-              <option value="1.16.5">1.16.5</option>
-              <option value="1.12.2">1.12.2</option>
-              <option value="1.8.9">1.8.9 — PvP Classic</option>
+              <option disabled>Loading versions…</option>
             </select>
           </div>
           <div class="control-card">

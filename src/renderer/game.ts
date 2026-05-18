@@ -139,6 +139,54 @@ if (mc) {
   });
 }
 
+// ── Version list from Mojang ───────────────────────────────────────────────────
+const snapshotsToggle = document.getElementById('snapshots-toggle') as HTMLInputElement;
+
+type MCVersion = { id: string; type: 'release' | 'snapshot' | 'old_beta' | 'old_alpha' };
+let allVersions: MCVersion[] = [];
+let latestRelease = '';
+
+function populateVersions() {
+  const showSnapshots = snapshotsToggle.checked;
+  const filtered = allVersions.filter(v =>
+    v.type === 'release' || (showSnapshots && v.type === 'snapshot')
+  );
+  const prev = mcVersion.value;
+  mcVersion.innerHTML = '';
+  for (const v of filtered) {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = v.id === latestRelease
+      ? `${v.id} — Latest Release`
+      : v.type === 'snapshot'
+        ? `${v.id} ✦ Snapshot`
+        : v.id;
+    mcVersion.appendChild(opt);
+  }
+  if (filtered.find(v => v.id === prev)) mcVersion.value = prev;
+}
+
+fetch('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json')
+  .then(r => r.json())
+  .then((data: { latest: { release: string }; versions: MCVersion[] }) => {
+    latestRelease = data.latest.release;
+    allVersions = data.versions;
+    populateVersions();
+  })
+  .catch(() => {
+    // Fallback static list if fetch fails
+    allVersions = [
+      { id: '1.21.5', type: 'release' }, { id: '1.21.4', type: 'release' },
+      { id: '1.20.4', type: 'release' }, { id: '1.19.4', type: 'release' },
+      { id: '1.18.2', type: 'release' }, { id: '1.16.5', type: 'release' },
+      { id: '1.12.2', type: 'release' }, { id: '1.8.9',  type: 'release' },
+    ];
+    latestRelease = '1.21.5';
+    populateVersions();
+  });
+
+snapshotsToggle.addEventListener('change', populateVersions);
+
 // ── Memory slider ──────────────────────────────────────────────────────────────
 mcMemory.addEventListener('input', () => {
   mcMemoryVal.textContent = mcMemory.value;
