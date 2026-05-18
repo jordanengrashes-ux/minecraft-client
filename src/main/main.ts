@@ -79,8 +79,9 @@ function openMicrosoftAuthWindow(): Promise<string> {
   });
 }
 
-async function fetchJson(url: string, init?: Parameters<typeof net.fetch>[1]): Promise<any> {
-  const res = await net.fetch(url, init);
+async function fetchJson(url: string, init?: object): Promise<any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const res = await (net.fetch as any)(url, init);
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
   return res.json();
 }
