@@ -118,9 +118,32 @@ ipcMain.on('win-maximize', () => {
   if (w?.isMaximized()) w.unmaximize(); else w?.maximize();
 });
 
+// ── Auto-updater ──────────────────────────────────────────────────────────────
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info) => {
+    gameWin?.webContents.send('update-available', info.version);
+  });
+  autoUpdater.on('download-progress', (p) => {
+    gameWin?.webContents.send('update-progress', Math.round(p.percent));
+  });
+  autoUpdater.on('update-downloaded', () => {
+    gameWin?.webContents.send('update-downloaded');
+  });
+  autoUpdater.on('error', () => { /* ignore update errors silently */ });
+
+  autoUpdater.checkForUpdates().catch(() => {});
+}
+
+ipcMain.on('install-update', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+
 app.whenReady().then(() => {
   createLoginWindow();
-  if (!DEV) autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+  if (!DEV) setupAutoUpdater();
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

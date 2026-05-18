@@ -175,3 +175,32 @@ if (mc) {
 }
 
 setStatus('Ready — login with Microsoft to play');
+
+// ── Auto-updater UI ────────────────────────────────────────────────────────────
+const updater = (window as any).updater;
+if (updater) {
+  const banner       = document.getElementById('update-banner')!;
+  const updateText   = document.getElementById('update-text')!;
+  const progressWrap2= document.getElementById('update-progress-wrap')!;
+  const progressBar2 = document.getElementById('update-progress-bar')!;
+  const installBtn   = document.getElementById('update-install-btn')!;
+
+  updater.onAvailable((ver: string) => {
+    banner.style.display = 'flex';
+    updateText.textContent = `⬇ Update v${ver} downloading…`;
+    progressWrap2.style.display = 'block';
+  });
+
+  updater.onProgress((pct: number) => {
+    progressBar2.style.width = `${pct}%`;
+    updateText.textContent = `⬇ Downloading update… ${pct}%`;
+  });
+
+  updater.onDownloaded(() => {
+    progressWrap2.style.display = 'none';
+    updateText.textContent = '✅ Update ready — restart to apply';
+    installBtn.style.display = 'inline-block';
+  });
+
+  installBtn.addEventListener('click', () => updater.install());
+}

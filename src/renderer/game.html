@@ -163,6 +163,13 @@
   </style>
 </head>
 <body>
+  <!-- Update banner -->
+  <div id="update-banner" style="display:none;position:fixed;top:32px;left:0;right:0;z-index:200;background:#1f3a1f;border-bottom:1px solid #3fb950;padding:7px 16px;font-size:12px;display:none;align-items:center;gap:10px;">
+    <span id="update-text" style="flex:1;color:#aeffae;"></span>
+    <div id="update-progress-wrap" style="width:120px;height:4px;background:#21262d;border-radius:2px;overflow:hidden;display:none"><div id="update-progress-bar" style="height:100%;background:#3fb950;width:0%;transition:width 0.3s;border-radius:2px"></div></div>
+    <button id="update-install-btn" style="display:none;padding:4px 14px;background:#238636;border:1px solid #3fb950;border-radius:6px;color:#fff;font-size:12px;cursor:pointer;">Restart & Update</button>
+  </div>
+
   <div id="titlebar">
     <span id="titlebar-title">VOXEL CLIENT</span>
     <div id="titlebar-btns">

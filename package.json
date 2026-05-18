@@ -1,50 +1,41 @@
 {
   "name": "minecraft-client",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "Voxel game client",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently \"vite\" \"electron .\"",
     "build": "vite build && tsc -p tsconfig.electron.json",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:all": "npm run build && electron-builder --win --mac"
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "release": "npm run build && electron-builder --win --mac --publish always"
   },
   "build": {
-    "appId": "com.minecraft.client",
+    "appId": "com.voxelclient.app",
     "productName": "Voxel Client",
-    "icon": "assets/icon",
-    "files": [
-      "dist/**/*",
-      "dist-electron/**/*"
-    ],
-    "directories": {
-      "output": "release"
+    "files": ["dist/**/*", "dist-electron/**/*"],
+    "directories": { "output": "release" },
+    "publish": {
+      "provider": "github",
+      "owner": "jordanengrashes-ux",
+      "repo": "minecraft-client"
     },
     "win": {
-      "target": [
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Voxel Client",
+      "artifactName": "VoxelClient-Setup-${version}.exe",
+      "deleteAppDataOnUninstall": false
     },
     "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
-      "category": "public.app-category.games"
-    },
-    "portable": {
-      "artifactName": "VoxelClient-${version}-portable.exe"
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "category": "public.app-category.games",
+      "artifactName": "VoxelClient-${version}.dmg"
     }
   },
   "devDependencies": {

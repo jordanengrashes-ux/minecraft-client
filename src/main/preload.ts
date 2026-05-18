@@ -8,6 +8,13 @@ contextBridge.exposeInMainWorld('electron', {
   maximize:     () => ipcRenderer.send('win-maximize'),
 });
 
+contextBridge.exposeInMainWorld('updater', {
+  onAvailable:   (cb: (ver: string) => void)  => ipcRenderer.on('update-available',  (_e, v) => cb(v)),
+  onProgress:    (cb: (pct: number) => void)  => ipcRenderer.on('update-progress',   (_e, p) => cb(p)),
+  onDownloaded:  (cb: () => void)             => ipcRenderer.on('update-downloaded', () => cb()),
+  install:       () => ipcRenderer.send('install-update'),
+});
+
 contextBridge.exposeInMainWorld('mc', {
   auth:       () => ipcRenderer.invoke('mc-auth'),
   launch:     (opts: { version: string; maxMem: number }) => ipcRenderer.invoke('mc-launch', opts),

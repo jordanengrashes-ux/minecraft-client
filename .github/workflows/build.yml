@@ -15,12 +15,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run dist:win
+      - run: npm run build && electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: release/*.exe
 
   build-mac:
     runs-on: macos-latest
@@ -31,9 +28,6 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run dist:mac
+      - run: npm run build && electron-builder --mac --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: release/*.dmg
