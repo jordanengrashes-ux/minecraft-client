@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Voxel Client</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; width: 100vw; height: 100vh; }
+    #titlebar {
+      position: fixed; top: 0; left: 0; right: 0; height: 28px;
+      display: flex; align-items: center; justify-content: flex-end;
+      padding: 0 6px; -webkit-app-region: drag; z-index: 200;
+      background: rgba(0,0,0,0.4);
+    }
+    .tbtn { -webkit-app-region: no-drag; background: none; border: none; color: #888; font-size: 14px; cursor: pointer; padding: 3px 9px; border-radius: 4px; }
+    .tbtn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    #close-btn:hover { background: #c42b1c; color: #fff; }
+    canvas { display: block; }
+    #crosshair { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); color: rgba(255,255,255,0.8); font-size: 24px; pointer-events: none; text-shadow: 0 0 4px #000; z-index: 10; }
+    #hud { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 8px; z-index: 10; pointer-events: none; }
+    .slot { width: 52px; height: 52px; background: rgba(0,0,0,0.55); border: 2px solid rgba(255,255,255,0.25); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .slot.active { border-color: #fff; background: rgba(255,255,255,0.15); }
+    #info { position: fixed; top: 36px; left: 12px; color: #fff; font-family: monospace; font-size: 12px; text-shadow: 1px 1px 2px #000; z-index: 10; pointer-events: none; line-height: 1.7; }
+    #chat-box { position: fixed; bottom: 70px; left: 12px; width: 380px; z-index: 10; }
+    #chat-log { max-height: 140px; overflow-y: auto; margin-bottom: 4px; display: flex; flex-direction: column; gap: 2px; }
+    .chat-msg { background: rgba(0,0,0,0.55); color: #fff; font-family: monospace; font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+    #chat-input { width: 100%; padding: 6px 10px; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: #fff; font-family: monospace; font-size: 13px; display: none; outline: none; }
+    #click-to-play { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-family: monospace; z-index: 50; cursor: pointer; }
+    #click-to-play h1 { font-size: 36px; margin-bottom: 12px; }
+    #click-to-play p { font-size: 16px; opacity: 0.7; }
+  </style>
+</head>
+<body>
+  <div id="titlebar">
+    <button class="tbtn" onclick="window.electron?.minimize()">─</button>
+    <button class="tbtn" onclick="window.electron?.maximize()">□</button>
+    <button class="tbtn" id="close-btn" onclick="window.electron?.close()">✕</button>
+  </div>
+  <div id="click-to-play"><h1>🌿 VOXEL CLIENT</h1><p>Click to play</p></div>
+  <div id="crosshair">+</div>
+  <div id="info">
+    <div id="info-pos"></div>
+    <div id="info-block"></div>
+    <div id="info-fps"></div>
+    <div id="info-player"></div>
+  </div>
+  <div id="hud">
+    <div class="slot active" id="slot-0">🪨</div>
+    <div class="slot" id="slot-1">🟫</div>
+    <div class="slot" id="slot-2">🌿</div>
+    <div class="slot" id="slot-3">🪵</div>
+    <div class="slot" id="slot-4">🏖️</div>
+    <div class="slot" id="slot-5">🧊</div>
+    <div class="slot" id="slot-6">🪟</div>
+    <div class="slot" id="slot-7">💡</div>
+    <div class="slot" id="slot-8">🔥</div>
+  </div>
+  <div id="chat-box">
+    <div id="chat-log"></div>
+    <input id="chat-input" placeholder="Press T to chat…" maxlength="100" />
+  </div>
+  <script type="module" src="./game.ts"></script>
+</body>
+</html>

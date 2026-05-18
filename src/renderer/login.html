@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxel Client</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    /* custom title bar */
+    #titlebar {
+      position: fixed; top: 0; left: 0; right: 0; height: 32px;
+      display: flex; align-items: center; justify-content: flex-end;
+      padding: 0 8px; -webkit-app-region: drag; z-index: 100;
+    }
+    .tbtn {
+      -webkit-app-region: no-drag;
+      background: none; border: none; color: #888;
+      font-size: 16px; cursor: pointer; padding: 4px 10px; border-radius: 4px;
+    }
+    .tbtn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    #close:hover { background: #c42b1c; color: #fff; }
+
+    .logo {
+      font-size: 48px; font-weight: 900; letter-spacing: 4px;
+      background: linear-gradient(135deg, #4cff91, #00c8ff);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    .subtitle { color: #666; font-size: 13px; margin-bottom: 40px; letter-spacing: 1px; }
+    .card {
+      background: #111118; border: 1px solid #222; border-radius: 16px;
+      padding: 36px 40px; width: 360px;
+    }
+    .tab-row { display: flex; margin-bottom: 28px; gap: 4px; }
+    .tab {
+      flex: 1; padding: 8px; background: none; border: 1px solid #333;
+      color: #666; font-size: 13px; cursor: pointer; border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .tab.active { background: #1a1a2e; border-color: #4cff91; color: #4cff91; }
+    input {
+      width: 100%; padding: 12px 14px; background: #0d0d15;
+      border: 1px solid #2a2a3a; border-radius: 8px; color: #fff;
+      font-size: 14px; margin-bottom: 14px; outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #4cff91; }
+    .btn {
+      width: 100%; padding: 13px; background: linear-gradient(135deg, #4cff91, #00c8ff);
+      border: none; border-radius: 8px; color: #000; font-weight: 700;
+      font-size: 15px; cursor: pointer; margin-top: 4px; transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .err { color: #ff4444; font-size: 12px; margin-top: 10px; text-align: center; min-height: 18px; }
+    .divider { border: none; border-top: 1px solid #222; margin: 20px 0; }
+    .google-btn {
+      width: 100%; padding: 11px; background: #1a1a2a; border: 1px solid #333;
+      border-radius: 8px; color: #fff; font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: background 0.2s;
+    }
+    .google-btn:hover { background: #222233; }
+  </style>
+</head>
+<body>
+  <div id="titlebar">
+    <button class="tbtn" onclick="window.electron?.minimize()">─</button>
+    <button class="tbtn" id="close" onclick="window.electron?.close()">✕</button>
+  </div>
+
+  <div class="logo">VOXEL</div>
+  <div class="subtitle">COMMUNITY CLIENT</div>
+
+  <div class="card">
+    <div class="tab-row">
+      <button class="tab active" id="tab-login"    onclick="switchTab('login')">Sign In</button>
+      <button class="tab"        id="tab-register" onclick="switchTab('register')">Register</button>
+    </div>
+
+    <div id="form-login">
+      <input id="l-email"    type="email"    placeholder="Email" />
+      <input id="l-password" type="password" placeholder="Password" />
+      <button class="btn" id="btn-login" onclick="doLogin()">PLAY</button>
+      <hr class="divider" />
+      <button class="google-btn" onclick="doGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+
+    <div id="form-register" style="display:none">
+      <input id="r-name"     type="text"     placeholder="Username" />
+      <input id="r-email"    type="email"    placeholder="Email" />
+      <input id="r-password" type="password" placeholder="Password (min 6 chars)" />
+      <button class="btn" id="btn-register" onclick="doRegister()">CREATE ACCOUNT</button>
+    </div>
+
+    <div class="err" id="err-msg"></div>
+  </div>
+
+  <script type="module" src="./login.ts"></script>
+</body>
+</html>
