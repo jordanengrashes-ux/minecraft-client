@@ -5,29 +5,108 @@
   <title>Voxel Client</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; overflow: hidden; width: 100vw; height: 100vh; }
+    body { background: #000; overflow: hidden; width: 100vw; height: 100vh; font-family: monospace; }
+
+    /* ── Title bar ── */
     #titlebar {
       position: fixed; top: 0; left: 0; right: 0; height: 28px;
       display: flex; align-items: center; justify-content: flex-end;
-      padding: 0 6px; -webkit-app-region: drag; z-index: 200;
-      background: rgba(0,0,0,0.4);
+      padding: 0 6px; -webkit-app-region: drag; z-index: 500;
+      background: rgba(0,0,0,0.5);
     }
     .tbtn { -webkit-app-region: no-drag; background: none; border: none; color: #888; font-size: 14px; cursor: pointer; padding: 3px 9px; border-radius: 4px; }
     .tbtn:hover { background: rgba(255,255,255,0.1); color: #fff; }
     #close-btn:hover { background: #c42b1c; color: #fff; }
+
     canvas { display: block; }
-    #crosshair { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); color: rgba(255,255,255,0.8); font-size: 24px; pointer-events: none; text-shadow: 0 0 4px #000; z-index: 10; }
-    #hud { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 8px; z-index: 10; pointer-events: none; }
+
+    /* ── Main menu ── */
+    #main-menu {
+      position: fixed; inset: 0; z-index: 100;
+      background: linear-gradient(180deg, #1a3a1a 0%, #0d1a0d 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: #fff;
+    }
+    #main-menu h1 { font-size: 42px; letter-spacing: 4px; color: #5dff5d; text-shadow: 0 0 20px #3aff3a; margin-bottom: 8px; }
+    #main-menu .subtitle { color: #888; font-size: 13px; letter-spacing: 2px; margin-bottom: 48px; }
+    .menu-btn {
+      width: 280px; padding: 14px 0; margin: 8px 0;
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px; color: #fff; font-family: monospace; font-size: 16px;
+      cursor: pointer; letter-spacing: 1px; transition: background 0.15s, border-color 0.15s;
+    }
+    .menu-btn:hover { background: rgba(93,255,93,0.12); border-color: #5dff5d; color: #5dff5d; }
+    .menu-btn.primary { background: rgba(93,255,93,0.18); border-color: #5dff5d; }
+
+    /* ── Server browser ── */
+    #server-browser {
+      position: fixed; inset: 0; z-index: 110;
+      background: rgba(0,0,0,0.92); backdrop-filter: blur(4px);
+      display: none; flex-direction: column; align-items: center; justify-content: center; color: #fff;
+    }
+    #server-browser h2 { font-size: 22px; color: #5dff5d; letter-spacing: 3px; margin-bottom: 32px; }
+    .sb-row { display: flex; gap: 10px; margin-bottom: 14px; width: 420px; }
+    .sb-input {
+      flex: 1; padding: 11px 14px; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 7px;
+      color: #fff; font-family: monospace; font-size: 14px; outline: none;
+    }
+    .sb-input:focus { border-color: #5dff5d; }
+    .sb-input::placeholder { color: #555; }
+    #sb-connect { padding: 11px 28px; background: #1a5c1a; border: 1px solid #5dff5d; border-radius: 7px; color: #5dff5d; font-family: monospace; font-size: 15px; cursor: pointer; }
+    #sb-connect:hover { background: #2a8c2a; }
+    #sb-back { padding: 11px 28px; background: rgba(255,255,255,0.05); border: 1px solid #444; border-radius: 7px; color: #888; font-family: monospace; font-size: 15px; cursor: pointer; }
+    #sb-back:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    #sb-status { width: 420px; min-height: 24px; color: #aaa; font-size: 13px; text-align: center; margin-top: 6px; }
+    #sb-status.error { color: #ff5555; }
+    #sb-status.ok { color: #5dff5d; }
+    #sb-status.warn { color: #ffcc44; }
+
+    /* ── Device code prompt ── */
+    #device-code-box {
+      display: none; margin-top: 18px; width: 420px;
+      background: rgba(255,204,0,0.08); border: 1px solid #aa8800;
+      border-radius: 10px; padding: 20px; text-align: center;
+    }
+    #device-code-box p { color: #ccc; font-size: 13px; margin-bottom: 10px; }
+    #device-code-url { color: #5dff5d; font-size: 14px; margin-bottom: 10px; }
+    #device-code-val { font-size: 28px; letter-spacing: 6px; color: #ffcc44; font-weight: bold; }
+
+    /* ── In-game HUD ── */
+    #crosshair { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); color: rgba(255,255,255,0.8); font-size: 24px; pointer-events: none; text-shadow: 0 0 4px #000; z-index: 10; display: none; }
+    #hud { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); display: none; gap: 4px; padding: 8px; z-index: 10; pointer-events: none; }
     .slot { width: 52px; height: 52px; background: rgba(0,0,0,0.55); border: 2px solid rgba(255,255,255,0.25); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
     .slot.active { border-color: #fff; background: rgba(255,255,255,0.15); }
-    #info { position: fixed; top: 36px; left: 12px; color: #fff; font-family: monospace; font-size: 12px; text-shadow: 1px 1px 2px #000; z-index: 10; pointer-events: none; line-height: 1.7; }
-    #chat-box { position: fixed; bottom: 70px; left: 12px; width: 380px; z-index: 10; }
-    #chat-log { max-height: 140px; overflow-y: auto; margin-bottom: 4px; display: flex; flex-direction: column; gap: 2px; }
-    .chat-msg { background: rgba(0,0,0,0.55); color: #fff; font-family: monospace; font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+    #info { position: fixed; top: 36px; left: 12px; color: #fff; font-family: monospace; font-size: 12px; text-shadow: 1px 1px 2px #000; z-index: 10; pointer-events: none; line-height: 1.7; display: none; }
+
+    /* ── Server status banner (connected) ── */
+    #server-bar {
+      display: none; position: fixed; top: 28px; left: 0; right: 0; z-index: 20;
+      background: rgba(0,80,0,0.7); padding: 5px 16px;
+      font-size: 12px; color: #aeffae; letter-spacing: 1px;
+      display: none; align-items: center; gap: 16px;
+    }
+    #server-bar span { color: #fff; }
+
+    /* ── Chat ── */
+    #chat-box { position: fixed; bottom: 70px; left: 12px; width: 420px; z-index: 10; display: none; }
+    #chat-log { max-height: 160px; overflow-y: auto; margin-bottom: 4px; display: flex; flex-direction: column; gap: 2px; }
+    .chat-msg { background: rgba(0,0,0,0.55); color: #fff; font-family: monospace; font-size: 12px; padding: 2px 8px; border-radius: 4px; word-break: break-all; }
+    .chat-msg.mc { border-left: 2px solid #5dff5d; }
     #chat-input { width: 100%; padding: 6px 10px; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: #fff; font-family: monospace; font-size: 13px; display: none; outline: none; }
-    #click-to-play { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-family: monospace; z-index: 50; cursor: pointer; }
+
+    /* ── Click-to-play (local mode) ── */
+    #click-to-play { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-family: monospace; z-index: 50; cursor: pointer; }
     #click-to-play h1 { font-size: 36px; margin-bottom: 12px; }
     #click-to-play p { font-size: 16px; opacity: 0.7; }
+
+    /* ── Disconnect overlay ── */
+    #disconnected {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; color: #fff;
+    }
+    #disconnected h2 { font-size: 28px; color: #ff5555; margin-bottom: 16px; }
+    #disconnected p { color: #ccc; font-size: 14px; margin-bottom: 32px; max-width: 400px; text-align: center; }
   </style>
 </head>
 <body>
@@ -36,7 +115,47 @@
     <button class="tbtn" onclick="window.electron?.maximize()">□</button>
     <button class="tbtn" id="close-btn" onclick="window.electron?.close()">✕</button>
   </div>
-  <div id="click-to-play"><h1>🌿 VOXEL CLIENT</h1><p>Click to play</p></div>
+
+  <!-- ── Main menu ── -->
+  <div id="main-menu">
+    <h1>⛏ VOXEL CLIENT</h1>
+    <div class="subtitle">MINECRAFT JAVA EDITION</div>
+    <button class="menu-btn primary" id="btn-multiplayer">🌐 Join Server (Multiplayer)</button>
+    <button class="menu-btn" id="btn-local">🌿 Play Local World</button>
+  </div>
+
+  <!-- ── Server browser ── -->
+  <div id="server-browser">
+    <h2>JOIN SERVER</h2>
+    <div class="sb-row">
+      <input class="sb-input" id="sb-host" placeholder="Server IP  (e.g. hypixel.net)" style="flex:2" />
+      <input class="sb-input" id="sb-port" placeholder="Port" style="flex:0.6; width:80px" value="25565" />
+    </div>
+    <div class="sb-row" style="margin-bottom:6px">
+      <input class="sb-input" id="sb-user" placeholder="Microsoft account email" />
+    </div>
+    <div class="sb-row" style="justify-content:center; gap:12px">
+      <button id="sb-back">← Back</button>
+      <button id="sb-connect">Connect →</button>
+    </div>
+    <div id="sb-status"></div>
+    <div id="device-code-box">
+      <p>Sign in with your Microsoft account:</p>
+      <div id="device-code-url"></div>
+      <div id="device-code-val"></div>
+      <p style="margin-top:10px;font-size:11px;color:#888">Enter the code above at the URL, then wait…</p>
+    </div>
+  </div>
+
+  <!-- ── Disconnected screen ── -->
+  <div id="disconnected">
+    <h2>Disconnected</h2>
+    <p id="disconnect-reason"></p>
+    <button class="menu-btn" id="btn-reconnect" style="width:220px">🔄 Back to Menu</button>
+  </div>
+
+  <!-- ── In-game (local world) ── -->
+  <div id="click-to-play"><h1>🌿 LOCAL WORLD</h1><p>Click to play</p></div>
   <div id="crosshair">+</div>
   <div id="info">
     <div id="info-pos"></div>
@@ -55,10 +174,18 @@
     <div class="slot" id="slot-7">💡</div>
     <div class="slot" id="slot-8">🔥</div>
   </div>
+
+  <!-- ── Server status bar (when connected to real MC) ── -->
+  <div id="server-bar">
+    🟢 Connected to <span id="server-bar-host"></span> as <span id="server-bar-user"></span>
+  </div>
+
+  <!-- ── Chat (shared between local and MC) ── -->
   <div id="chat-box">
     <div id="chat-log"></div>
-    <input id="chat-input" placeholder="Press T to chat…" maxlength="100" />
+    <input id="chat-input" placeholder="Press T to chat…" maxlength="256" />
   </div>
+
   <script type="module" src="./game.ts"></script>
 </body>
 </html>

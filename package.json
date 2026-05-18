@@ -14,13 +14,33 @@
     "appId": "com.minecraft.client",
     "productName": "Voxel Client",
     "icon": "assets/icon",
-    "files": ["dist/**/*", "dist-electron/**/*"],
-    "directories": { "output": "release" },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
     "win": {
-      "target": [{ "target": "portable", "arch": ["x64"] }]
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "category": "public.app-category.games"
     },
     "portable": {
@@ -39,6 +59,7 @@
   "dependencies": {
     "electron-updater": "^6.0.0",
     "firebase": "^10.14.0",
+    "minecraft-protocol": "^1.66.2",
     "three": "^0.184.0"
   }
 }
