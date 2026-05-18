@@ -160,6 +160,61 @@
       background: none; border: none; color: #484f58; font-size: 11px; cursor: pointer; padding: 0;
     }
     #log-toggle:hover { color: #8b949e; }
+
+    /* ── Mods panel ── */
+    #mods-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+    #mods-hero {
+      padding: 24px 32px 20px; border-bottom: 1px solid #21262d;
+      background: linear-gradient(135deg,#0d1b12,#0a1628);
+    }
+    #mods-hero h2 { font-size: 20px; font-weight: 700; }
+    #mods-hero p  { font-size: 12px; color: #8b949e; margin-top: 4px; }
+    #mods-loader-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-top: 14px; padding: 10px 14px;
+      background: rgba(63,185,80,0.07); border: 1px solid rgba(63,185,80,0.2);
+      border-radius: 8px; font-size: 12px; color: #8b949e;
+    }
+    #mods-loader-row span { flex: 1; }
+    #fabric-badge {
+      padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+      background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.3);
+    }
+    #mods-list { flex: 1; overflow-y: auto; padding: 20px 32px; display: flex; flex-direction: column; gap: 10px; }
+    .mod-card {
+      display: flex; align-items: center; gap: 14px;
+      background: #161b22; border: 1px solid #21262d; border-radius: 10px;
+      padding: 14px 16px; transition: border-color 0.15s;
+    }
+    .mod-card:hover { border-color: #30363d; }
+    .mod-card.enabled { border-color: rgba(63,185,80,0.35); background: rgba(63,185,80,0.04); }
+    .mod-icon { font-size: 26px; width: 38px; text-align: center; flex-shrink: 0; }
+    .mod-info { flex: 1; min-width: 0; }
+    .mod-name { font-size: 14px; font-weight: 600; color: #e6edf3; }
+    .mod-desc { font-size: 12px; color: #8b949e; margin-top: 3px; }
+    .mod-tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .mod-tag {
+      font-size: 10px; padding: 2px 8px; border-radius: 10px;
+      background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid #30363d;
+    }
+    .mod-tag.perf  { background: rgba(255,165,0,0.1);  color: #d29922; border-color: rgba(255,165,0,0.2); }
+    .mod-tag.visual{ background: rgba(130,80,255,0.1); color: #a371f7; border-color: rgba(130,80,255,0.2); }
+    .mod-tag.util  { background: rgba(63,185,80,0.1);  color: #3fb950; border-color: rgba(63,185,80,0.2); }
+    .mod-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+    .mod-version { font-size: 11px; color: #484f58; }
+    /* Toggle switch */
+    .toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: #21262d; border-radius: 24px;
+      border: 1px solid #30363d; transition: all 0.2s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; width: 16px; height: 16px;
+      left: 3px; top: 3px; background: #484f58; border-radius: 50%; transition: all 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: rgba(63,185,80,0.2); border-color: #3fb950; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(20px); background: #3fb950; }
   </style>
 </head>
 <body>
@@ -186,9 +241,9 @@
         <h1>⛏ VOXEL</h1>
         <p>Minecraft Launcher</p>
       </div>
-      <div class="nav-item active">🎮 &nbsp;Play</div>
-      <div class="nav-item" style="margin-top:4px">📦 &nbsp;Versions</div>
-      <div class="nav-item">⚙️ &nbsp;Settings</div>
+      <div class="nav-item active" id="nav-play">🎮 &nbsp;Play</div>
+      <div class="nav-item" id="nav-mods" style="margin-top:4px">🧩 &nbsp;Mods</div>
+      <div class="nav-item" id="nav-settings">⚙️ &nbsp;Settings</div>
       <div id="sidebar-bottom">
         <div id="user-chip">
           <div id="user-avatar">👤</div>
@@ -254,7 +309,21 @@
         <button id="log-toggle" style="display:none">Show log ▲</button>
       </div>
     </div>
-  </div>
+
+    <!-- Mods panel (same level as #content, inside #launcher) -->
+    <div id="mods-panel">
+    <div id="mods-hero">
+      <h2>🧩 Mods</h2>
+      <p>Toggle mods on/off. Requires Fabric — installed automatically when you play with mods enabled.</p>
+      <div id="mods-loader-row">
+        <span>Mod Loader</span>
+        <span id="fabric-badge">Fabric (auto)</span>
+      </div>
+    </div>
+    <div id="mods-list">
+      <!-- Populated by game.ts -->
+    </div>
+  </div><!-- end #launcher -->
 
   <!-- Log panel (slide up) -->
   <div id="log-panel"></div>

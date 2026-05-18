@@ -2,6 +2,100 @@
 
 const mc = (window as any).mc;
 
+// ── Mod definitions ────────────────────────────────────────────────────────────
+const MODS = [
+  {
+    id: 'sodium',
+    name: 'Sodium',
+    desc: 'Massive FPS boost — replaces the vanilla renderer. Most popular performance mod.',
+    icon: '⚡',
+    tags: [{ label: 'Performance', cls: 'perf' }],
+    version: '0.5.11',
+    defaultOn: true,
+  },
+  {
+    id: 'iris',
+    name: 'Iris Shaders',
+    desc: 'Adds shader support compatible with Sodium. Run OptiFine shaders without OptiFine.',
+    icon: '🌅',
+    tags: [{ label: 'Visual', cls: 'visual' }, { label: 'Shaders', cls: 'visual' }],
+    version: '1.7.5',
+    defaultOn: false,
+  },
+  {
+    id: 'lithium',
+    name: 'Lithium',
+    desc: 'Optimises game physics, mob AI, and block ticking. Works great alongside Sodium.',
+    icon: '🪨',
+    tags: [{ label: 'Performance', cls: 'perf' }],
+    version: '0.12.7',
+    defaultOn: true,
+  },
+  {
+    id: 'fabric-api',
+    name: 'Fabric API',
+    desc: 'Required by most Fabric mods. Provides core hooks and utilities.',
+    icon: '📦',
+    tags: [{ label: 'Utility', cls: 'util' }],
+    version: '0.97.8',
+    defaultOn: true,
+  },
+  {
+    id: 'ferritecore',
+    name: 'FerriteCore',
+    desc: 'Reduces memory usage significantly — useful if you have less than 8 GB RAM.',
+    icon: '🧲',
+    tags: [{ label: 'Performance', cls: 'perf' }],
+    version: '6.0.3',
+    defaultOn: false,
+  },
+  {
+    id: 'modmenu',
+    name: 'Mod Menu',
+    desc: 'Adds a mods button to the in-game pause menu so you can see what\'s installed.',
+    icon: '📋',
+    tags: [{ label: 'Utility', cls: 'util' }],
+    version: '11.0.3',
+    defaultOn: true,
+  },
+  {
+    id: 'entityculling',
+    name: 'Entity Culling',
+    desc: 'Skips rendering entities and block entities that are not visible to you.',
+    icon: '👁',
+    tags: [{ label: 'Performance', cls: 'perf' }],
+    version: '1.7.2',
+    defaultOn: true,
+  },
+  {
+    id: 'betterf3',
+    name: 'BetterF3',
+    desc: 'Makes the F3 debug screen colourful, readable, and customisable.',
+    icon: '🔢',
+    tags: [{ label: 'Utility', cls: 'util' }],
+    version: '7.0.2',
+    defaultOn: false,
+  },
+  {
+    id: 'replaymod',
+    name: 'ReplayMod',
+    desc: 'Record and replay your gameplay. Great for content creators.',
+    icon: '🎬',
+    tags: [{ label: 'Utility', cls: 'util' }],
+    version: '2.6.15',
+    defaultOn: false,
+  },
+  {
+    id: 'minimap',
+    name: 'Xaero\'s Minimap',
+    desc: 'Adds a minimap to the corner of your screen with waypoints.',
+    icon: '🗺️',
+    tags: [{ label: 'Utility', cls: 'util' }],
+    version: '24.5.0',
+    defaultOn: false,
+  },
+] as const;
+
 // ── DOM ────────────────────────────────────────────────────────────────────────
 const userName      = document.getElementById('user-name')!;
 const mcIgnBadge    = document.getElementById('mc-username-badge')!;
@@ -175,6 +269,65 @@ if (mc) {
 }
 
 setStatus('Ready — login with Microsoft to play');
+
+// ── Nav switching ─────────────────────────────────────────────────────────────
+const contentEl  = document.getElementById('content')!;
+const modsPanelEl= document.getElementById('mods-panel')!;
+const navPlay    = document.getElementById('nav-play')!;
+const navMods    = document.getElementById('nav-mods')!;
+
+function showPlay() {
+  contentEl.style.display   = 'flex';
+  modsPanelEl.style.display = 'none';
+  navPlay.classList.add('active');
+  navMods.classList.remove('active');
+}
+function showMods() {
+  contentEl.style.display   = 'none';
+  modsPanelEl.style.display = 'flex';
+  navPlay.classList.remove('active');
+  navMods.classList.add('active');
+}
+navPlay.addEventListener('click', showPlay);
+navMods.addEventListener('click', showMods);
+
+// ── Build mods list ────────────────────────────────────────────────────────────
+const enabledMods = new Set<string>(MODS.filter(m => m.defaultOn).map(m => m.id));
+const modsList = document.getElementById('mods-list')!;
+
+function renderMods() {
+  modsList.innerHTML = '';
+  for (const mod of MODS) {
+    const on = enabledMods.has(mod.id);
+    const card = document.createElement('div');
+    card.className = 'mod-card' + (on ? ' enabled' : '');
+    card.innerHTML = `
+      <div class="mod-icon">${mod.icon}</div>
+      <div class="mod-info">
+        <div class="mod-name">${mod.name}</div>
+        <div class="mod-desc">${mod.desc}</div>
+        <div class="mod-tags">
+          ${mod.tags.map(t => `<span class="mod-tag ${t.cls}">${t.label}</span>`).join('')}
+        </div>
+      </div>
+      <div class="mod-right">
+        <span class="mod-version">v${mod.version}</span>
+        <label class="toggle">
+          <input type="checkbox" data-mod="${mod.id}" ${on ? 'checked' : ''} />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    `;
+    card.querySelector('input')!.addEventListener('change', (e) => {
+      const checked = (e.target as HTMLInputElement).checked;
+      if (checked) enabledMods.add(mod.id); else enabledMods.delete(mod.id);
+      card.className = 'mod-card' + (checked ? ' enabled' : '');
+    });
+    modsList.appendChild(card);
+  }
+}
+
+renderMods();
 
 // ── Auto-updater UI ────────────────────────────────────────────────────────────
 const updater = (window as any).updater;

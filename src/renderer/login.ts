@@ -1,91 +1,113 @@
 import { loginEmail, registerEmail, loginGoogle } from './firebase';
 
-declare global {
-  interface Window {
-    electron?: { loginSuccess: (d: object) => void; close: () => void; minimize: () => void; maximize: () => void; };
-    switchTab: (t: string) => void;
-    doLogin: () => void;
-    doRegister: () => void;
-    doGoogle: () => void;
-  }
-}
+const errEl   = document.getElementById('err-msg')     as HTMLElement;
+const btnLogin    = document.getElementById('btn-login')    as HTMLButtonElement;
+const btnRegister = document.getElementById('btn-register') as HTMLButtonElement;
+const btnGoogle   = document.getElementById('btn-google')   as HTMLButtonElement;
+const tabLogin    = document.getElementById('tab-login')    as HTMLButtonElement;
+const tabRegister = document.getElementById('tab-register') as HTMLButtonElement;
+const formLogin   = document.getElementById('form-login')   as HTMLElement;
+const formRegister= document.getElementById('form-register')as HTMLElement;
 
-function showErr(msg: string) {
-  (document.getElementById('err-msg') as HTMLElement).textContent = msg;
-}
+// title bar
+document.getElementById('btn-minimize')!.addEventListener('click', () => window.electron?.minimize());
+document.getElementById('close')!       .addEventListener('click', () => window.electron?.close());
 
-function setLoading(id: string, loading: boolean) {
-  const btn = document.getElementById(id) as HTMLButtonElement;
-  btn.disabled = loading;
-  btn.textContent = loading ? 'Please wait…' : (id === 'btn-login' ? 'PLAY' : 'CREATE ACCOUNT');
+function showErr(msg: string) { errEl.textContent = msg; }
+
+function setLoading(btn: HTMLButtonElement, loading: boolean, label: string) {
+  btn.disabled    = loading;
+  btn.textContent = loading ? 'Please wait…' : label;
 }
 
 function onSuccess(data: { uid: string; name: string }) {
   if (window.electron) {
     window.electron.loginSuccess(data);
   } else {
-    // dev fallback — redirect to game page in browser
     sessionStorage.setItem('userData', JSON.stringify(data));
     window.location.href = './game.html';
   }
 }
 
-window.switchTab = (tab: string) => {
-  const isLogin = tab === 'login';
-  (document.getElementById('form-login')    as HTMLElement).style.display = isLogin ? '' : 'none';
-  (document.getElementById('form-register') as HTMLElement).style.display = isLogin ? 'none' : '';
-  (document.getElementById('tab-login')     as HTMLElement).classList.toggle('active', isLogin);
-  (document.getElementById('tab-register')  as HTMLElement).classList.toggle('active', !isLogin);
+// ── Tab switching ─────────────────────────────────────────────────────────────
+tabLogin.addEventListener('click', () => {
+  formLogin.style.display    = '';
+  formRegister.style.display = 'none';
+  tabLogin.classList.add('active');
+  tabRegister.classList.remove('active');
   showErr('');
-};
+});
 
-window.doLogin = async () => {
+tabRegister.addEventListener('click', () => {
+  formLogin.style.display    = 'none';
+  formRegister.style.display = '';
+  tabLogin.classList.remove('active');
+  tabRegister.classList.add('active');
+  showErr('');
+});
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+btnLogin.addEventListener('click', async () => {
   const email    = (document.getElementById('l-email')    as HTMLInputElement).value.trim();
   const password = (document.getElementById('l-password') as HTMLInputElement).value;
   if (!email || !password) { showErr('Fill in all fields.'); return; }
-  setLoading('btn-login', true);
+  setLoading(btnLogin, true, 'PLAY');
   try {
-    const data = await loginEmail(email, password);
-    onSuccess(data);
+    onSuccess(await loginEmail(email, password));
   } catch (e: any) {
     showErr(friendlyError(e.code));
-    setLoading('btn-login', false);
+    setLoading(btnLogin, false, 'PLAY');
   }
-};
+});
 
-window.doRegister = async () => {
+// ── Register ──────────────────────────────────────────────────────────────────
+btnRegister.addEventListener('click', async () => {
   const name     = (document.getElementById('r-name')     as HTMLInputElement).value.trim();
   const email    = (document.getElementById('r-email')    as HTMLInputElement).value.trim();
   const password = (document.getElementById('r-password') as HTMLInputElement).value;
   if (!name || !email || !password) { showErr('Fill in all fields.'); return; }
   if (password.length < 6) { showErr('Password must be at least 6 characters.'); return; }
-  setLoading('btn-register', true);
+  setLoading(btnRegister, true, 'CREATE ACCOUNT');
   try {
-    const data = await registerEmail(email, password, name);
-    onSuccess(data);
+    onSuccess(await registerEmail(email, password, name));
   } catch (e: any) {
     showErr(friendlyError(e.code));
-    setLoading('btn-register', false);
+    setLoading(btnRegister, false, 'CREATE ACCOUNT');
   }
-};
+});
 
-window.doGoogle = async () => {
+// ── Google ────────────────────────────────────────────────────────────────────
+btnGoogle.addEventListener('click', async () => {
+  btnGoogle.disabled = true;
   try {
-    const data = await loginGoogle();
-    onSuccess(data);
+    onSuccess(await loginGoogle());
   } catch (e: any) {
     showErr(friendlyError(e.code));
+    btnGoogle.disabled = false;
   }
-};
+});
+
+// ── Enter key support ─────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (formLogin.style.display !== 'none') btnLogin.click();
+  else btnRegister.click();
+});
 
 function friendlyError(code: string): string {
   const map: Record<string, string> = {
-    'auth/invalid-credential':      'Wrong email or password.',
-    'auth/email-already-in-use':    'Email already registered.',
-    'auth/weak-password':           'Password too weak.',
-    'auth/invalid-email':           'Invalid email address.',
-    'auth/user-not-found':          'No account with that email.',
-    'auth/popup-closed-by-user':    'Sign-in cancelled.',
+    'auth/invalid-credential':   'Wrong email or password.',
+    'auth/email-already-in-use': 'Email already registered.',
+    'auth/weak-password':        'Password too weak.',
+    'auth/invalid-email':        'Invalid email address.',
+    'auth/user-not-found':       'No account with that email.',
+    'auth/popup-closed-by-user': 'Sign-in cancelled.',
   };
   return map[code] ?? 'Something went wrong. Try again.';
+}
+
+declare global {
+  interface Window {
+    electron?: { loginSuccess: (d: object) => void; close: () => void; minimize: () => void; maximize: () => void; };
+  }
 }
