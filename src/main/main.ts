@@ -1,12 +1,14 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const mc = require('minecraft-protocol');
+const { Client } = require('minecraft-launcher-core');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { Auth } = require('msmc');
 
 let loginWin: BrowserWindow | null = null;
 let gameWin:  BrowserWindow | null = null;
-let mcClient: any = null;
+let mcAuthToken: any = null;
 
 const DEV = !app.isPackaged;
 
@@ -23,10 +25,8 @@ function createLoginWindow() {
       nodeIntegration: false,
     },
   });
-
   if (DEV) {
     loginWin.loadURL('http://localhost:5173/login.html');
-    loginWin.webContents.openDevTools({ mode: 'detach' });
   } else {
     loginWin.loadFile(path.join(__dirname, '../dist/login.html'));
   }
@@ -34,9 +34,9 @@ function createLoginWindow() {
 
 function createGameWindow() {
   gameWin = new BrowserWindow({
-    width: 1280, height: 720,
+    width: 1100, height: 680,
     minWidth: 800, minHeight: 500,
-    backgroundColor: '#87ceeb',
+    backgroundColor: '#0d1117',
     titleBarStyle: 'hidden',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -44,115 +44,18 @@ function createGameWindow() {
       nodeIntegration: false,
     },
   });
-  gameWin.maximize();
 
   if (DEV) {
     gameWin.loadURL('http://localhost:5173/game.html');
+    gameWin.webContents.openDevTools({ mode: 'detach' });
   } else {
     gameWin.loadFile(path.join(__dirname, '../dist/game.html'));
   }
 
-  gameWin.on('closed', () => {
-    gameWin = null;
-    if (mcClient) { try { mcClient.end('window closed'); } catch {} mcClient = null; }
-    app.quit();
-  });
+  gameWin.on('closed', () => { gameWin = null; app.quit(); });
 }
 
-// ── Flatten Minecraft chat JSON to plain text ─────────────────────────────────
-function flattenChat(json: any): string {
-  if (typeof json === 'string') return json;
-  if (Array.isArray(json)) return json.map(flattenChat).join('');
-  let text = json.text || '';
-  if (json.translate) {
-    const args = (json.with || []).map(flattenChat);
-    text = json.translate.replace(/%s|%\d+\$s/g, () => args.shift() || '');
-  }
-  if (json.extra) text += json.extra.map(flattenChat).join('');
-  return text;
-}
-
-function safeParseChat(raw: string): string {
-  try { return flattenChat(JSON.parse(raw)); } catch { return raw; }
-}
-
-// ── Minecraft protocol IPC ────────────────────────────────────────────────────
-ipcMain.handle('mc-connect', async (_e, opts: { host: string; port: number; username: string }) => {
-  if (mcClient) {
-    try { mcClient.end('reconnect'); } catch {}
-    mcClient = null;
-  }
-
-  try {
-    const clientOpts: any = {
-      host: opts.host,
-      port: opts.port || 25565,
-      username: opts.username,
-      auth: 'microsoft',
-      deviceCodeCallback: (data: any) => {
-        gameWin?.webContents.send('mc-device-code', {
-          userCode: data.user_code,
-          verificationUri: data.verification_uri,
-        });
-      },
-    };
-
-    mcClient = mc.createClient(clientOpts);
-
-    // 1.18 and earlier chat
-    mcClient.on('chat', (packet: any) => {
-      gameWin?.webContents.send('mc-chat', safeParseChat(packet.message));
-    });
-
-    // 1.19+ system messages (server broadcasts, join/leave, death, etc.)
-    mcClient.on('system_chat', (packet: any) => {
-      gameWin?.webContents.send('mc-chat', safeParseChat(packet.content));
-    });
-
-    // 1.19+ player chat (actual player messages with signature)
-    mcClient.on('player_chat', (packet: any) => {
-      const body = packet.plainMessage ?? safeParseChat(packet.message ?? '');
-      const sender = packet.networkName ? safeParseChat(packet.networkName) : opts.username;
-      gameWin?.webContents.send('mc-chat', `<${sender}> ${body}`);
-    });
-
-    mcClient.on('login', (_packet: any) => {
-      gameWin?.webContents.send('mc-login', { username: mcClient.username || opts.username });
-    });
-
-    mcClient.on('kick_disconnect', (packet: any) => {
-      gameWin?.webContents.send('mc-kicked', safeParseChat(packet.reason));
-      mcClient = null;
-    });
-
-    mcClient.on('error', (err: Error) => {
-      gameWin?.webContents.send('mc-error', err.message);
-      mcClient = null;
-    });
-
-    mcClient.on('end', (reason: string) => {
-      gameWin?.webContents.send('mc-end', reason || 'disconnected');
-      mcClient = null;
-    });
-
-    return { ok: true };
-  } catch (err: any) {
-    return { ok: false, error: err.message };
-  }
-});
-
-ipcMain.on('mc-chat', (_e, message: string) => {
-  if (!mcClient) return;
-  try { mcClient.write('chat', { message }); } catch {}
-});
-
-ipcMain.on('mc-disconnect', () => {
-  if (!mcClient) return;
-  try { mcClient.end('Client disconnected'); } catch {}
-  mcClient = null;
-});
-
-// ── IPC: login succeeded → open game window ───────────────────────────────────
+// ── IPC: login succeeded → open launcher ─────────────────────────────────────
 ipcMain.on('login-success', (_e, userData) => {
   createGameWindow();
   loginWin?.close();
@@ -160,6 +63,51 @@ ipcMain.on('login-success', (_e, userData) => {
   gameWin?.webContents.once('did-finish-load', () => {
     gameWin?.webContents.send('user-data', userData);
   });
+});
+
+// ── IPC: Microsoft / Minecraft auth ──────────────────────────────────────────
+ipcMain.handle('mc-auth', async () => {
+  try {
+    const auth = new Auth('select_account');
+    const xbox = await auth.launch('electron');
+    const mc   = await xbox.getMinecraft();
+    mcAuthToken = mc.mclc();
+    return { ok: true, username: mc.profile.name };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// ── IPC: launch Minecraft ──────────────────────────────────────────────────────
+ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }) => {
+  if (!mcAuthToken) return { ok: false, error: 'Not authenticated with Microsoft' };
+
+  try {
+    const launcher = new Client();
+    const rootPath = path.join(app.getPath('userData'), '.minecraft');
+
+    launcher.launch({
+      authorization: mcAuthToken,
+      root: rootPath,
+      version: {
+        number: opts.version || '1.21.4',
+        type: 'release',
+      },
+      memory: {
+        max: `${opts.maxMem || 4}G`,
+        min: '2G',
+      },
+    });
+
+    launcher.on('data',     (data: string)  => gameWin?.webContents.send('mc-log',      data));
+    launcher.on('progress', (e: any)        => gameWin?.webContents.send('mc-progress', e));
+    launcher.on('close',    (code: number)  => gameWin?.webContents.send('mc-closed',   code));
+    launcher.on('error',    (err: Error)    => gameWin?.webContents.send('mc-error',    err.message));
+
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
 });
 
 // ── IPC: window controls ──────────────────────────────────────────────────────
@@ -172,9 +120,7 @@ ipcMain.on('win-maximize', () => {
 
 app.whenReady().then(() => {
   createLoginWindow();
-  if (!DEV) {
-    autoUpdater.checkForUpdatesAndNotify().catch(() => {});
-  }
+  if (!DEV) autoUpdater.checkForUpdatesAndNotify().catch(() => {});
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

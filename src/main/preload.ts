@@ -9,15 +9,10 @@ contextBridge.exposeInMainWorld('electron', {
 });
 
 contextBridge.exposeInMainWorld('mc', {
-  connect:      (host: string, port: number, username: string) =>
-                  ipcRenderer.invoke('mc-connect', { host, port, username }),
-  disconnect:   () => ipcRenderer.send('mc-disconnect'),
-  chat:         (message: string) => ipcRenderer.send('mc-chat', message),
-  onChat:       (cb: (msg: string) => void) => ipcRenderer.on('mc-chat', (_e, m) => cb(m)),
-  onLogin:      (cb: (data: any) => void) => ipcRenderer.on('mc-login', (_e, d) => cb(d)),
-  onKicked:     (cb: (reason: string) => void) => ipcRenderer.on('mc-kicked', (_e, r) => cb(r)),
-  onError:      (cb: (err: string) => void) => ipcRenderer.on('mc-error', (_e, e) => cb(e)),
-  onEnd:        (cb: (reason: string) => void) => ipcRenderer.on('mc-end', (_e, r) => cb(r)),
-  onDeviceCode: (cb: (data: { userCode: string; verificationUri: string }) => void) =>
-                  ipcRenderer.on('mc-device-code', (_e, d) => cb(d)),
+  auth:       () => ipcRenderer.invoke('mc-auth'),
+  launch:     (opts: { version: string; maxMem: number }) => ipcRenderer.invoke('mc-launch', opts),
+  onLog:      (cb: (line: string) => void)   => ipcRenderer.on('mc-log',      (_e, l) => cb(l)),
+  onProgress: (cb: (e: any) => void)         => ipcRenderer.on('mc-progress', (_e, e) => cb(e)),
+  onClosed:   (cb: (code: number) => void)   => ipcRenderer.on('mc-closed',   (_e, c) => cb(c)),
+  onError:    (cb: (msg: string) => void)    => ipcRenderer.on('mc-error',    (_e, m) => cb(m)),
 });

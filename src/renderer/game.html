@@ -2,189 +2,255 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Voxel Client</title>
+  <title>Voxel Client — Launcher</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; overflow: hidden; width: 100vw; height: 100vh; font-family: monospace; }
+    body {
+      background: #0d1117; color: #e6edf3; font-family: 'Inter', monospace;
+      width: 100vw; height: 100vh; overflow: hidden; user-select: none;
+    }
 
     /* ── Title bar ── */
     #titlebar {
-      position: fixed; top: 0; left: 0; right: 0; height: 28px;
-      display: flex; align-items: center; justify-content: flex-end;
-      padding: 0 6px; -webkit-app-region: drag; z-index: 500;
-      background: rgba(0,0,0,0.5);
+      position: fixed; top: 0; left: 0; right: 0; height: 32px;
+      -webkit-app-region: drag; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 14px 0 16px;
+      background: #010409; border-bottom: 1px solid #21262d; z-index: 100;
     }
-    .tbtn { -webkit-app-region: no-drag; background: none; border: none; color: #888; font-size: 14px; cursor: pointer; padding: 3px 9px; border-radius: 4px; }
-    .tbtn:hover { background: rgba(255,255,255,0.1); color: #fff; }
-    #close-btn:hover { background: #c42b1c; color: #fff; }
+    #titlebar-title { font-size: 12px; color: #484f58; letter-spacing: 1px; }
+    #titlebar-btns { -webkit-app-region: no-drag; display: flex; gap: 4px; }
+    .tbtn { background: none; border: none; color: #484f58; font-size: 13px; cursor: pointer; padding: 2px 10px; border-radius: 4px; }
+    .tbtn:hover { background: rgba(255,255,255,0.07); color: #e6edf3; }
+    #close-btn:hover { background: #da3633; color: #fff; }
 
-    canvas { display: block; }
-
-    /* ── Main menu ── */
-    #main-menu {
-      position: fixed; inset: 0; z-index: 100;
-      background: linear-gradient(180deg, #1a3a1a 0%, #0d1a0d 100%);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      color: #fff;
+    /* ── Layout ── */
+    #launcher {
+      display: flex; height: 100vh; padding-top: 32px;
     }
-    #main-menu h1 { font-size: 42px; letter-spacing: 4px; color: #5dff5d; text-shadow: 0 0 20px #3aff3a; margin-bottom: 8px; }
-    #main-menu .subtitle { color: #888; font-size: 13px; letter-spacing: 2px; margin-bottom: 48px; }
-    .menu-btn {
-      width: 280px; padding: 14px 0; margin: 8px 0;
-      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 8px; color: #fff; font-family: monospace; font-size: 16px;
-      cursor: pointer; letter-spacing: 1px; transition: background 0.15s, border-color 0.15s;
+
+    /* ── Left sidebar ── */
+    #sidebar {
+      width: 220px; min-width: 220px; background: #010409;
+      border-right: 1px solid #21262d; display: flex; flex-direction: column;
+      padding: 24px 0;
     }
-    .menu-btn:hover { background: rgba(93,255,93,0.12); border-color: #5dff5d; color: #5dff5d; }
-    .menu-btn.primary { background: rgba(93,255,93,0.18); border-color: #5dff5d; }
-
-    /* ── Server browser ── */
-    #server-browser {
-      position: fixed; inset: 0; z-index: 110;
-      background: rgba(0,0,0,0.92); backdrop-filter: blur(4px);
-      display: none; flex-direction: column; align-items: center; justify-content: center; color: #fff;
+    #sidebar-logo {
+      padding: 0 20px 24px; border-bottom: 1px solid #21262d;
     }
-    #server-browser h2 { font-size: 22px; color: #5dff5d; letter-spacing: 3px; margin-bottom: 32px; }
-    .sb-row { display: flex; gap: 10px; margin-bottom: 14px; width: 420px; }
-    .sb-input {
-      flex: 1; padding: 11px 14px; background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.2); border-radius: 7px;
-      color: #fff; font-family: monospace; font-size: 14px; outline: none;
+    #sidebar-logo h1 { font-size: 18px; font-weight: 700; color: #3fb950; letter-spacing: 1px; }
+    #sidebar-logo p { font-size: 11px; color: #484f58; margin-top: 2px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px; font-size: 13px; color: #8b949e; cursor: pointer;
+      border-left: 2px solid transparent; transition: all 0.15s;
     }
-    .sb-input:focus { border-color: #5dff5d; }
-    .sb-input::placeholder { color: #555; }
-    #sb-connect { padding: 11px 28px; background: #1a5c1a; border: 1px solid #5dff5d; border-radius: 7px; color: #5dff5d; font-family: monospace; font-size: 15px; cursor: pointer; }
-    #sb-connect:hover { background: #2a8c2a; }
-    #sb-back { padding: 11px 28px; background: rgba(255,255,255,0.05); border: 1px solid #444; border-radius: 7px; color: #888; font-family: monospace; font-size: 15px; cursor: pointer; }
-    #sb-back:hover { background: rgba(255,255,255,0.1); color: #fff; }
-    #sb-status { width: 420px; min-height: 24px; color: #aaa; font-size: 13px; text-align: center; margin-top: 6px; }
-    #sb-status.error { color: #ff5555; }
-    #sb-status.ok { color: #5dff5d; }
-    #sb-status.warn { color: #ffcc44; }
-
-    /* ── Device code prompt ── */
-    #device-code-box {
-      display: none; margin-top: 18px; width: 420px;
-      background: rgba(255,204,0,0.08); border: 1px solid #aa8800;
-      border-radius: 10px; padding: 20px; text-align: center;
+    .nav-item:hover { color: #e6edf3; background: rgba(255,255,255,0.03); }
+    .nav-item.active { color: #3fb950; border-left-color: #3fb950; background: rgba(63,185,80,0.06); }
+    #sidebar-bottom {
+      margin-top: auto; padding: 16px 20px; border-top: 1px solid #21262d;
     }
-    #device-code-box p { color: #ccc; font-size: 13px; margin-bottom: 10px; }
-    #device-code-url { color: #5dff5d; font-size: 14px; margin-bottom: 10px; }
-    #device-code-val { font-size: 28px; letter-spacing: 6px; color: #ffcc44; font-weight: bold; }
-
-    /* ── In-game HUD ── */
-    #crosshair { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); color: rgba(255,255,255,0.8); font-size: 24px; pointer-events: none; text-shadow: 0 0 4px #000; z-index: 10; display: none; }
-    #hud { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); display: none; gap: 4px; padding: 8px; z-index: 10; pointer-events: none; }
-    .slot { width: 52px; height: 52px; background: rgba(0,0,0,0.55); border: 2px solid rgba(255,255,255,0.25); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-    .slot.active { border-color: #fff; background: rgba(255,255,255,0.15); }
-    #info { position: fixed; top: 36px; left: 12px; color: #fff; font-family: monospace; font-size: 12px; text-shadow: 1px 1px 2px #000; z-index: 10; pointer-events: none; line-height: 1.7; display: none; }
-
-    /* ── Server status banner (connected) ── */
-    #server-bar {
-      display: none; position: fixed; top: 28px; left: 0; right: 0; z-index: 20;
-      background: rgba(0,80,0,0.7); padding: 5px 16px;
-      font-size: 12px; color: #aeffae; letter-spacing: 1px;
-      display: none; align-items: center; gap: 16px;
+    #user-chip {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.04); border-radius: 8px;
+      padding: 8px 10px; font-size: 12px;
     }
-    #server-bar span { color: #fff; }
+    #user-avatar { width: 28px; height: 28px; border-radius: 50%; background: #21262d; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    #user-name { color: #e6edf3; font-weight: 500; }
+    #user-sub  { color: #484f58; font-size: 11px; }
 
-    /* ── Chat ── */
-    #chat-box { position: fixed; bottom: 70px; left: 12px; width: 420px; z-index: 10; display: none; }
-    #chat-log { max-height: 160px; overflow-y: auto; margin-bottom: 4px; display: flex; flex-direction: column; gap: 2px; }
-    .chat-msg { background: rgba(0,0,0,0.55); color: #fff; font-family: monospace; font-size: 12px; padding: 2px 8px; border-radius: 4px; word-break: break-all; }
-    .chat-msg.mc { border-left: 2px solid #5dff5d; }
-    #chat-input { width: 100%; padding: 6px 10px; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: #fff; font-family: monospace; font-size: 13px; display: none; outline: none; }
+    /* ── Main content ── */
+    #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-    /* ── Click-to-play (local mode) ── */
-    #click-to-play { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-family: monospace; z-index: 50; cursor: pointer; }
-    #click-to-play h1 { font-size: 36px; margin-bottom: 12px; }
-    #click-to-play p { font-size: 16px; opacity: 0.7; }
-
-    /* ── Disconnect overlay ── */
-    #disconnected {
-      display: none; position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; color: #fff;
+    /* ── Hero banner ── */
+    #hero {
+      height: 180px; position: relative; overflow: hidden;
+      background: linear-gradient(135deg, #0d1b12 0%, #0a1628 50%, #0d1b12 100%);
+      border-bottom: 1px solid #21262d;
     }
-    #disconnected h2 { font-size: 28px; color: #ff5555; margin-bottom: 16px; }
-    #disconnected p { color: #ccc; font-size: 14px; margin-bottom: 32px; max-width: 400px; text-align: center; }
+    #hero-bg {
+      position: absolute; inset: 0; opacity: 0.35;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 15px, rgba(63,185,80,0.08) 15px, rgba(63,185,80,0.08) 16px),
+        repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(63,185,80,0.08) 15px, rgba(63,185,80,0.08) 16px);
+    }
+    #hero-content { position: relative; padding: 28px 32px; }
+    #hero-content h2 { font-size: 26px; font-weight: 700; color: #fff; }
+    #hero-content p  { font-size: 13px; color: #8b949e; margin-top: 6px; }
+    #mc-username-badge {
+      display: inline-block; margin-top: 10px;
+      background: rgba(63,185,80,0.15); border: 1px solid rgba(63,185,80,0.3);
+      border-radius: 20px; padding: 3px 12px; font-size: 12px; color: #3fb950;
+    }
+
+    /* ── Controls panel ── */
+    #controls { padding: 24px 32px; flex: 1; overflow-y: auto; }
+
+    .section-label { font-size: 11px; color: #484f58; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; margin-top: 24px; }
+    .section-label:first-child { margin-top: 0; }
+
+    .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .control-card {
+      background: #161b22; border: 1px solid #21262d; border-radius: 10px;
+      padding: 16px; transition: border-color 0.15s;
+    }
+    .control-card:hover { border-color: #30363d; }
+    .control-card label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 8px; }
+
+    select, input[type="range"] {
+      width: 100%; background: #0d1117; border: 1px solid #30363d;
+      border-radius: 6px; color: #e6edf3; padding: 8px 10px; font-size: 13px;
+      outline: none; appearance: none; cursor: pointer;
+    }
+    select:focus { border-color: #3fb950; }
+    select option { background: #161b22; }
+
+    input[type="range"] { padding: 0; height: 4px; accent-color: #3fb950; cursor: pointer; }
+    .range-row { display: flex; align-items: center; gap: 10px; }
+    .range-val { font-size: 13px; color: #3fb950; font-weight: 600; min-width: 36px; text-align: right; }
+
+    /* ── Auth button ── */
+    #mc-auth-btn {
+      width: 100%; padding: 12px; margin-top: 20px;
+      background: #21262d; border: 1px solid #30363d; border-radius: 8px;
+      color: #e6edf3; font-size: 14px; cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    #mc-auth-btn:hover { background: #2d333b; border-color: #8b949e; }
+    #mc-auth-btn.authed { background: rgba(63,185,80,0.1); border-color: rgba(63,185,80,0.4); color: #3fb950; }
+
+    /* ── Play button ── */
+    #play-row { padding: 0 32px 24px; }
+    #mc-play-btn {
+      width: 100%; padding: 16px; font-size: 17px; font-weight: 700; letter-spacing: 1px;
+      background: linear-gradient(135deg, #238636, #2ea043);
+      border: 1px solid #3fb950; border-radius: 10px; color: #fff; cursor: pointer;
+      transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    #mc-play-btn:hover:not(:disabled) { background: linear-gradient(135deg, #2ea043, #3fb950); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(63,185,80,0.3); }
+    #mc-play-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+    #mc-play-btn.running { background: linear-gradient(135deg, #8b1a1a, #da3633); border-color: #f85149; }
+
+    /* ── Progress & log ── */
+    #status-bar {
+      background: #010409; border-top: 1px solid #21262d;
+      padding: 8px 32px; font-size: 11px; color: #484f58;
+      display: flex; align-items: center; gap: 12px; min-height: 34px;
+    }
+    #status-dot { width: 7px; height: 7px; border-radius: 50%; background: #484f58; flex-shrink: 0; }
+    #status-dot.green { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
+    #status-dot.yellow { background: #d29922; }
+    #status-dot.red { background: #f85149; }
+    #status-text { flex: 1; }
+    #progress-bar-wrap { width: 160px; height: 4px; background: #21262d; border-radius: 2px; overflow: hidden; display: none; }
+    #progress-bar { height: 100%; background: #3fb950; width: 0%; transition: width 0.3s; border-radius: 2px; }
+
+    #log-panel {
+      position: fixed; bottom: 34px; left: 220px; right: 0;
+      max-height: 200px; overflow-y: auto; background: #010409;
+      border-top: 1px solid #21262d; padding: 8px 32px;
+      font-family: monospace; font-size: 11px; color: #484f58; display: none;
+    }
+    .log-line { line-height: 1.6; }
+    .log-line.warn  { color: #d29922; }
+    .log-line.error { color: #f85149; }
+
+    #log-toggle {
+      background: none; border: none; color: #484f58; font-size: 11px; cursor: pointer; padding: 0;
+    }
+    #log-toggle:hover { color: #8b949e; }
   </style>
 </head>
 <body>
   <div id="titlebar">
-    <button class="tbtn" onclick="window.electron?.minimize()">─</button>
-    <button class="tbtn" onclick="window.electron?.maximize()">□</button>
-    <button class="tbtn" id="close-btn" onclick="window.electron?.close()">✕</button>
-  </div>
-
-  <!-- ── Main menu ── -->
-  <div id="main-menu">
-    <h1>⛏ VOXEL CLIENT</h1>
-    <div class="subtitle">MINECRAFT JAVA EDITION</div>
-    <button class="menu-btn primary" id="btn-multiplayer">🌐 Join Server (Multiplayer)</button>
-    <button class="menu-btn" id="btn-local">🌿 Play Local World</button>
-  </div>
-
-  <!-- ── Server browser ── -->
-  <div id="server-browser">
-    <h2>JOIN SERVER</h2>
-    <div class="sb-row">
-      <input class="sb-input" id="sb-host" placeholder="Server IP  (e.g. hypixel.net)" style="flex:2" />
-      <input class="sb-input" id="sb-port" placeholder="Port" style="flex:0.6; width:80px" value="25565" />
-    </div>
-    <div class="sb-row" style="margin-bottom:6px">
-      <input class="sb-input" id="sb-user" placeholder="Microsoft account email" />
-    </div>
-    <div class="sb-row" style="justify-content:center; gap:12px">
-      <button id="sb-back">← Back</button>
-      <button id="sb-connect">Connect →</button>
-    </div>
-    <div id="sb-status"></div>
-    <div id="device-code-box">
-      <p>Sign in with your Microsoft account:</p>
-      <div id="device-code-url"></div>
-      <div id="device-code-val"></div>
-      <p style="margin-top:10px;font-size:11px;color:#888">Enter the code above at the URL, then wait…</p>
+    <span id="titlebar-title">VOXEL CLIENT</span>
+    <div id="titlebar-btns">
+      <button class="tbtn" onclick="window.electron?.minimize()">─</button>
+      <button class="tbtn" onclick="window.electron?.maximize()">□</button>
+      <button class="tbtn" id="close-btn" onclick="window.electron?.close()">✕</button>
     </div>
   </div>
 
-  <!-- ── Disconnected screen ── -->
-  <div id="disconnected">
-    <h2>Disconnected</h2>
-    <p id="disconnect-reason"></p>
-    <button class="menu-btn" id="btn-reconnect" style="width:220px">🔄 Back to Menu</button>
+  <div id="launcher">
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div id="sidebar-logo">
+        <h1>⛏ VOXEL</h1>
+        <p>Minecraft Launcher</p>
+      </div>
+      <div class="nav-item active">🎮 &nbsp;Play</div>
+      <div class="nav-item" style="margin-top:4px">📦 &nbsp;Versions</div>
+      <div class="nav-item">⚙️ &nbsp;Settings</div>
+      <div id="sidebar-bottom">
+        <div id="user-chip">
+          <div id="user-avatar">👤</div>
+          <div>
+            <div id="user-name">Loading…</div>
+            <div id="user-sub">App account</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div id="content">
+      <!-- Hero -->
+      <div id="hero">
+        <div id="hero-bg"></div>
+        <div id="hero-content">
+          <h2>Ready to Play</h2>
+          <p>Join any Minecraft Java Edition server</p>
+          <div id="mc-username-badge" style="display:none">🎮 Logged in as <span id="mc-ign"></span></div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div id="controls">
+        <div class="section-label">Game Settings</div>
+        <div class="control-grid">
+          <div class="control-card">
+            <label>Minecraft Version</label>
+            <select id="mc-version">
+              <option value="1.21.4">1.21.4 — Latest Release</option>
+              <option value="1.20.4">1.20.4</option>
+              <option value="1.19.4">1.19.4</option>
+              <option value="1.18.2">1.18.2</option>
+              <option value="1.16.5">1.16.5</option>
+              <option value="1.12.2">1.12.2</option>
+              <option value="1.8.9">1.8.9 — PvP Classic</option>
+            </select>
+          </div>
+          <div class="control-card">
+            <label>RAM Allocation</label>
+            <div class="range-row">
+              <input type="range" id="mc-memory" min="1" max="16" value="4" step="1" />
+              <span class="range-val"><span id="mc-memory-val">4</span>GB</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-label">Microsoft Account</div>
+        <button id="mc-auth-btn">🔐 &nbsp;Login with Microsoft to Play</button>
+      </div>
+
+      <!-- Play button -->
+      <div id="play-row">
+        <button id="mc-play-btn" disabled>▶ &nbsp;PLAY</button>
+      </div>
+
+      <!-- Status bar -->
+      <div id="status-bar">
+        <div id="status-dot"></div>
+        <span id="status-text">Ready</span>
+        <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+        <button id="log-toggle" style="display:none">Show log ▲</button>
+      </div>
+    </div>
   </div>
 
-  <!-- ── In-game (local world) ── -->
-  <div id="click-to-play"><h1>🌿 LOCAL WORLD</h1><p>Click to play</p></div>
-  <div id="crosshair">+</div>
-  <div id="info">
-    <div id="info-pos"></div>
-    <div id="info-block"></div>
-    <div id="info-fps"></div>
-    <div id="info-player"></div>
-  </div>
-  <div id="hud">
-    <div class="slot active" id="slot-0">🪨</div>
-    <div class="slot" id="slot-1">🟫</div>
-    <div class="slot" id="slot-2">🌿</div>
-    <div class="slot" id="slot-3">🪵</div>
-    <div class="slot" id="slot-4">🏖️</div>
-    <div class="slot" id="slot-5">🧊</div>
-    <div class="slot" id="slot-6">🪟</div>
-    <div class="slot" id="slot-7">💡</div>
-    <div class="slot" id="slot-8">🔥</div>
-  </div>
-
-  <!-- ── Server status bar (when connected to real MC) ── -->
-  <div id="server-bar">
-    🟢 Connected to <span id="server-bar-host"></span> as <span id="server-bar-user"></span>
-  </div>
-
-  <!-- ── Chat (shared between local and MC) ── -->
-  <div id="chat-box">
-    <div id="chat-log"></div>
-    <input id="chat-input" placeholder="Press T to chat…" maxlength="256" />
-  </div>
+  <!-- Log panel (slide up) -->
+  <div id="log-panel"></div>
 
   <script type="module" src="./game.ts"></script>
 </body>

@@ -59,7 +59,8 @@
   "dependencies": {
     "electron-updater": "^6.0.0",
     "firebase": "^10.14.0",
-    "minecraft-protocol": "^1.66.2",
+    "minecraft-launcher-core": "^3.18.2",
+    "msmc": "^2.2.3",
     "three": "^0.184.0"
   }
 }
