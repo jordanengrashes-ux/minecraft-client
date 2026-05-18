@@ -218,6 +218,7 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }
       root: path.join(app.getPath('userData'), '.minecraft'),
       version: { number: opts.version || '1.21.4', type: 'release' },
       memory:  { max: `${opts.maxMem || 4}G`, min: '2G' },
+      overrides: { maxSockets: 64 },
     });
     launcher.on('data',     (d: string)  => gameWin?.webContents.send('mc-log',      d));
     launcher.on('progress', (e: any)     => gameWin?.webContents.send('mc-progress', e));

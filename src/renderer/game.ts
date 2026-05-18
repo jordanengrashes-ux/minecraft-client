@@ -2,100 +2,6 @@
 
 const mc = (window as any).mc;
 
-// ── Mod definitions ────────────────────────────────────────────────────────────
-const MODS = [
-  {
-    id: 'sodium',
-    name: 'Sodium',
-    desc: 'Massive FPS boost — replaces the vanilla renderer. Most popular performance mod.',
-    icon: '⚡',
-    tags: [{ label: 'Performance', cls: 'perf' }],
-    version: '0.5.11',
-    defaultOn: true,
-  },
-  {
-    id: 'iris',
-    name: 'Iris Shaders',
-    desc: 'Adds shader support compatible with Sodium. Run OptiFine shaders without OptiFine.',
-    icon: '🌅',
-    tags: [{ label: 'Visual', cls: 'visual' }, { label: 'Shaders', cls: 'visual' }],
-    version: '1.7.5',
-    defaultOn: false,
-  },
-  {
-    id: 'lithium',
-    name: 'Lithium',
-    desc: 'Optimises game physics, mob AI, and block ticking. Works great alongside Sodium.',
-    icon: '🪨',
-    tags: [{ label: 'Performance', cls: 'perf' }],
-    version: '0.12.7',
-    defaultOn: true,
-  },
-  {
-    id: 'fabric-api',
-    name: 'Fabric API',
-    desc: 'Required by most Fabric mods. Provides core hooks and utilities.',
-    icon: '📦',
-    tags: [{ label: 'Utility', cls: 'util' }],
-    version: '0.97.8',
-    defaultOn: true,
-  },
-  {
-    id: 'ferritecore',
-    name: 'FerriteCore',
-    desc: 'Reduces memory usage significantly — useful if you have less than 8 GB RAM.',
-    icon: '🧲',
-    tags: [{ label: 'Performance', cls: 'perf' }],
-    version: '6.0.3',
-    defaultOn: false,
-  },
-  {
-    id: 'modmenu',
-    name: 'Mod Menu',
-    desc: 'Adds a mods button to the in-game pause menu so you can see what\'s installed.',
-    icon: '📋',
-    tags: [{ label: 'Utility', cls: 'util' }],
-    version: '11.0.3',
-    defaultOn: true,
-  },
-  {
-    id: 'entityculling',
-    name: 'Entity Culling',
-    desc: 'Skips rendering entities and block entities that are not visible to you.',
-    icon: '👁',
-    tags: [{ label: 'Performance', cls: 'perf' }],
-    version: '1.7.2',
-    defaultOn: true,
-  },
-  {
-    id: 'betterf3',
-    name: 'BetterF3',
-    desc: 'Makes the F3 debug screen colourful, readable, and customisable.',
-    icon: '🔢',
-    tags: [{ label: 'Utility', cls: 'util' }],
-    version: '7.0.2',
-    defaultOn: false,
-  },
-  {
-    id: 'replaymod',
-    name: 'ReplayMod',
-    desc: 'Record and replay your gameplay. Great for content creators.',
-    icon: '🎬',
-    tags: [{ label: 'Utility', cls: 'util' }],
-    version: '2.6.15',
-    defaultOn: false,
-  },
-  {
-    id: 'minimap',
-    name: 'Xaero\'s Minimap',
-    desc: 'Adds a minimap to the corner of your screen with waypoints.',
-    icon: '🗺️',
-    tags: [{ label: 'Utility', cls: 'util' }],
-    version: '24.5.0',
-    defaultOn: false,
-  },
-] as const;
-
 // ── DOM ────────────────────────────────────────────────────────────────────────
 const userName      = document.getElementById('user-name')!;
 const mcIgnBadge    = document.getElementById('mc-username-badge')!;
@@ -390,43 +296,99 @@ document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => 
   }
 });
 
-// ── Build mods list ────────────────────────────────────────────────────────────
-const enabledMods = new Set<string>(MODS.filter(m => m.defaultOn).map(m => m.id));
-const modsList = document.getElementById('mods-list')!;
+// ── Modrinth mod search ────────────────────────────────────────────────────────
+const enabledMods = new Set<string>();
+const modsList    = document.getElementById('mods-list')!;
+const modsSearch  = document.getElementById('mods-search') as HTMLInputElement;
+const modsLoading = document.getElementById('mods-loading')!;
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-function renderMods() {
+interface ModrinthHit {
+  project_id: string;
+  title: string;
+  description: string;
+  icon_url: string | null;
+  downloads: number;
+  categories: string[];
+}
+
+function fmtDownloads(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `${Math.round(n / 1_000)}K`;
+  return String(n);
+}
+
+function buildModCard(mod: ModrinthHit): HTMLElement {
+  const on   = enabledMods.has(mod.project_id);
+  const card = document.createElement('div');
+  card.className = 'mod-card' + (on ? ' enabled' : '');
+
+  const iconHtml = mod.icon_url
+    ? `<img src="${mod.icon_url}" class="mod-icon-img" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'mod-icon',textContent:'🧩'}))">`
+    : `<div class="mod-icon">🧩</div>`;
+
+  const tagHtml = mod.categories.slice(0, 3).map(cat => {
+    const cls = ['optimization','performance'].includes(cat) ? 'perf'
+              : ['shader','decoration','magic'].includes(cat) ? 'visual' : 'util';
+    return `<span class="mod-tag ${cls}">${cat}</span>`;
+  }).join('') + `<span class="mod-tag" style="margin-left:auto">⬇ ${fmtDownloads(mod.downloads)}</span>`;
+
+  card.innerHTML = `
+    ${iconHtml}
+    <div class="mod-info">
+      <div class="mod-name">${mod.title}</div>
+      <div class="mod-desc">${mod.description}</div>
+      <div class="mod-tags">${tagHtml}</div>
+    </div>
+    <div class="mod-right">
+      <label class="toggle">
+        <input type="checkbox" ${on ? 'checked' : ''} />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>`;
+
+  card.querySelector('input')!.addEventListener('change', e => {
+    const checked = (e.target as HTMLInputElement).checked;
+    if (checked) enabledMods.add(mod.project_id); else enabledMods.delete(mod.project_id);
+    card.className = 'mod-card' + (checked ? ' enabled' : '');
+  });
+  return card;
+}
+
+async function searchModrinth(query: string) {
+  modsLoading.style.display = 'flex';
   modsList.innerHTML = '';
-  for (const mod of MODS) {
-    const on = enabledMods.has(mod.id);
-    const card = document.createElement('div');
-    card.className = 'mod-card' + (on ? ' enabled' : '');
-    card.innerHTML = `
-      <div class="mod-icon">${mod.icon}</div>
-      <div class="mod-info">
-        <div class="mod-name">${mod.name}</div>
-        <div class="mod-desc">${mod.desc}</div>
-        <div class="mod-tags">
-          ${mod.tags.map(t => `<span class="mod-tag ${t.cls}">${t.label}</span>`).join('')}
-        </div>
-      </div>
-      <div class="mod-right">
-        <span class="mod-version">v${mod.version}</span>
-        <label class="toggle">
-          <input type="checkbox" data-mod="${mod.id}" ${on ? 'checked' : ''} />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-    `;
-    card.querySelector('input')!.addEventListener('change', (e) => {
-      const checked = (e.target as HTMLInputElement).checked;
-      if (checked) enabledMods.add(mod.id); else enabledMods.delete(mod.id);
-      card.className = 'mod-card' + (checked ? ' enabled' : '');
+  try {
+    const facets = JSON.stringify([
+      ['project_type:mod'],
+      ['client_side:required', 'client_side:optional'],
+    ]);
+    const params = new URLSearchParams({
+      query, facets, limit: '50',
+      index: query ? 'relevance' : 'downloads',
     });
-    modsList.appendChild(card);
+    const res  = await fetch(`https://api.modrinth.com/v2/search?${params}`);
+    const data = await res.json() as { hits: ModrinthHit[] };
+    modsLoading.style.display = 'none';
+    if (!data.hits.length) {
+      modsList.innerHTML = '<p style="color:#484f58;padding:20px;text-align:center">No mods found</p>';
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    data.hits.forEach(h => frag.appendChild(buildModCard(h)));
+    modsList.appendChild(frag);
+  } catch {
+    modsLoading.style.display = 'none';
+    modsList.innerHTML = '<p style="color:#f85149;padding:20px;text-align:center">Could not reach Modrinth — check your connection</p>';
   }
 }
 
-renderMods();
+modsSearch.addEventListener('input', () => {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => searchModrinth(modsSearch.value.trim()), 400);
+});
+
+searchModrinth('');
 
 // ── Auto-updater UI ────────────────────────────────────────────────────────────
 const updater = (window as any).updater;
