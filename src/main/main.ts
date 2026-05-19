@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, net, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
@@ -236,15 +237,21 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }
     const launcher = new Client();
     const { cached_at: _, ...auth } = mcAuthToken as any;
 
-    gameWin?.webContents.send('mc-log', `[Launcher] mcRoot: ${mcRoot}`);
-    gameWin?.webContents.send('mc-log', `[Launcher] version: ${opts.version || '1.21.4'}, mem: ${opts.maxMem || 4}G`);
-    gameWin?.webContents.send('mc-log', `[Launcher] uuid: ${auth.uuid}, name: ${auth.name}`);
+    // Log Java version so we can diagnose version mismatches
+    try {
+      const javaVer = execSync('java -version 2>&1', { encoding: 'utf-8', timeout: 5000 }).trim();
+      gameWin?.webContents.send('mc-log', `[Launcher] Java: ${javaVer.split('\n')[0]}`);
+    } catch {
+      gameWin?.webContents.send('mc-log', '[Launcher] WARNING: java not found in PATH');
+    }
+    gameWin?.webContents.send('mc-log', `[Launcher] version: ${opts.version || '1.21.4'}, mem: ${opts.maxMem || 4}G, user: ${auth.name}`);
 
     launcher.launch({
       authorization: auth,
       root: mcRoot,
       version: { number: opts.version || '1.21.4', type: 'release' },
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
+      javaPath: 'javaw',  // suppress Windows console window
     });
     // Send every line so the renderer can detect crash causes
     launcher.on('data',     (d: string)  => gameWin?.webContents.send('mc-log',      d));
