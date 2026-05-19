@@ -230,6 +230,33 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }
   }
 });
 
+// ── IPC: skin upload ──────────────────────────────────────────────────────────
+ipcMain.handle('mc-upload-skin', async (_e, opts: { base64: string; variant: 'classic' | 'slim' }) => {
+  if (!mcAuthToken?.access_token) return { ok: false, error: 'Not authenticated' };
+  try {
+    const buf = Buffer.from(opts.base64, 'base64');
+    const boundary = '----VoxelBoundary' + Date.now();
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="variant"\r\n\r\n${opts.variant}\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="skin.png"\r\nContent-Type: image/png\r\n\r\n`),
+      buf,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+    const res = await (net.fetch as any)('https://api.minecraftservices.com/minecraft/profile/skins', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${mcAuthToken.access_token}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+      body,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
 // ── IPC: window controls ──────────────────────────────────────────────────────
 ipcMain.on('win-close',    () => BrowserWindow.getFocusedWindow()?.close());
 ipcMain.on('win-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());

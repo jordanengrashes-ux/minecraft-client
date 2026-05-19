@@ -238,40 +238,27 @@ if (mc) {
 setStatus('Ready — login with Microsoft to play');
 
 // ── Nav switching ─────────────────────────────────────────────────────────────
-const contentEl     = document.getElementById('content')!;
-const modsPanelEl   = document.getElementById('mods-panel')!;
+const contentEl       = document.getElementById('content')!;
+const modsPanelEl     = document.getElementById('mods-panel')!;
+const customizePanelEl= document.getElementById('customize-panel')!;
 const settingsPanelEl = document.getElementById('settings-panel')!;
-const navPlay       = document.getElementById('nav-play')!;
-const navMods       = document.getElementById('nav-mods')!;
-const navSettings   = document.getElementById('nav-settings')!;
+const navPlay         = document.getElementById('nav-play')!;
+const navMods         = document.getElementById('nav-mods')!;
+const navCustomize    = document.getElementById('nav-customize')!;
+const navSettings     = document.getElementById('nav-settings')!;
+const allPanels       = [contentEl, modsPanelEl, customizePanelEl, settingsPanelEl];
+const allNavs         = [navPlay, navMods, navCustomize, navSettings];
 
-function showPlay() {
-  contentEl.style.display      = 'flex';
-  modsPanelEl.style.display    = 'none';
-  settingsPanelEl.style.display= 'none';
-  navPlay.classList.add('active');
-  navMods.classList.remove('active');
-  navSettings.classList.remove('active');
+function showPanel(panel: HTMLElement, nav: HTMLElement) {
+  allPanels.forEach(p => p.style.display = 'none');
+  allNavs.forEach(n => n.classList.remove('active'));
+  panel.style.display = 'flex';
+  nav.classList.add('active');
 }
-function showMods() {
-  contentEl.style.display      = 'none';
-  modsPanelEl.style.display    = 'flex';
-  settingsPanelEl.style.display= 'none';
-  navPlay.classList.remove('active');
-  navMods.classList.add('active');
-  navSettings.classList.remove('active');
-}
-function showSettings() {
-  contentEl.style.display      = 'none';
-  modsPanelEl.style.display    = 'none';
-  settingsPanelEl.style.display= 'flex';
-  navPlay.classList.remove('active');
-  navMods.classList.remove('active');
-  navSettings.classList.add('active');
-}
-navPlay.addEventListener('click', showPlay);
-navMods.addEventListener('click', showMods);
-navSettings.addEventListener('click', showSettings);
+navPlay    .addEventListener('click', () => showPanel(contentEl,        navPlay));
+navMods    .addEventListener('click', () => { showPanel(modsPanelEl,    navMods);     if (!modsPanelEl.dataset.loaded) { searchModrinth(''); modsPanelEl.dataset.loaded = '1'; } });
+navCustomize.addEventListener('click',() => { showPanel(customizePanelEl, navCustomize); if (!customizePanelEl.dataset.loaded) { searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
+navSettings.addEventListener('click', () => showPanel(settingsPanelEl,  navSettings));
 
 // ── Reauth button ──────────────────────────────────────────────────────────────
 document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => {
@@ -294,6 +281,131 @@ document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => 
   } else {
     setStatus(`Auth failed: ${res?.error || 'Unknown error'}`, 'red');
   }
+});
+
+// ── Customize: Skin ───────────────────────────────────────────────────────────
+const skinCanvas   = document.getElementById('skin-canvas') as HTMLCanvasElement;
+const skinStatus   = document.getElementById('skin-status')!;
+const skinApplyBtn = document.getElementById('skin-apply-btn') as HTMLButtonElement;
+const skinPickBtn  = document.getElementById('skin-pick-btn') as HTMLButtonElement;
+let skinBase64 = '';
+let skinVariant: 'classic' | 'slim' = 'classic';
+
+function drawSkinPreview(img: HTMLImageElement) {
+  const ctx = skinCanvas.getContext('2d')!;
+  ctx.clearRect(0, 0, 92, 148);
+  ctx.imageSmoothingEnabled = false;
+  const s = 4; // scale factor
+  // Head front (8,8 -> 16,16 on skin = 8x8 px)
+  ctx.drawImage(img, 8, 8, 8, 8, 14, 0, 8*s, 8*s);
+  // Body front (20,20 -> 28,32)
+  ctx.drawImage(img, 20, 20, 8, 12, 14, 34, 8*s, 12*s);
+  // Right arm front (44,20 -> 48,32) classic=4wide slim=3wide
+  const armW = skinVariant === 'slim' ? 3 : 4;
+  ctx.drawImage(img, 44, 20, armW, 12, 0, 34, armW*s, 12*s);
+  // Left arm front (36,52 -> 40,64) — 1.8 skin layout
+  ctx.drawImage(img, 36, 52, armW, 12, 14+8*s, 34, armW*s, 12*s);
+  // Right leg (4,20 -> 8,32)
+  ctx.drawImage(img, 4, 20, 4, 12, 14, 34+12*s, 4*s, 12*s);
+  // Left leg (20,52 -> 24,64)
+  ctx.drawImage(img, 20, 52, 4, 12, 14+4*s, 34+12*s, 4*s, 12*s);
+}
+
+skinPickBtn.addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/png';
+  input.onchange = () => {
+    const file = input.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      skinBase64 = dataUrl.split(',')[1];
+      const img = new Image();
+      img.onload = () => { drawSkinPreview(img); };
+      img.src = dataUrl;
+      document.getElementById('skin-name')!.textContent = file.name;
+      skinApplyBtn.disabled = false;
+      skinApplyBtn.style.opacity = '1';
+      skinStatus.textContent = 'Skin loaded — click Apply to upload';
+      skinStatus.style.color = '#3fb950';
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+});
+
+skinApplyBtn.addEventListener('click', async () => {
+  if (!mc || !skinBase64) return;
+  skinApplyBtn.disabled = true;
+  skinStatus.textContent = 'Uploading…';
+  skinStatus.style.color = '#d29922';
+  const res = await mc.uploadSkin({ base64: skinBase64, variant: skinVariant });
+  if (res.ok) {
+    skinStatus.textContent = '✓ Skin applied!';
+    skinStatus.style.color = '#3fb950';
+  } else {
+    skinStatus.textContent = `Failed: ${res.error}`;
+    skinStatus.style.color = '#f85149';
+  }
+  skinApplyBtn.disabled = false;
+});
+
+document.querySelectorAll('.model-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.model-btn').forEach(b => {
+      (b as HTMLElement).style.background = '#21262d';
+      (b as HTMLElement).style.borderColor = '#30363d';
+      (b as HTMLElement).style.color = '#8b949e';
+    });
+    const el = btn as HTMLElement;
+    el.style.background = '#238636';
+    el.style.borderColor = '#3fb950';
+    el.style.color = '#fff';
+    skinVariant = (el.dataset.model as 'classic' | 'slim') || 'classic';
+  });
+});
+
+// ── Customize: Texture Packs ───────────────────────────────────────────────────
+const tpList    = document.getElementById('tp-list')!;
+const tpLoading = document.getElementById('tp-loading')!;
+const tpSearch  = document.getElementById('tp-search') as HTMLInputElement;
+let tpTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function searchTexturePacks(query: string) {
+  tpLoading.style.display = 'flex';
+  tpList.innerHTML = '';
+  try {
+    const facets = JSON.stringify([['project_type:resourcepack']]);
+    const params = new URLSearchParams({ query, facets, limit: '30', index: query ? 'relevance' : 'downloads' });
+    const res  = await fetch(`https://api.modrinth.com/v2/search?${params}`);
+    const data = await res.json() as { hits: ModrinthHit[] };
+    tpLoading.style.display = 'none';
+    if (!data.hits.length) { tpList.innerHTML = '<p style="color:#484f58;text-align:center;padding:16px">No results</p>'; return; }
+    data.hits.forEach(h => {
+      const row = document.createElement('div');
+      row.className = 'mod-card';
+      const icon = h.icon_url ? `<img src="${h.icon_url}" class="mod-icon-img" alt="">` : `<div class="mod-icon">🎨</div>`;
+      row.innerHTML = `${icon}
+        <div class="mod-info">
+          <div class="mod-name">${h.title}</div>
+          <div class="mod-desc">${h.description}</div>
+          <div class="mod-tags"><span class="mod-tag util">Resource Pack</span><span class="mod-tag" style="margin-left:auto">⬇ ${fmtDownloads(h.downloads)}</span></div>
+        </div>
+        <div class="mod-right">
+          <a href="https://modrinth.com/resourcepack/${h.project_id}" target="_blank"
+            style="padding:7px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:12px;text-decoration:none;white-space:nowrap;">View →</a>
+        </div>`;
+      tpList.appendChild(row);
+    });
+  } catch {
+    tpLoading.style.display = 'none';
+    tpList.innerHTML = '<p style="color:#f85149;text-align:center;padding:16px">Could not reach Modrinth</p>';
+  }
+}
+
+tpSearch.addEventListener('input', () => {
+  if (tpTimer) clearTimeout(tpTimer);
+  tpTimer = setTimeout(() => searchTexturePacks(tpSearch.value.trim()), 400);
 });
 
 // ── Modrinth mod search ────────────────────────────────────────────────────────
@@ -387,8 +499,6 @@ modsSearch.addEventListener('input', () => {
   if (searchTimer) clearTimeout(searchTimer);
   searchTimer = setTimeout(() => searchModrinth(modsSearch.value.trim()), 400);
 });
-
-searchModrinth('');
 
 // ── Auto-updater UI ────────────────────────────────────────────────────────────
 const updater = (window as any).updater;

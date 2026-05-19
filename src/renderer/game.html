@@ -245,6 +245,7 @@
       </div>
       <div class="nav-item active" id="nav-play">🎮 &nbsp;Play</div>
       <div class="nav-item" id="nav-mods" style="margin-top:4px">🧩 &nbsp;Mods</div>
+      <div class="nav-item" id="nav-customize">🎨 &nbsp;Customize</div>
       <div class="nav-item" id="nav-settings">⚙️ &nbsp;Settings</div>
       <div id="sidebar-bottom">
         <div id="user-chip">
@@ -330,6 +331,72 @@
       </div>
       <div id="mods-list">
         <!-- Populated by game.ts -->
+      </div>
+    </div>
+
+    <!-- Customize panel -->
+    <div id="customize-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="padding:24px 32px 20px;border-bottom:1px solid #21262d;background:linear-gradient(135deg,#0d1b12,#0a1628);">
+        <h2 style="font-size:20px;font-weight:700;">🎨 Customize</h2>
+        <p style="font-size:12px;color:#8b949e;margin-top:4px;">Change your skin, cape and texture packs</p>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:24px;">
+
+        <!-- Skin editor -->
+        <div>
+          <div class="section-label" style="margin-top:0">Your Skin</div>
+          <div style="display:flex;gap:20px;align-items:flex-start;">
+            <!-- Preview -->
+            <div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;min-width:140px;">
+              <canvas id="skin-canvas" width="92" height="148" style="image-rendering:pixelated;border-radius:4px;"></canvas>
+              <span id="skin-name" style="font-size:11px;color:#484f58;">No skin loaded</span>
+            </div>
+            <!-- Controls -->
+            <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+              <div class="control-card">
+                <label>Upload Skin (PNG)</label>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                  <button id="skin-pick-btn" style="flex:1;padding:9px;background:#21262d;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-size:13px;cursor:pointer;">📁 Choose File</button>
+                  <button id="skin-apply-btn" disabled style="flex:1;padding:9px;background:linear-gradient(135deg,#238636,#2ea043);border:1px solid #3fb950;border-radius:7px;color:#fff;font-size:13px;cursor:pointer;opacity:0.4;">✓ Apply Skin</button>
+                </div>
+                <div id="skin-status" style="font-size:11px;color:#484f58;margin-top:6px;"></div>
+              </div>
+              <div class="control-card">
+                <label>Skin Model</label>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                  <button id="skin-slim-off" class="model-btn active" data-model="classic" style="flex:1;padding:8px;background:#238636;border:1px solid #3fb950;border-radius:6px;color:#fff;font-size:12px;cursor:pointer;">Classic (Steve)</button>
+                  <button id="skin-slim-on" class="model-btn" data-model="slim" style="flex:1;padding:8px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:12px;cursor:pointer;">Slim (Alex)</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cape -->
+        <div>
+          <div class="section-label">Cape</div>
+          <div class="control-card" style="display:flex;align-items:center;gap:16px;">
+            <div id="cape-preview" style="width:32px;height:48px;background:#21262d;border-radius:4px;border:1px solid #30363d;display:flex;align-items:center;justify-content:center;font-size:20px;">🦸</div>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:600;" id="cape-name">No cape equipped</div>
+              <div style="font-size:12px;color:#8b949e;margin-top:3px;">Capes are earned in-game or via Minecraft Java Edition purchases</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Texture packs -->
+        <div style="flex:1;display:flex;flex-direction:column;">
+          <div class="section-label">Texture Packs</div>
+          <input id="tp-search" type="text" placeholder="🔍  Search texture packs on Modrinth…"
+            style="width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;margin-bottom:12px;"
+            onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
+          <div id="tp-loading" style="display:none;align-items:center;gap:10px;padding:16px;color:#484f58;font-size:13px;">
+            <div style="width:14px;height:14px;border:2px solid #30363d;border-top-color:#3fb950;border-radius:50%;animation:spin 0.7s linear infinite"></div>
+            Loading…
+          </div>
+          <div id="tp-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+
       </div>
     </div>
 
