@@ -26,7 +26,7 @@ function saveCachedAuth(token: any) {
 }
 function isTokenStale(token: any): boolean {
   if (!token?.cached_at) return true;
-  return Date.now() - token.cached_at > 20 * 60 * 60 * 1000; // 20 hours
+  return Date.now() - token.cached_at > 23 * 60 * 60 * 1000; // 23 hours
 }
 function clearCachedAuth() {
   try { if (fs.existsSync(AUTH_CACHE)) fs.unlinkSync(AUTH_CACHE); } catch {}
@@ -216,17 +216,18 @@ ipcMain.handle('mc-reauth', async () => {
 ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }) => {
   if (!mcAuthToken) return { ok: false, error: 'Not authenticated with Microsoft' };
 
-  // Refresh token if stale (> 20 h) so server joins don't fail auth
+  // Refresh token if stale (> 20 h); if refresh fails, try cached token anyway
   if (isTokenStale(mcAuthToken)) {
     try {
-      gameWin?.webContents.send('mc-log', '[Launcher] Token expired — re-authenticating…');
+      gameWin?.webContents.send('mc-log', '[Launcher] Token may be stale — re-authenticating…');
       const code  = await openMicrosoftAuthWindow();
       const token = await authenticateWithMinecraft(code);
       mcAuthToken = token;
       saveCachedAuth(token);
       gameWin?.webContents.send('mc-already-authed', token.name);
     } catch (err: any) {
-      return { ok: false, error: `Token refresh failed: ${err.message}` };
+      // Rate-limited or cancelled — proceed with cached token and hope it still works
+      gameWin?.webContents.send('mc-log', `[Launcher] Token refresh skipped (${err.message}) — using cached token`);
     }
   }
 
