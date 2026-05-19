@@ -245,6 +245,15 @@ if (mc) {
 
       addLog(`⚠ Crash: ${reason}`, 'error');
       setStatus(`Crashed: ${reason}`, 'red');
+      // Try to surface the actual Java crash report
+      if (mc.crashReport) {
+        mc.crashReport().then((r: any) => {
+          if (r.ok) {
+            addLog(`--- Crash report: ${r.name} ---`, 'error');
+            r.content.split('\n').slice(0, 60).forEach((l: string) => { if (l.trim()) addLog(l, 'error'); });
+          }
+        });
+      }
     } else {
       setStatus('Minecraft closed', '');
     }

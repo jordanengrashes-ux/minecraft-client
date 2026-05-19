@@ -233,12 +233,13 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }
   try {
     const mcRoot = path.join(app.getPath('userData'), '.minecraft');
     const launcher = new Client();
+    // Strip internal fields MCLC doesn't understand
+    const { cached_at: _, ...auth } = mcAuthToken as any;
     launcher.launch({
-      authorization: mcAuthToken,
+      authorization: auth,
       root: mcRoot,
       version: { number: opts.version || '1.21.4', type: 'release' },
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
-      overrides: { maxSockets: 64 },
     });
     // Send every line so the renderer can detect crash causes
     launcher.on('data',     (d: string)  => gameWin?.webContents.send('mc-log',      d));
@@ -257,6 +258,23 @@ ipcMain.handle('mc-repair', async () => {
     const mcRoot = path.join(app.getPath('userData'), '.minecraft');
     fs.rmSync(mcRoot, { recursive: true, force: true });
     return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// ── IPC: crash report reader ──────────────────────────────────────────────────
+ipcMain.handle('mc-crash-report', async () => {
+  try {
+    const crashDir = path.join(app.getPath('userData'), '.minecraft', 'crash-reports');
+    if (!fs.existsSync(crashDir)) return { ok: false, error: 'No crash reports found' };
+    const files = fs.readdirSync(crashDir)
+      .filter(f => f.endsWith('.txt'))
+      .map(f => ({ name: f, mtime: fs.statSync(path.join(crashDir, f)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime);
+    if (!files.length) return { ok: false, error: 'No crash reports found' };
+    const content = fs.readFileSync(path.join(crashDir, files[0].name), 'utf-8');
+    return { ok: true, name: files[0].name, content: content.slice(0, 8000) };
   } catch (err: any) {
     return { ok: false, error: err.message };
   }
