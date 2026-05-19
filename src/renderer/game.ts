@@ -201,21 +201,26 @@ if (mc) {
     if (task === total && total > 0) addLog(`✓ ${label} complete`);
   });
 
+  const recentLines: string[] = [];
+
   mc.onLog((line: string) => {
-    // Only show meaningful log lines
-    if (line.includes('ERROR') || line.includes('WARN')) {
-      addLog(line.trim(), line.includes('ERROR') ? 'error' : 'warn');
+    const t = line.trim();
+    if (!t) return;
+    recentLines.push(t);
+    if (recentLines.length > 300) recentLines.shift();
+
+    if (t.includes('ERROR') || t.includes('WARN') || t.includes('Exception') || t.includes('at java.')) {
+      addLog(t, t.includes('ERROR') || t.includes('Exception') ? 'error' : 'warn');
     } else if (
-      line.includes('Logging in') || line.includes('Setting user') ||
-      line.includes('Preparing level') || line.includes('Done') ||
-      line.includes('Joining') || line.includes('LWJGL') ||
-      line.includes('Minecraft') || line.includes('main/')
+      t.includes('Logging in') || t.includes('Setting user') ||
+      t.includes('Preparing level') || t.includes('Done') ||
+      t.includes('Joining') || t.includes('Backend library') ||
+      t.includes('[Launcher]') || t.includes('main/')
     ) {
-      addLog(line.trim());
+      addLog(t);
     }
 
-    // Detect game fully started
-    if (line.includes('[Render thread/INFO]') && line.includes('Backend library')) {
+    if (t.includes('Backend library')) {
       setStatus('Minecraft is running', 'green');
       setProgress(null);
       mcPlayBtn.textContent = '🟢  Running';
@@ -223,12 +228,33 @@ if (mc) {
   });
 
   mc.onClosed((code: number) => {
-    addLog(`Minecraft exited with code ${code}`);
-    setStatus(code === 0 ? 'Minecraft closed' : `Minecraft crashed (code ${code})`, code === 0 ? '' : 'red');
+    if (code !== 0) {
+      // Auto-open log and show crash diagnosis
+      logVisible = true;
+      logPanel.style.display = 'block';
+      logToggle.textContent = 'Hide log ▼';
+
+      const crashLines = recentLines.slice(-80);
+      const reason =
+        crashLines.some(l => l.includes('OutOfMemoryError'))     ? 'Out of memory — increase RAM allocation' :
+        crashLines.some(l => l.includes('Failed to verify username') || l.includes('Invalid session')) ? 'Session expired — click Microsoft Login to re-authenticate' :
+        crashLines.some(l => l.includes('OpenGL') || l.includes('GLFW'))   ? 'Graphics error — update your GPU drivers' :
+        crashLines.some(l => l.includes('UnsupportedClassVersionError'))    ? 'Java version too old — Minecraft needs Java 21' :
+        crashLines.some(l => l.includes('FileNotFoundException') || l.includes('corrupt')) ? 'Corrupt game files — use Repair in Settings' :
+        `Exit code ${code}`;
+
+      addLog(`⚠ Crash: ${reason}`, 'error');
+      setStatus(`Crashed: ${reason}`, 'red');
+    } else {
+      setStatus('Minecraft closed', '');
+    }
     resetPlay();
   });
 
   mc.onError((msg: string) => {
+    logVisible = true;
+    logPanel.style.display = 'block';
+    logToggle.textContent = 'Hide log ▼';
     addLog(`Error: ${msg}`, 'error');
     setStatus(`Error: ${msg}`, 'red');
     resetPlay();
@@ -259,6 +285,22 @@ navPlay    .addEventListener('click', () => showPanel(contentEl,        navPlay)
 navMods    .addEventListener('click', () => { showPanel(modsPanelEl,    navMods);     if (!modsPanelEl.dataset.loaded) { searchModrinth(''); modsPanelEl.dataset.loaded = '1'; } });
 navCustomize.addEventListener('click',() => { showPanel(customizePanelEl, navCustomize); if (!customizePanelEl.dataset.loaded) { searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
 navSettings.addEventListener('click', () => showPanel(settingsPanelEl,  navSettings));
+
+// ── Repair button ─────────────────────────────────────────────────────────────
+document.getElementById('repair-btn')?.addEventListener('click', async () => {
+  if (!mc) return;
+  const btn = document.getElementById('repair-btn') as HTMLButtonElement;
+  btn.disabled = true; btn.textContent = 'Repairing…';
+  const res = await mc.repair();
+  if (res.ok) {
+    btn.textContent = '✓ Done — relaunch to redownload';
+    setStatus('Game files cleared — press Play to redownload', 'yellow');
+  } else {
+    btn.textContent = 'Repair Game';
+    btn.disabled = false;
+    setStatus(`Repair failed: ${res.error}`, 'red');
+  }
+});
 
 // ── Reauth button ──────────────────────────────────────────────────────────────
 document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => {

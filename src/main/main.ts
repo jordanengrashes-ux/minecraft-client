@@ -22,7 +22,11 @@ function loadCachedAuth() {
   } catch { mcAuthToken = null; }
 }
 function saveCachedAuth(token: any) {
-  try { fs.writeFileSync(AUTH_CACHE, JSON.stringify(token), 'utf-8'); } catch {}
+  try { fs.writeFileSync(AUTH_CACHE, JSON.stringify({ ...token, cached_at: Date.now() }), 'utf-8'); } catch {}
+}
+function isTokenStale(token: any): boolean {
+  if (!token?.cached_at) return true;
+  return Date.now() - token.cached_at > 20 * 60 * 60 * 1000; // 20 hours
 }
 function clearCachedAuth() {
   try { if (fs.existsSync(AUTH_CACHE)) fs.unlinkSync(AUTH_CACHE); } catch {}
@@ -211,19 +215,47 @@ ipcMain.handle('mc-reauth', async () => {
 // ── IPC: launch Minecraft ─────────────────────────────────────────────────────
 ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }) => {
   if (!mcAuthToken) return { ok: false, error: 'Not authenticated with Microsoft' };
+
+  // Refresh token if stale (> 20 h) so server joins don't fail auth
+  if (isTokenStale(mcAuthToken)) {
+    try {
+      gameWin?.webContents.send('mc-log', '[Launcher] Token expired — re-authenticating…');
+      const code  = await openMicrosoftAuthWindow();
+      const token = await authenticateWithMinecraft(code);
+      mcAuthToken = token;
+      saveCachedAuth(token);
+      gameWin?.webContents.send('mc-already-authed', token.name);
+    } catch (err: any) {
+      return { ok: false, error: `Token refresh failed: ${err.message}` };
+    }
+  }
+
   try {
+    const mcRoot = path.join(app.getPath('userData'), '.minecraft');
     const launcher = new Client();
     launcher.launch({
       authorization: mcAuthToken,
-      root: path.join(app.getPath('userData'), '.minecraft'),
+      root: mcRoot,
       version: { number: opts.version || '1.21.4', type: 'release' },
-      memory:  { max: `${opts.maxMem || 4}G`, min: '2G' },
+      memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       overrides: { maxSockets: 64 },
     });
+    // Send every line so the renderer can detect crash causes
     launcher.on('data',     (d: string)  => gameWin?.webContents.send('mc-log',      d));
     launcher.on('progress', (e: any)     => gameWin?.webContents.send('mc-progress', e));
     launcher.on('close',    (c: number)  => gameWin?.webContents.send('mc-closed',   c));
     launcher.on('error',    (e: Error)   => gameWin?.webContents.send('mc-error',    e.message));
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// ── IPC: repair (delete cached game files) ────────────────────────────────────
+ipcMain.handle('mc-repair', async () => {
+  try {
+    const mcRoot = path.join(app.getPath('userData'), '.minecraft');
+    fs.rmSync(mcRoot, { recursive: true, force: true });
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: err.message };
