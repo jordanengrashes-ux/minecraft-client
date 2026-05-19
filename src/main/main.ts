@@ -267,21 +267,41 @@ ipcMain.handle('mc-repair', async () => {
   }
 });
 
-// ── IPC: crash report reader ──────────────────────────────────────────────────
+// ── IPC: crash report + log reader ───────────────────────────────────────────
 ipcMain.handle('mc-crash-report', async () => {
+  const mcRoot = path.join(app.getPath('userData'), '.minecraft');
+  const results: string[] = [];
+
+  // Read latest.log
   try {
-    const crashDir = path.join(app.getPath('userData'), '.minecraft', 'crash-reports');
-    if (!fs.existsSync(crashDir)) return { ok: false, error: 'No crash reports found' };
-    const files = fs.readdirSync(crashDir)
-      .filter(f => f.endsWith('.txt'))
-      .map(f => ({ name: f, mtime: fs.statSync(path.join(crashDir, f)).mtimeMs }))
-      .sort((a, b) => b.mtime - a.mtime);
-    if (!files.length) return { ok: false, error: 'No crash reports found' };
-    const content = fs.readFileSync(path.join(crashDir, files[0].name), 'utf-8');
-    return { ok: true, name: files[0].name, content: content.slice(0, 8000) };
-  } catch (err: any) {
-    return { ok: false, error: err.message };
-  }
+    const logPath = path.join(mcRoot, 'logs', 'latest.log');
+    if (fs.existsSync(logPath)) {
+      const content = fs.readFileSync(logPath, 'utf-8');
+      const lines = content.split('\n');
+      // Last 100 lines of the log
+      results.push('=== latest.log (last 100 lines) ===');
+      results.push(...lines.slice(-100));
+    }
+  } catch {}
+
+  // Read newest crash report
+  try {
+    const crashDir = path.join(mcRoot, 'crash-reports');
+    if (fs.existsSync(crashDir)) {
+      const files = fs.readdirSync(crashDir)
+        .filter(f => f.endsWith('.txt'))
+        .map(f => ({ name: f, mtime: fs.statSync(path.join(crashDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      if (files.length) {
+        const content = fs.readFileSync(path.join(crashDir, files[0].name), 'utf-8');
+        results.push(`=== crash-reports/${files[0].name} ===`);
+        results.push(...content.split('\n').slice(0, 80));
+      }
+    }
+  } catch {}
+
+  if (!results.length) return { ok: false, error: 'No log files found in ' + mcRoot };
+  return { ok: true, name: 'logs', content: results.join('\n') };
 });
 
 // ── IPC: skin upload ──────────────────────────────────────────────────────────

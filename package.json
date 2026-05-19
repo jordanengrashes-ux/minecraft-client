@@ -1,6 +1,6 @@
 {
   "name": "minecraft-client",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Voxel game client",
   "main": "dist-electron/main.js",
   "scripts": {
