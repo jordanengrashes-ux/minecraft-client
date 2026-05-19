@@ -138,11 +138,11 @@ async function authenticateWithMinecraft(code: string): Promise<any> {
 
   return {
     access_token: mc.access_token,
-    client_token: uhs,
+    client_token: mc.access_token,
     uuid: profile.id,
     name: profile.name,
-    user_properties: '{}',
-    meta: { type: 'msa' },
+    user_properties: {},
+    meta: { type: 'msa', demo: false },
   };
 }
 
@@ -233,8 +233,12 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }
   try {
     const mcRoot = path.join(app.getPath('userData'), '.minecraft');
     const launcher = new Client();
-    // Strip internal fields MCLC doesn't understand
     const { cached_at: _, ...auth } = mcAuthToken as any;
+
+    gameWin?.webContents.send('mc-log', `[Launcher] mcRoot: ${mcRoot}`);
+    gameWin?.webContents.send('mc-log', `[Launcher] version: ${opts.version || '1.21.4'}, mem: ${opts.maxMem || 4}G`);
+    gameWin?.webContents.send('mc-log', `[Launcher] uuid: ${auth.uuid}, name: ${auth.name}`);
+
     launcher.launch({
       authorization: auth,
       root: mcRoot,

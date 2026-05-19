@@ -166,6 +166,11 @@ mcPlayBtn.addEventListener('click', async () => {
   setProgress(0);
   logToggle.style.display = 'inline';
 
+  // Auto-open log so user can see output
+  logVisible = true;
+  logPanel.style.display = 'block';
+  logToggle.textContent = 'Hide log ▼';
+
   addLog(`Launching Minecraft ${version} with ${maxMem}GB RAM…`);
 
   const res = await mc.launch({ version, maxMem });
@@ -207,20 +212,14 @@ if (mc) {
     const t = line.trim();
     if (!t) return;
     recentLines.push(t);
-    if (recentLines.length > 300) recentLines.shift();
+    if (recentLines.length > 500) recentLines.shift();
 
-    if (t.includes('ERROR') || t.includes('WARN') || t.includes('Exception') || t.includes('at java.')) {
-      addLog(t, t.includes('ERROR') || t.includes('Exception') ? 'error' : 'warn');
-    } else if (
-      t.includes('Logging in') || t.includes('Setting user') ||
-      t.includes('Preparing level') || t.includes('Done') ||
-      t.includes('Joining') || t.includes('Backend library') ||
-      t.includes('[Launcher]') || t.includes('main/')
-    ) {
-      addLog(t);
-    }
+    // Show all lines in log
+    const isErr = t.includes('ERROR') || t.includes('Exception') || t.includes('FATAL');
+    const isWarn = t.includes('WARN');
+    addLog(t, isErr ? 'error' : isWarn ? 'warn' : '');
 
-    if (t.includes('Backend library')) {
+    if (t.includes('Backend library') || t.includes('Game engine started')) {
       setStatus('Minecraft is running', 'green');
       setProgress(null);
       mcPlayBtn.textContent = '🟢  Running';
