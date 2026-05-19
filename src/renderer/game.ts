@@ -273,15 +273,17 @@ setStatus('Ready — login with Microsoft to play');
 
 // ── Nav switching ─────────────────────────────────────────────────────────────
 const contentEl       = document.getElementById('content')!;
+const bedrockPanelEl  = document.getElementById('bedrock-panel')!;
 const modsPanelEl     = document.getElementById('mods-panel')!;
 const customizePanelEl= document.getElementById('customize-panel')!;
 const settingsPanelEl = document.getElementById('settings-panel')!;
 const navPlay         = document.getElementById('nav-play')!;
+const navBedrock      = document.getElementById('nav-bedrock')!;
 const navMods         = document.getElementById('nav-mods')!;
 const navCustomize    = document.getElementById('nav-customize')!;
 const navSettings     = document.getElementById('nav-settings')!;
-const allPanels       = [contentEl, modsPanelEl, customizePanelEl, settingsPanelEl];
-const allNavs         = [navPlay, navMods, navCustomize, navSettings];
+const allPanels       = [contentEl, bedrockPanelEl, modsPanelEl, customizePanelEl, settingsPanelEl];
+const allNavs         = [navPlay, navBedrock, navMods, navCustomize, navSettings];
 
 function showPanel(panel: HTMLElement, nav: HTMLElement) {
   allPanels.forEach(p => p.style.display = 'none');
@@ -290,9 +292,53 @@ function showPanel(panel: HTMLElement, nav: HTMLElement) {
   nav.classList.add('active');
 }
 navPlay    .addEventListener('click', () => showPanel(contentEl,        navPlay));
+navBedrock .addEventListener('click', () => { showPanel(bedrockPanelEl, navBedrock); initBedrock(); });
 navMods    .addEventListener('click', () => { showPanel(modsPanelEl,    navMods);     if (!modsPanelEl.dataset.loaded) { searchModrinth(''); modsPanelEl.dataset.loaded = '1'; } });
 navCustomize.addEventListener('click',() => { showPanel(customizePanelEl, navCustomize); if (!customizePanelEl.dataset.loaded) { searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
 navSettings.addEventListener('click', () => showPanel(settingsPanelEl,  navSettings));
+
+// ── Bedrock Edition ────────────────────────────────────────────────────────────
+const bedrockIcon       = document.getElementById('bedrock-icon')!;
+const bedrockStatusText = document.getElementById('bedrock-status-text')!;
+const bedrockStatusSub  = document.getElementById('bedrock-status-sub')!;
+const bedrockLaunchBtn  = document.getElementById('bedrock-launch-btn') as HTMLButtonElement;
+let bedrockInited = false;
+
+function initBedrock() {
+  if (bedrockInited) return;
+  bedrockInited = true;
+  // Detect via launch attempt — if minecraft: URI fails the OS won't find a handler
+  // We check by trying to resolve the UWP package path via IPC
+  bedrockLaunchBtn.addEventListener('click', async () => {
+    if (!mc) return;
+    bedrockLaunchBtn.disabled = true;
+    bedrockLaunchBtn.textContent = '⏳  Launching…';
+    const res = await mc.launchBedrock();
+    bedrockLaunchBtn.disabled = false;
+    if (res.ok) {
+      bedrockLaunchBtn.textContent = '✅  Bedrock launched!';
+      bedrockIcon.textContent = '✅';
+      bedrockStatusText.textContent = 'Minecraft Bedrock Edition launched';
+      bedrockStatusSub.textContent = 'The game should open shortly';
+      setTimeout(() => { bedrockLaunchBtn.textContent = '🪨  Launch Bedrock Edition'; }, 3000);
+    } else if (res.notInstalled) {
+      bedrockIcon.textContent = '🛒';
+      bedrockStatusText.textContent = 'Bedrock not installed';
+      bedrockStatusSub.textContent = 'Opening Microsoft Store to purchase/install Minecraft for Windows…';
+      bedrockLaunchBtn.textContent = '🛒  Get Bedrock Edition';
+    } else {
+      bedrockStatusText.textContent = `Error: ${res.error}`;
+      bedrockLaunchBtn.textContent = '🪨  Launch Bedrock Edition';
+    }
+  });
+
+  // Check install status without launching
+  if (mc?.launchBedrock) {
+    bedrockIcon.textContent = '🪨';
+    bedrockStatusText.textContent = 'Minecraft Bedrock Edition';
+    bedrockStatusSub.textContent = 'Click Launch to open Bedrock, or Get to install it from the Microsoft Store';
+  }
+}
 
 // ── Repair button ─────────────────────────────────────────────────────────────
 document.getElementById('repair-btn')?.addEventListener('click', async () => {

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net } from 'electron';
+import { app, BrowserWindow, ipcMain, net, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
 import fs from 'fs';
@@ -303,6 +303,23 @@ ipcMain.handle('mc-crash-report', async () => {
 
   if (!results.length) return { ok: false, error: 'No log files found in ' + mcRoot };
   return { ok: true, name: 'logs', content: results.join('\n') };
+});
+
+// ── IPC: Bedrock Edition launch ───────────────────────────────────────────────
+ipcMain.handle('mc-launch-bedrock', async () => {
+  try {
+    const bedrockDir = path.join(process.env.LOCALAPPDATA || '', 'Packages', 'Microsoft.MinecraftUWP_8wekyb3d8bbwe');
+    const installed = fs.existsSync(bedrockDir);
+    if (installed) {
+      await shell.openExternal('minecraft:');
+      return { ok: true };
+    } else {
+      await shell.openExternal('ms-windows-store://pdp/?ProductId=9NBLGGH2JHXJ');
+      return { ok: false, notInstalled: true };
+    }
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
 });
 
 // ── IPC: skin upload ──────────────────────────────────────────────────────────

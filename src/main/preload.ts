@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('mc', {
   uploadSkin:      (opts: { base64: string; variant: 'classic' | 'slim' }) => ipcRenderer.invoke('mc-upload-skin', opts),
   repair:          () => ipcRenderer.invoke('mc-repair'),
   crashReport:     () => ipcRenderer.invoke('mc-crash-report'),
+  launchBedrock:   () => ipcRenderer.invoke('mc-launch-bedrock'),
   onAlreadyAuthed: (cb: (name: string) => void) => ipcRenderer.on('mc-already-authed', (_e, n) => cb(n)),
   onLog:           (cb: (line: string) => void) => ipcRenderer.on('mc-log',      (_e, l) => cb(l)),
   onProgress:      (cb: (e: any) => void)       => ipcRenderer.on('mc-progress', (_e, e) => cb(e)),
