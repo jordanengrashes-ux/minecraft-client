@@ -522,11 +522,13 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
 
 // ── IPC: force-kill MC ────────────────────────────────────────────────────────
 ipcMain.handle('mc-kill', () => {
-  if (mcProcess) {
-    mcProcess.kill('SIGKILL');
+  if (mcProcess?.pid) {
+    try { execSync(`taskkill /F /PID ${mcProcess.pid} /T`, { stdio: 'ignore' }); } catch {}
+    mcProcess = null;
     return;
   }
-  // Fallback: kill all javaw.exe (covers cases where process ref was lost)
+  // Fallback: kill any java process (covers cases where process ref was lost)
+  try { execSync('taskkill /F /IM java.exe /T',  { stdio: 'ignore' }); } catch {}
   try { execSync('taskkill /F /IM javaw.exe /T', { stdio: 'ignore' }); } catch {}
 });
 
