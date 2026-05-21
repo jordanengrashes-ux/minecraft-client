@@ -1,0 +1,13 @@
+diff --git a/node_modules/minecraft-launcher-core/components/handler.js b/node_modules/minecraft-launcher-core/components/handler.js
+index 111a797..47a48b4 100644
+--- a/node_modules/minecraft-launcher-core/components/handler.js
++++ b/node_modules/minecraft-launcher-core/components/handler.js
+@@ -177,7 +177,7 @@ class Handler {
+       const subhash = hash.substring(0, 2)
+       const subAsset = path.join(assetDirectory, 'objects', subhash)
+ 
+-      if (!fs.existsSync(path.join(subAsset, hash)) || !await this.checkSum(hash, path.join(subAsset, hash))) {
++      if (!fs.existsSync(path.join(subAsset, hash))) {
+         await this.downloadAsync(`${this.options.overrides.url.resource}/${subhash}/${hash}`, subAsset, hash, true, 'assets')
+       }
+       counter++

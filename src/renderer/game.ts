@@ -899,10 +899,15 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
       statusEl.style.color = '#d29922';
       try {
         const ver = mcVersion.value || '1.21.4';
-        const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '5' });
-        const vRes  = await fetch(`https://api.modrinth.com/v2/project/${mod.project_id}/version?${params}`);
-        const versions = await vRes.json() as { files: { url: string; filename: string; primary: boolean }[] }[];
-        if (!versions?.length) throw new Error(`No Fabric build for ${ver}`);
+        const tryVersions = [ver, '1.21.4', '1.21.1', '1.21'];
+        let versions: { files: { url: string; filename: string; primary: boolean }[] }[] = [];
+        for (const tv of tryVersions) {
+          const params = new URLSearchParams({ game_versions: `["${tv}"]`, loaders: '["fabric"]', limit: '5' });
+          const vRes = await fetch(`https://api.modrinth.com/v2/project/${mod.project_id}/version?${params}`);
+          const data = await vRes.json();
+          if (Array.isArray(data) && data.length) { versions = data; break; }
+        }
+        if (!versions.length) throw new Error('No Fabric build available');
         const file = versions[0].files.find(f => f.primary) ?? versions[0].files[0];
         if (!file) throw new Error('No download file found');
         statusEl.textContent = '⬇';
@@ -1031,8 +1036,7 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
     label: '⌨️ HUD & Info',
     color: '#58a6ff',
     mods: [
-      { slug: 'keystrokes',          emoji: '⌨️', name: 'Keystrokes',         desc: 'Live WASD + click display — exactly like Lunar Client', group: 'HUD' },
-      { slug: 'lunar-keystrokes',    emoji: '🌙', name: 'Lunar Keystrokes',   desc: 'Pixel-perfect Lunar Client keystrokes style', group: 'HUD' },
+      { slug: 'keystrokes+',          emoji: '⌨️', name: 'Keystrokes+',        desc: 'Live WASD + click display — exactly like Lunar Client', group: 'HUD' },
       { slug: 'appleskin',           emoji: '🍎', name: 'AppleSkin',          desc: 'Shows exact saturation & exhaustion on the hunger bar', group: 'HUD' },
       { slug: 'armor-status',        emoji: '🛡️', name: 'Armor Status',       desc: 'Armor & held item durability HUD', group: 'HUD' },
       { slug: 'status-effect-bars',  emoji: '🧪', name: 'Status Effect Bars', desc: 'Duration bars under every active potion effect', group: 'HUD' },
@@ -1046,20 +1050,18 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
     color: '#a371f7',
     mods: [
       { slug: 'custom-crosshair-mod', emoji: '🎯', name: 'Custom Crosshair',    desc: 'Change crosshair style, size, color & gap like Lunar', group: 'Visual' },
-      { slug: 'motionblur',           emoji: '💨', name: 'Motion Blur',         desc: 'Smooth camera motion blur when turning', group: 'Visual' },
+      { slug: 'natural-motion-blur',   emoji: '💨', name: 'Motion Blur',         desc: 'Smooth camera motion blur when turning', group: 'Visual' },
       { slug: 'not-enough-animations',emoji: '🏃', name: 'Not Enough Animations',desc: 'Restores eating, bow & item animations from older MC', group: 'Visual' },
       { slug: 'damage-tilt',          emoji: '💥', name: 'Damage Tilt',         desc: 'Screen tilts in the direction you take damage', group: 'Visual' },
-      { slug: 'cleanview',            emoji: '🌫️', name: 'CleanView',           desc: 'Removes first-person particle effects cluttering your screen', group: 'Visual' },
     ],
   },
   {
     label: '⚙️ Utility',
     color: '#3fb950',
     mods: [
-      { slug: 'togglesprint',      emoji: '🏃', name: 'Toggle Sprint',    desc: 'Toggle sprint on/off — no need to hold Ctrl', group: 'Utility' },
+      { slug: 'zebrastogglesneak-fabric', emoji: '🏃', name: 'Toggle Sprint', desc: 'Toggle sprint on/off — no need to hold Ctrl', group: 'Utility' },
       { slug: 'no-chat-reports',   emoji: '🔇', name: 'No Chat Reports',  desc: 'Removes chat signing — prevents Microsoft report system', group: 'Utility' },
       { slug: 'item-highlighter',  emoji: '🔆', name: 'Item Highlighter', desc: 'Highlights newly picked up items in your hotbar', group: 'Utility' },
-      { slug: 'inspecio',          emoji: '🔍', name: 'Inspecio',         desc: 'Rich item tooltips — map previews, book text, food value', group: 'Utility' },
     ],
   },
 ];
@@ -1094,10 +1096,15 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
       statusEl.textContent = '⏳'; statusEl.style.color = '#d29922';
       try {
         const ver = mcVersion.value || '1.21.4';
-        const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '5' });
-        const vRes = await fetch(`https://api.modrinth.com/v2/project/${mod.slug}/version?${params}`);
-        const versions = await vRes.json() as { files: { url: string; filename: string; primary: boolean }[] }[];
-        if (!versions?.length) throw new Error(`No Fabric build for ${ver}`);
+        const tryVersions = [ver, '1.21.4', '1.21.1', '1.21'];
+        let versions: { files: { url: string; filename: string; primary: boolean }[] }[] = [];
+        for (const tv of tryVersions) {
+          const params = new URLSearchParams({ game_versions: `["${tv}"]`, loaders: '["fabric"]', limit: '5' });
+          const vRes = await fetch(`https://api.modrinth.com/v2/project/${mod.slug}/version?${params}`);
+          const data = await vRes.json();
+          if (Array.isArray(data) && data.length) { versions = data; break; }
+        }
+        if (!versions.length) throw new Error('No Fabric build available');
         const file = versions[0].files.find(f => f.primary) ?? versions[0].files[0];
         statusEl.textContent = '⬇';
         const res = await mc.installMod({ url: file.url, filename: file.filename });
