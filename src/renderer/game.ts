@@ -665,7 +665,7 @@ async function installGameBg(btn: HTMLButtonElement, statusEl: HTMLElement) {
   statusEl.textContent = 'Installing resource pack…';
   const res = await mc.installBg({ images });
   if (res.ok) {
-    statusEl.textContent = '✅ Installed — enable "VoxelClient" in Minecraft › Options › Resource Packs';
+    statusEl.textContent = '✅ Applied — auto-enables on next Minecraft launch';
     statusEl.style.color = '#3fb950';
     btn.textContent = '↺ Reinstall';
   } else {
@@ -1543,6 +1543,8 @@ const srvIpInput   = document.getElementById('srv-ip') as HTMLInputElement;
 let srvRunning = false;
 let srvLogLines: string[] = [];
 let myUid = '';
+let pendingSrvName = '';
+let pendingSrvVersion = '';
 
 // ── Saved servers (localStorage) ──────────────────────────────────────────────
 interface SavedServer { id: string; name: string; ip: string; version: string; publish: boolean; }
@@ -1651,6 +1653,14 @@ if ((window as any).electron) {
 
 srvMemSlider?.addEventListener('input', () => { srvMemVal.textContent = srvMemSlider.value; });
 
+async function onServerReady(name: string, version: string) {
+  const manualIp = srvIpInput.value.trim();
+  const ip = manualIp || await getPublicIP();
+  if (!manualIp) srvIpInput.value = ip;
+  srvAddress.textContent = `localhost:25565   (public: ${ip}:25565)`;
+  await publishServer(name, version, ip);
+}
+
 function srvAddLog(text: string) {
   const lines = text.split('\n').filter(l => l.trim());
   lines.forEach(l => {
@@ -1662,6 +1672,11 @@ function srvAddLog(text: string) {
                     : l.includes('[Host]') ? '#79c0ff' : '#6e7681';
     div.textContent = l;
     srvLog.appendChild(div);
+    // Detect when MC server finishes starting — show connection address
+    if (srvRunning && srvAddress.textContent?.includes('Starting') &&
+        (l.includes(' Done (') || l.includes('!  Done'))) {
+      onServerReady(pendingSrvName, pendingSrvVersion);
+    }
   });
   // Remove placeholder
   const placeholder = srvLog.querySelector('div[style*="30363d"]');
@@ -1718,7 +1733,7 @@ async function loadServerVersions() {
   try {
     const res  = await fetch('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json');
     const data = await res.json() as { versions: { id: string; type: string }[] };
-    const releases = data.versions.filter(v => v.type === 'release' && isJava21Compatible(v.id));
+    const releases = data.versions.filter(v => v.type === 'release');
     sel.innerHTML = '';
     releases.forEach((v, i) => {
       const opt = document.createElement('option');
@@ -1802,6 +1817,9 @@ srvStartBtn?.addEventListener('click', async () => {
   srvLog.innerHTML = '';
   srvLogLines = [];
 
+  pendingSrvName    = name;
+  pendingSrvVersion = version;
+
   const res = await server.start({ version, maxMem, name });
   if (!res.ok) {
     srvAddLog(`[Error] ${res.error}`);
@@ -1813,18 +1831,12 @@ srvStartBtn?.addEventListener('click', async () => {
     return;
   }
 
-  // Show info panel + get public IP
   srvInfo.style.display = 'block';
   srvVerDisplay.textContent = version;
-  srvAddress.textContent = 'Getting IP…';
+  srvAddress.textContent = '⏳ Starting… use localhost:25565 once ready';
   srvStartBtn.textContent = '⏹ Stop Server';
   srvStartBtn.disabled = false;
-
-  const manualIp = srvIpInput.value.trim();
-  const ip = manualIp || await getPublicIP();
-  if (!manualIp) srvIpInput.value = ip; // fill in auto-detected IP
-  srvAddress.textContent = `${ip}:25565`;
-  await publishServer(name, version, ip);
+  // IP + publish happen in srvAddLog when MC logs "Done"
 });
 
 // Handle server log events

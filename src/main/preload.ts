@@ -27,6 +27,12 @@ contextBridge.exposeInMainWorld('server', {
   onClosed: (cb: (c: number) => void)  => ipcRenderer.on('server-closed', (_e, c) => cb(c)),
 });
 
+contextBridge.exposeInMainWorld('overlay', {
+  getMods:  () => ipcRenderer.invoke('overlay-get-mods'),
+  saveMods: (data: any) => ipcRenderer.invoke('overlay-save-mods', data),
+  close:    () => ipcRenderer.send('overlay-close'),
+});
+
 contextBridge.exposeInMainWorld('cosmetics', {
   installMod: () => ipcRenderer.invoke('cosmetics-install-mod'),
   getUuid:    () => ipcRenderer.invoke('mc-get-uuid'),

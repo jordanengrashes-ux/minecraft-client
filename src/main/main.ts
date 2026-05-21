@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { execSync, spawnSync, spawn, ChildProcess } from 'child_process';
 import https from 'https';
@@ -8,8 +8,9 @@ import fs from 'fs';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Client } = require('minecraft-launcher-core');
 
-let loginWin: BrowserWindow | null = null;
-let gameWin:  BrowserWindow | null = null;
+let loginWin:   BrowserWindow | null = null;
+let gameWin:    BrowserWindow | null = null;
+let overlayWin: BrowserWindow | null = null;
 let mcAuthToken: any = null;
 let serverProcess: ChildProcess | null = null;
 let mcProcess: ChildProcess | null = null;
@@ -345,6 +346,32 @@ function createLoginWindow() {
   });
   if (DEV) loginWin.loadURL('http://localhost:5173/login.html');
   else loginWin.loadFile(path.join(__dirname, '../dist/login.html'));
+}
+
+function createOverlayWindow() {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  overlayWin = new BrowserWindow({
+    width: 330, height: 540,
+    x: Math.round(width / 2 - 165),
+    y: Math.round(height / 2 - 270),
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+  });
+  overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  if (DEV) overlayWin.loadURL('http://localhost:5173/overlay.html');
+  else overlayWin.loadFile(path.join(__dirname, '../dist/overlay.html'));
+  overlayWin.on('closed', () => { overlayWin = null; });
+}
+
+function toggleOverlay() {
+  if (!overlayWin) { createOverlayWindow(); return; }
+  if (overlayWin.isVisible()) overlayWin.hide();
+  else { overlayWin.show(); overlayWin.focus(); }
 }
 
 function createGameWindow() {
@@ -879,10 +906,33 @@ function setupAutoUpdater() {
 ipcMain.on('install-update',    () => autoUpdater.quitAndInstall(false, true));
 ipcMain.on('check-for-updates', () => { autoUpdater.checkForUpdates().catch(() => {}); });
 
+// ── IPC: overlay mod state (reads/writes game window's localStorage) ──────────
+ipcMain.handle('overlay-get-mods', async () => {
+  if (!gameWin) return {};
+  try {
+    return await gameWin.webContents.executeJavaScript(
+      'JSON.parse(localStorage.getItem("voxel_installed_mods") || "{}")'
+    );
+  } catch { return {}; }
+});
+
+ipcMain.handle('overlay-save-mods', async (_e, data: any) => {
+  if (!gameWin) return;
+  try {
+    await gameWin.webContents.executeJavaScript(
+      `localStorage.setItem("voxel_installed_mods", ${JSON.stringify(JSON.stringify(data))})`
+    );
+  } catch {}
+});
+
+ipcMain.on('overlay-close', () => { overlayWin?.hide(); });
+
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   loadCachedAuth();
   createLoginWindow();
+  globalShortcut.register('Shift+F9', toggleOverlay);
 });
+app.on('will-quit', () => { globalShortcut.unregisterAll(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (!loginWin && !gameWin) createLoginWindow(); });

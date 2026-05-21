@@ -9,8 +9,9 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        login: path.resolve(__dirname, 'src/renderer/login.html'),
-        game:  path.resolve(__dirname, 'src/renderer/game.html'),
+        login:   path.resolve(__dirname, 'src/renderer/login.html'),
+        game:    path.resolve(__dirname, 'src/renderer/game.html'),
+        overlay: path.resolve(__dirname, 'src/renderer/overlay.html'),
       },
     },
   },

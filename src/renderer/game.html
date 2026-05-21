@@ -635,96 +635,74 @@
 
     <!-- Server Host panel -->
     <div id="server-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
-      <div style="padding:24px 32px 20px;border-bottom:1px solid rgba(33,38,45,0.5);background:rgba(8,12,20,0.45);backdrop-filter:blur(4px);">
-        <h2 style="font-size:20px;font-weight:700;">🖥️ Host a Server</h2>
-        <p style="font-size:12px;color:#8b949e;margin-top:4px;">Run a server on your PC or save one to the community list 24/7</p>
-      </div>
-      <div style="flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:16px;">
 
-        <!-- Config row -->
-        <div class="control-grid" style="grid-template-columns:1fr 1fr 1fr;">
-          <div class="control-card">
-            <label>Server Name</label>
-            <input id="srv-name" type="text" value="My Server" placeholder="My Server"
-              style="width:100%;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:13px;outline:none;margin-top:6px;"
-              onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
+      <!-- Top config bar -->
+      <div style="padding:14px 20px;border-bottom:1px solid rgba(33,38,45,0.5);background:rgba(8,12,20,0.6);backdrop-filter:blur(6px);flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <input id="srv-name" type="text" value="My Server" placeholder="Server name"
+            style="flex:1;min-width:120px;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;font-size:13px;outline:none;"
+            onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
+          <select id="srv-version" style="flex:1;min-width:110px;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;font-size:13px;outline:none;cursor:pointer;">
+            <option disabled selected>Loading…</option>
+          </select>
+          <div style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+            <span style="font-size:12px;color:#6e7681;">RAM</span>
+            <input type="range" id="srv-mem" min="1" max="16" value="2" style="width:80px;accent-color:#3fb950;" />
+            <span style="font-size:13px;color:#3fb950;font-weight:600;min-width:28px;"><span id="srv-mem-val">2</span>G</span>
           </div>
-          <div class="control-card">
-            <label>IP Address</label>
-            <input id="srv-ip" type="text" placeholder="Auto-detected when started" value=""
-              style="width:100%;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:13px;outline:none;margin-top:6px;font-family:monospace;"
-              onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
-          </div>
-          <div class="control-card">
-            <label>Version</label>
-            <select id="srv-version" style="width:100%;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:13px;outline:none;margin-top:6px;">
-              <option disabled>Loading versions…</option>
-            </select>
-          </div>
-          <div class="control-card">
-            <label>RAM &nbsp;<span id="srv-mem-val" style="color:#3fb950;font-weight:600;">2</span>GB</label>
-            <input type="range" id="srv-mem" min="1" max="8" value="2" style="width:100%;margin-top:10px;accent-color:#3fb950;" />
-          </div>
-          <div class="control-card" style="display:flex;align-items:center;justify-content:space-between;">
-            <div>
-              <div style="font-size:12px;font-weight:600;color:#e6edf3;">24/7 Community Listing</div>
-              <div style="font-size:11px;color:#484f58;margin-top:2px;">Always visible even when offline</div>
-            </div>
-            <label class="toggle"><input type="checkbox" id="srv-247-toggle" /><span class="toggle-slider"></span></label>
-          </div>
-          <div class="control-card" style="display:flex;flex-direction:column;justify-content:center;gap:8px;">
-            <button id="srv-save-btn" style="padding:8px 0;background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.35);border-radius:7px;color:#3fb950;font-size:12px;font-weight:600;cursor:pointer;width:100%;">💾 Save Server</button>
-            <div id="srv-save-status" style="font-size:11px;color:#484f58;text-align:center;"></div>
-          </div>
+          <button id="srv-start-btn" style="padding:8px 20px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#238636,#2ea043);border:1px solid #3fb950;border-radius:8px;color:#fff;cursor:pointer;transition:all 0.15s;white-space:nowrap;">
+            ▶ Start
+          </button>
         </div>
-
-        <!-- Start/Stop button -->
-        <button id="srv-start-btn" style="width:100%;padding:14px;font-size:16px;font-weight:700;background:linear-gradient(135deg,#238636,#2ea043);border:1px solid #3fb950;border-radius:10px;color:#fff;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:10px;">
-          ▶ &nbsp;Start Server Locally
-        </button>
 
         <!-- Connection info (shown when running) -->
-        <div id="srv-info" style="display:none;background:rgba(13,40,24,0.8);border:1px solid rgba(63,185,80,0.35);border-radius:10px;padding:16px 20px;">
-          <div style="font-size:13px;font-weight:600;color:#3fb950;margin-bottom:10px;">🟢 Server Online</div>
-          <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:12px;align-items:center;">
-            <span style="color:#484f58;">Address</span>
-            <span id="srv-address" style="color:#e6edf3;font-family:monospace;font-weight:600;">loading…</span>
-            <span style="color:#484f58;">Port</span>
-            <span style="color:#e6edf3;font-family:monospace;">25565</span>
-            <span style="color:#484f58;">Version</span>
-            <span id="srv-ver-display" style="color:#e6edf3;font-family:monospace;"></span>
-          </div>
-          <div style="margin-top:12px;font-size:11px;color:#484f58;">Friends need port 25565 forwarded on your router — or use <a href="https://playit.gg" target="_blank" style="color:#79c0ff;">playit.gg</a> for zero config.</div>
-          <div style="margin-top:12px;display:flex;gap:8px;">
-            <input id="srv-cmd-input" type="text" placeholder="Server command (e.g. list, say Hello)"
-              style="flex:1;background:rgba(1,4,9,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;font-size:12px;font-family:monospace;outline:none;"
-              onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
-            <button id="srv-cmd-btn" style="padding:7px 16px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:12px;cursor:pointer;">Send</button>
-          </div>
+        <div id="srv-info" style="display:none;margin-top:10px;display:none;align-items:center;gap:16px;background:rgba(13,40,24,0.6);border:1px solid rgba(63,185,80,0.25);border-radius:8px;padding:8px 14px;">
+          <span style="color:#3fb950;font-size:12px;font-weight:600;">🟢 Online</span>
+          <span style="color:#484f58;font-size:12px;">Address: <span id="srv-address" style="color:#e6edf3;font-family:monospace;font-weight:600;">—</span></span>
+          <span style="color:#484f58;font-size:12px;">Port: <span style="color:#e6edf3;font-family:monospace;">25565</span></span>
+          <span style="color:#484f58;font-size:12px;">Ver: <span id="srv-ver-display" style="color:#e6edf3;font-family:monospace;"></span></span>
+          <span style="color:#484f58;font-size:11px;flex:1;">Use <a href="https://playit.gg" target="_blank" style="color:#79c0ff;">playit.gg</a> to share without port forwarding</span>
         </div>
+      </div>
 
-        <!-- Server log -->
+      <!-- Console fills remaining space -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;background:rgba(1,4,9,0.95);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px;border-bottom:1px solid rgba(33,38,45,0.4);flex-shrink:0;">
+          <span style="font-size:10px;color:#3a4048;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Server Console</span>
+          <button id="srv-log-copy" style="background:rgba(33,38,45,0.6);border:1px solid #30363d;color:#6e7681;font-size:10px;cursor:pointer;padding:2px 8px;border-radius:4px;">📋 Copy</button>
+        </div>
+        <div id="srv-log" style="flex:1;overflow-y:auto;padding:10px 16px;font-family:'Consolas','Courier New',monospace;font-size:12px;color:#6e7681;cursor:text;line-height:1.7;">
+          <div style="color:#2a3038;">Server not started — select a version and click Start</div>
+        </div>
+        <!-- Command input at bottom of console -->
+        <div style="display:flex;gap:0;border-top:1px solid rgba(33,38,45,0.4);flex-shrink:0;">
+          <span style="padding:8px 10px;font-family:monospace;font-size:12px;color:#3fb950;background:rgba(13,17,23,0.9);border-right:1px solid rgba(33,38,45,0.4);">›</span>
+          <input id="srv-cmd-input" type="text" placeholder="Server command (list, say Hello, op player…)"
+            style="flex:1;background:rgba(13,17,23,0.9);border:none;color:#e6edf3;padding:8px 10px;font-size:12px;font-family:monospace;outline:none;" />
+          <button id="srv-cmd-btn" style="padding:8px 16px;background:rgba(63,185,80,0.08);border:none;border-left:1px solid rgba(33,38,45,0.4);color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">Send</button>
+        </div>
+      </div>
+
+      <!-- Saved + Community (scrollable strip below console) -->
+      <div style="max-height:200px;overflow-y:auto;border-top:1px solid rgba(33,38,45,0.4);padding:12px 20px;display:flex;flex-direction:column;gap:10px;background:rgba(5,8,15,0.8);">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div style="font-size:11px;color:#484f58;letter-spacing:2px;text-transform:uppercase;">Server Console</div>
-          <button id="srv-log-copy" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;font-size:11px;cursor:pointer;padding:3px 10px;border-radius:4px;">📋 Copy Log</button>
+          <span style="font-size:10px;color:#3a4048;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Saved Servers</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label class="toggle" style="width:34px;height:18px;"><input type="checkbox" id="srv-247-toggle" /><span class="toggle-slider"></span></label>
+            <span style="font-size:11px;color:#6e7681;">24/7 list</span>
+            <button id="srv-save-btn" style="padding:3px 12px;background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:5px;color:#3fb950;font-size:11px;font-weight:600;cursor:pointer;">💾 Save</button>
+            <span id="srv-save-status" style="font-size:11px;color:#484f58;"></span>
+          </div>
         </div>
-        <div id="srv-log" style="background:rgba(1,4,9,0.9);border:1px solid rgba(33,38,45,0.6);border-radius:8px;padding:12px 16px;height:160px;overflow-y:auto;font-family:monospace;font-size:11px;color:#484f58;cursor:text;">
-          <div style="color:#30363d;">Server not running</div>
+        <div id="saved-servers" style="display:flex;flex-direction:column;gap:6px;">
+          <div style="color:#2a3038;font-size:12px;" id="saved-servers-empty">No saved servers yet</div>
         </div>
-
-        <!-- Saved Servers -->
-        <div style="font-size:11px;color:#484f58;letter-spacing:2px;text-transform:uppercase;margin-top:4px;">Saved Servers</div>
-        <div id="saved-servers" style="display:flex;flex-direction:column;gap:8px;">
-          <div style="color:#30363d;font-size:12px;" id="saved-servers-empty">No saved servers yet — fill in the config above and click Save</div>
+        <div style="font-size:10px;color:#3a4048;letter-spacing:2px;text-transform:uppercase;font-weight:600;margin-top:4px;">Community Servers</div>
+        <div id="community-servers" style="display:flex;flex-direction:column;gap:6px;">
+          <div style="color:#2a3038;font-size:12px;">Loading…</div>
         </div>
-
-        <!-- Community Servers -->
-        <div style="font-size:11px;color:#484f58;letter-spacing:2px;text-transform:uppercase;margin-top:4px;">Community Servers</div>
-        <div style="font-size:12px;color:#484f58;margin-bottom:4px;">All Voxel Client users with servers saved or running</div>
-        <div id="community-servers" style="display:flex;flex-direction:column;gap:8px;">
-          <div style="color:#30363d;font-size:12px;">Loading…</div>
-        </div>
-
+        <!-- Hidden IP input for saved servers -->
+        <input id="srv-ip" type="hidden" value="" />
       </div>
     </div>
 

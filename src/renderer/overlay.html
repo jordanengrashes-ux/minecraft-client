@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>PvP Mods</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body {
+      width: 330px; height: 540px;
+      background: transparent;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #e6edf3;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #overlay {
+      width: 100%; height: 100%;
+      background: rgba(8, 13, 22, 0.94);
+      border: 1px solid rgba(63,185,80,0.35);
+      border-radius: 10px;
+      display: flex; flex-direction: column;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(63,185,80,0.08);
+      overflow: hidden;
+    }
+    #header {
+      background: linear-gradient(135deg, rgba(63,185,80,0.18) 0%, rgba(88,166,255,0.08) 100%);
+      border-bottom: 1px solid rgba(63,185,80,0.2);
+      padding: 10px 14px 9px;
+      display: flex; align-items: center; justify-content: space-between;
+      -webkit-app-region: drag;
+      cursor: move;
+    }
+    #header-left {}
+    #header-label { font-size: 9px; color: #3a4048; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
+    #header-title { font-size: 14px; font-weight: 800; letter-spacing: 1px; color: #3fb950; margin-top: 1px; }
+    #close-btn {
+      -webkit-app-region: no-drag;
+      background: none; border: none; color: #484f58; font-size: 16px; cursor: pointer;
+      padding: 2px 8px; border-radius: 5px; line-height: 1; transition: background 0.12s, color 0.12s;
+    }
+    #close-btn:hover { background: rgba(248,81,73,0.15); color: #f85149; }
+
+    #mod-list { flex: 1; overflow-y: auto; padding: 6px 10px 6px; }
+    #mod-list::-webkit-scrollbar { width: 3px; }
+    #mod-list::-webkit-scrollbar-track { background: transparent; }
+    #mod-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+    .group-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 8px 4px 4px; margin-top: 2px; opacity: 0.85;
+    }
+    .group-label:first-child { padding-top: 4px; }
+
+    .mod-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border-radius: 6px; margin: 1px 0;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.04);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .mod-row.active { background: rgba(63,185,80,0.07); border-color: rgba(63,185,80,0.22); }
+    .mod-row.error  { border-color: rgba(248,81,73,0.3); }
+
+    .mod-emoji { font-size: 13px; flex-shrink: 0; width: 18px; text-align: center; }
+    .mod-info  { flex: 1; min-width: 0; }
+    .mod-name  { font-size: 11px; font-weight: 600; color: #c9d1d9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mod-sub   { font-size: 9px; color: #484f58; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .toggle { position: relative; width: 34px; height: 18px; flex-shrink: 0; cursor: pointer; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: #21262d; border: 1px solid #30363d;
+      border-radius: 18px; transition: 0.18s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 12px; height: 12px; left: 2px; top: 2px;
+      background: #8b949e; border-radius: 50%; transition: 0.18s;
+    }
+    .toggle input:checked + .toggle-slider { background: rgba(63,185,80,0.25); border-color: #3fb950; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: #3fb950; }
+    .toggle input:disabled + .toggle-slider { opacity: 0.4; cursor: default; }
+
+    #footer {
+      padding: 7px 14px;
+      border-top: 1px solid rgba(33,38,45,0.6);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    #footer-note { font-size: 9px; color: #3a4048; }
+    #shortcut-badge {
+      font-size: 9px; color: #484f58; font-family: monospace;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 4px; padding: 1px 7px;
+    }
+  </style>
+</head>
+<body>
+<div id="overlay">
+  <div id="header">
+    <div id="header-left">
+      <div id="header-label">Voxel Client</div>
+      <div id="header-title">⚔ PvP Mods</div>
+    </div>
+    <button id="close-btn">✕</button>
+  </div>
+  <div id="mod-list"></div>
+  <div id="footer">
+    <span id="footer-note">Changes take effect on next launch</span>
+    <span id="shortcut-badge">Shift+F9</span>
+  </div>
+</div>
+<script type="module" src="./overlay.ts"></script>
+</body>
+</html>
