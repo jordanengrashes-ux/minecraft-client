@@ -7,16 +7,24 @@
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background: #0d1117; color: #e6edf3; font-family: 'Inter', monospace;
-      width: 100vw; height: 100vh; overflow: hidden; user-select: none;
+      background: #080c14; color: #e6edf3; font-family: 'Inter', monospace;
+      width: 100vw; height: 100vh; overflow: hidden;
     }
+    #bg-canvas {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    }
+    /* Disable selection on UI chrome but not on log output */
+    #sidebar, #titlebar, #hero, #play-row, #status-bar,
+    #mods-hero, #bedrock-mods-hero, .nav-item, .tbtn,
+    button, select, label { user-select: none; -webkit-user-select: none; }
 
     /* ── Title bar ── */
     #titlebar {
       position: fixed; top: 0; left: 0; right: 0; height: 32px;
       -webkit-app-region: drag; display: flex; align-items: center;
       justify-content: space-between; padding: 0 14px 0 16px;
-      background: #010409; border-bottom: 1px solid #21262d; z-index: 100;
+      background: rgba(1,4,9,0.85); border-bottom: 1px solid rgba(33,38,45,0.6);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 100;
     }
     #titlebar-title { font-size: 12px; color: #484f58; letter-spacing: 1px; }
     #titlebar-btns { -webkit-app-region: no-drag; display: flex; gap: 4px; }
@@ -26,14 +34,14 @@
 
     /* ── Layout ── */
     #launcher {
-      display: flex; height: 100vh; padding-top: 32px;
+      display: flex; height: 100vh; padding-top: 32px; position: relative; z-index: 1;
     }
 
     /* ── Left sidebar ── */
     #sidebar {
-      width: 220px; min-width: 220px; background: #010409;
-      border-right: 1px solid #21262d; display: flex; flex-direction: column;
-      padding: 24px 0;
+      width: 220px; min-width: 220px; background: rgba(1,4,9,0.82);
+      border-right: 1px solid rgba(33,38,45,0.5); display: flex; flex-direction: column;
+      padding: 24px 0; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     }
     #sidebar-logo {
       padding: 0 20px 24px; border-bottom: 1px solid #21262d;
@@ -65,14 +73,15 @@
     /* ── Hero banner ── */
     #hero {
       height: 180px; position: relative; overflow: hidden;
-      background: linear-gradient(135deg, #0d1b12 0%, #0a1628 50%, #0d1b12 100%);
-      border-bottom: 1px solid #21262d;
+      background: rgba(8,12,20,0.35);
+      border-bottom: 1px solid rgba(33,38,45,0.5);
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     }
     #hero-bg {
-      position: absolute; inset: 0; opacity: 0.35;
+      position: absolute; inset: 0; opacity: 0.18;
       background:
-        repeating-linear-gradient(0deg, transparent, transparent 15px, rgba(63,185,80,0.08) 15px, rgba(63,185,80,0.08) 16px),
-        repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(63,185,80,0.08) 15px, rgba(63,185,80,0.08) 16px);
+        repeating-linear-gradient(0deg, transparent, transparent 15px, rgba(63,185,80,0.15) 15px, rgba(63,185,80,0.15) 16px),
+        repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(63,185,80,0.15) 15px, rgba(63,185,80,0.15) 16px);
     }
     #hero-content { position: relative; padding: 28px 32px; }
     #hero-content h2 { font-size: 26px; font-weight: 700; color: #fff; }
@@ -92,14 +101,15 @@
     .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
     .control-card {
-      background: #161b22; border: 1px solid #21262d; border-radius: 10px;
+      background: rgba(22,27,34,0.82); border: 1px solid rgba(33,38,45,0.7); border-radius: 10px;
       padding: 16px; transition: border-color 0.15s;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     }
-    .control-card:hover { border-color: #30363d; }
+    .control-card:hover { border-color: rgba(48,54,61,0.9); }
     .control-card label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 8px; }
 
     select, input[type="range"] {
-      width: 100%; background: #0d1117; border: 1px solid #30363d;
+      width: 100%; background: rgba(13,17,23,0.9); border: 1px solid #30363d;
       border-radius: 6px; color: #e6edf3; padding: 8px 10px; font-size: 13px;
       outline: none; appearance: none; cursor: pointer;
     }
@@ -134,7 +144,8 @@
 
     /* ── Progress & log ── */
     #status-bar {
-      background: #010409; border-top: 1px solid #21262d;
+      background: rgba(1,4,9,0.88); border-top: 1px solid rgba(33,38,45,0.5);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       padding: 8px 32px; font-size: 11px; color: #484f58;
       display: flex; align-items: center; gap: 12px; min-height: 34px;
     }
@@ -147,10 +158,26 @@
     #progress-bar { height: 100%; background: #3fb950; width: 0%; transition: width 0.3s; border-radius: 2px; }
 
     #log-panel {
-      position: fixed; bottom: 34px; left: 220px; right: 0;
-      max-height: 200px; overflow-y: auto; background: #010409;
-      border-top: 1px solid #21262d; padding: 8px 32px;
-      font-family: monospace; font-size: 11px; color: #484f58; display: none;
+      position: fixed; bottom: 34px; left: 220px; right: 0; z-index: 500;
+      max-height: 260px; display: none; flex-direction: column;
+      background: rgba(1,4,9,0.96); border-top: 1px solid rgba(33,38,45,0.7);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    #log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 5px 14px 5px 32px; border-bottom: 1px solid rgba(33,38,45,0.5);
+      flex-shrink: 0;
+    }
+    #log-header span { font-size: 11px; color: #484f58; font-family: monospace; }
+    #log-close {
+      background: none; border: none; color: #484f58; font-size: 15px;
+      cursor: pointer; padding: 0 4px; line-height: 1;
+    }
+    #log-close:hover { color: #f85149; }
+    #log-body {
+      overflow-y: auto; padding: 6px 32px 8px;
+      font-family: monospace; font-size: 11px; color: #484f58; cursor: text;
+      flex: 1;
     }
     .log-line { line-height: 1.6; }
     .log-line.warn  { color: #d29922; }
@@ -164,8 +191,8 @@
     /* ── Mods panel ── */
     #mods-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
     #mods-hero {
-      padding: 24px 32px 20px; border-bottom: 1px solid #21262d;
-      background: linear-gradient(135deg,#0d1b12,#0a1628);
+      padding: 24px 32px 20px; border-bottom: 1px solid rgba(33,38,45,0.5);
+      background: rgba(8,12,20,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     }
     #mods-hero h2 { font-size: 20px; font-weight: 700; }
     #mods-hero p  { font-size: 12px; color: #8b949e; margin-top: 4px; }
@@ -183,10 +210,11 @@
     #mods-list { flex: 1; overflow-y: auto; padding: 20px 32px; display: flex; flex-direction: column; gap: 10px; }
     .mod-card {
       display: flex; align-items: center; gap: 14px;
-      background: #161b22; border: 1px solid #21262d; border-radius: 10px;
+      background: rgba(22,27,34,0.82); border: 1px solid rgba(33,38,45,0.7); border-radius: 10px;
       padding: 14px 16px; transition: border-color 0.15s;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     }
-    .mod-card:hover { border-color: #30363d; }
+    .mod-card:hover { border-color: rgba(48,54,61,0.9); }
     .mod-card.enabled { border-color: rgba(63,185,80,0.35); background: rgba(63,185,80,0.04); }
     .mod-icon { font-size: 26px; width: 38px; text-align: center; flex-shrink: 0; }
     .mod-info { flex: 1; min-width: 0; }
@@ -217,9 +245,85 @@
     .toggle input:checked + .toggle-slider::before { transform: translateX(20px); background: #3fb950; }
     .mod-icon-img { width: 38px; height: 38px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Cosmetics panel ── */
+    #cosmetics-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+    #cosmetics-hero {
+      padding: 24px 32px 20px; border-bottom: 1px solid rgba(33,38,45,0.5);
+      background: rgba(8,12,20,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    }
+    #cosmetics-hero h2 { font-size: 20px; font-weight: 700; }
+    #cosmetics-hero p  { font-size: 12px; color: #8b949e; margin-top: 4px; }
+    #cosmetics-body { flex: 1; overflow-y: auto; padding: 24px 32px; display: flex; flex-direction: column; gap: 20px; }
+    .cape-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .cape-card {
+      border-radius: 10px; overflow: hidden; cursor: pointer;
+      border: 2px solid rgba(33,38,45,0.7); transition: border-color 0.15s, transform 0.1s;
+      background: rgba(22,27,34,0.82); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .cape-card:hover { border-color: rgba(139,92,246,0.5); transform: translateY(-2px); }
+    .cape-card.equipped { border-color: #3fb950; }
+    .cape-swatch { height: 64px; width: 100%; }
+    .cape-label { padding: 8px 10px; }
+    .cape-name  { font-size: 13px; font-weight: 600; color: #e6edf3; }
+    .cape-equip {
+      width: 100%; margin-top: 6px; padding: 6px 0; border-radius: 6px;
+      font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid;
+      transition: all 0.15s;
+    }
+    .cape-equip.off {
+      background: rgba(63,185,80,0.1); border-color: rgba(63,185,80,0.35); color: #3fb950;
+    }
+    .cape-equip.off:hover { background: rgba(63,185,80,0.2); }
+    .cape-equip.on  { background: rgba(63,185,80,0.2); border-color: #3fb950; color: #3fb950; }
+    #cosmetics-status { font-size: 12px; color: #8b949e; margin-top: 4px; }
+    #mod-install-card {
+      padding: 16px; border-radius: 10px; border: 1px solid rgba(163,113,247,0.3);
+      background: rgba(163,113,247,0.06); backdrop-filter: blur(8px);
+    }
+
+    /* ── Token badge ── */
+    #token-badge {
+      display: flex; align-items: center; gap: 6px; padding: 6px 10px; margin-bottom: 8px;
+      background: rgba(210,153,34,0.08); border: 1px solid rgba(210,153,34,0.25);
+      border-radius: 8px; font-size: 12px; color: #d29922; font-weight: 600; cursor: default;
+    }
+
+    /* ── Cape cost badge ── */
+    .cape-cost { font-size: 10px; color: #d29922; margin-top: 2px; }
+    .cape-buy {
+      width: 100%; margin-top: 6px; padding: 6px 0; border-radius: 6px;
+      font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid;
+      transition: all 0.15s;
+      background: rgba(210,153,34,0.1); border-color: rgba(210,153,34,0.35); color: #d29922;
+    }
+    .cape-buy:hover { background: rgba(210,153,34,0.2); }
+    .cape-buy:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Friends panel ── */
+    #friends-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+    .friend-card {
+      display: flex; align-items: center; gap: 14px;
+      background: rgba(22,27,34,0.82); border: 1px solid rgba(33,38,45,0.7); border-radius: 10px;
+      padding: 12px 16px; transition: border-color 0.15s;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .friend-card.online { border-color: rgba(63,185,80,0.35); }
+    .friend-avatar {
+      width: 36px; height: 36px; border-radius: 8px; background: #21262d;
+      display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+    }
+    .friend-dot { width: 8px; height: 8px; border-radius: 50%; background: #484f58; flex-shrink: 0; }
+    .friend-dot.online { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
+    .req-card {
+      display: flex; align-items: center; gap: 12px;
+      background: rgba(88,166,255,0.05); border: 1px solid rgba(88,166,255,0.2); border-radius: 10px;
+      padding: 12px 16px;
+    }
   </style>
 </head>
 <body>
+  <canvas id="bg-canvas"></canvas>
   <!-- Update banner -->
   <div id="update-banner" style="display:none;position:fixed;top:32px;left:0;right:0;z-index:200;background:#1f3a1f;border-bottom:1px solid #3fb950;padding:7px 16px;font-size:12px;display:none;align-items:center;gap:10px;">
     <span id="update-text" style="flex:1;color:#aeffae;"></span>
@@ -229,7 +333,8 @@
 
   <div id="titlebar">
     <span id="titlebar-title">VOXEL CLIENT</span>
-    <div id="titlebar-btns">
+    <div id="titlebar-btns" style="-webkit-app-region:no-drag;display:flex;align-items:center;gap:4px;">
+      <button id="titlebar-update-btn" style="display:none;padding:2px 12px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:4px;color:#3fb950;font-size:11px;cursor:pointer;font-weight:600;-webkit-app-region:no-drag;">↺ Restart & Update</button>
       <button class="tbtn" onclick="window.electron?.minimize()">─</button>
       <button class="tbtn" onclick="window.electron?.maximize()">□</button>
       <button class="tbtn" id="close-btn" onclick="window.electron?.close()">✕</button>
@@ -245,10 +350,16 @@
       </div>
       <div class="nav-item active" id="nav-play">🎮 &nbsp;Play</div>
       <div class="nav-item" id="nav-bedrock" style="margin-top:4px">🪨 &nbsp;Bedrock</div>
-      <div class="nav-item" id="nav-mods" style="margin-top:4px">🧩 &nbsp;Mods</div>
+      <div class="nav-item" id="nav-mods" style="margin-top:4px">🧩 &nbsp;Java Mods</div>
+      <div class="nav-item" id="nav-pvp" style="margin-top:4px">⚔️ &nbsp;PvP Mods</div>
+      <div class="nav-item" id="nav-bedrock-mods" style="margin-top:4px">📦 &nbsp;Bedrock Mods</div>
+      <div class="nav-item" id="nav-server" style="margin-top:4px">🖥️ &nbsp;Host Server</div>
+      <div class="nav-item" id="nav-cosmetics" style="margin-top:4px">🧣 &nbsp;Cosmetics</div>
+      <div class="nav-item" id="nav-friends" style="margin-top:4px">👥 &nbsp;Friends</div>
       <div class="nav-item" id="nav-customize">🎨 &nbsp;Customize</div>
       <div class="nav-item" id="nav-settings">⚙️ &nbsp;Settings</div>
       <div id="sidebar-bottom">
+        <div id="token-badge">🪙 <span id="token-count">0</span> Tokens</div>
         <div id="user-chip">
           <div id="user-avatar">👤</div>
           <div>
@@ -299,13 +410,38 @@
           </div>
         </div>
 
-        <div class="section-label">Microsoft Account</div>
-        <button id="mc-auth-btn">🔐 &nbsp;Login with Microsoft to Play</button>
+        <div class="control-card" style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#e6edf3;">Offline Mode</div>
+            <div style="font-size:11px;color:#484f58;margin-top:2px;">Play without Microsoft account (LAN / offline servers only)</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="offline-toggle" /><span class="toggle-slider"></span></label>
+        </div>
+        <div class="control-card" style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#a371f7;">🧵 Fabric Loader</div>
+            <div style="font-size:11px;color:#484f58;margin-top:2px;">Auto-installs Fabric for the selected version — required for mods</div>
+            <div id="fabric-status" style="font-size:11px;color:#484f58;margin-top:2px;"></div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="fabric-toggle" /><span class="toggle-slider"></span></label>
+        </div>
+        <div id="offline-name-row" style="display:none;grid-column:1/-1;">
+          <div class="control-card">
+            <label>Offline Username</label>
+            <input id="offline-username" type="text" value="Player" maxlength="16" placeholder="Enter username…"
+              style="width:100%;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:13px;outline:none;margin-top:6px;"
+              onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
+          </div>
+        </div>
+        <div class="section-label" style="grid-column:1/-1">Microsoft Account</div>
+        <div style="grid-column:1/-1">
+          <button id="mc-auth-btn">🔐 &nbsp;Login with Microsoft to Play</button>
+        </div>
       </div>
 
       <!-- Play button -->
       <div id="play-row">
-        <button id="mc-play-btn" disabled>▶ &nbsp;PLAY</button>
+        <button id="mc-play-btn">▶ &nbsp;PLAY</button>
       </div>
 
       <!-- Status bar -->
@@ -362,16 +498,72 @@
         <div style="font-size:11px;color:#484f58;text-align:center;">
           Bedrock Edition requires a separate purchase from the Microsoft Store. Java &amp; Bedrock are bundled together on PC.
         </div>
+
+        <!-- Chromebook -->
+        <div class="control-card" style="display:flex;align-items:center;gap:16px;border-color:rgba(121,192,255,0.35);background:rgba(121,192,255,0.04);">
+          <div style="font-size:32px;">💻</div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;color:#79c0ff;">Play on Chromebook</div>
+            <div style="font-size:12px;color:#8b949e;margin-top:3px;">Enable Linux on your Chromebook (Settings → Developers → Linux), download the Linux build of Voxel Client, or play Bedrock for free via the Google Play Store.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0;">
+            <a href="https://github.com/jordanengrashes-ux/minecraft-client/releases/latest" target="_blank"
+              style="padding:7px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#79c0ff;font-size:12px;text-decoration:none;white-space:nowrap;">Linux Build →</a>
+            <a href="https://play.google.com/store/apps/details?id=com.mojang.minecraftpe" target="_blank"
+              style="padding:7px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#3fb950;font-size:12px;text-decoration:none;white-space:nowrap;">Play Store →</a>
+          </div>
+        </div>
+
+        <!-- Bedrock Addons -->
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="section-label" style="margin-top:0;">Bedrock Addons</div>
+
+          <!-- External site buttons -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <a href="https://mcpedl.com" target="_blank" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:#161b22;border:1px solid #21262d;border-radius:10px;text-decoration:none;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#30363d'" onmouseout="this.style.borderColor='#21262d'">
+              <span style="font-size:24px;">🌐</span>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#e6edf3;">MCPEDL</div>
+                <div style="font-size:11px;color:#8b949e;margin-top:2px;">Largest Bedrock addon library</div>
+              </div>
+              <span style="margin-left:auto;font-size:11px;color:#484f58;">↗</span>
+            </a>
+            <a href="https://www.curseforge.com/minecraft-bedrock" target="_blank" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:#161b22;border:1px solid #21262d;border-radius:10px;text-decoration:none;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#30363d'" onmouseout="this.style.borderColor='#21262d'">
+              <span style="font-size:24px;">🔥</span>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#e6edf3;">CurseForge</div>
+                <div style="font-size:11px;color:#8b949e;margin-top:2px;">Addons, maps &amp; texture packs</div>
+              </div>
+              <span style="margin-left:auto;font-size:11px;color:#484f58;">↗</span>
+            </a>
+          </div>
+
+          <!-- Live Modrinth search -->
+          <input id="bedrock-addon-search" type="text" placeholder="🔍  Search resource packs &amp; shaders on Modrinth…"
+            style="width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;"
+            onfocus="this.style.borderColor='#a371f7'" onblur="this.style.borderColor='#30363d'" />
+
+          <div id="bedrock-addon-loading" style="display:none;align-items:center;gap:10px;padding:20px;color:#484f58;font-size:13px;">
+            <div style="width:14px;height:14px;border:2px solid #30363d;border-top-color:#a371f7;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0;"></div>
+            Searching Modrinth…
+          </div>
+          <div id="bedrock-addon-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+
       </div>
     </div>
 
     <!-- Mods panel -->
     <div id="mods-panel">
       <div id="mods-hero">
-        <h2>🧩 Mods</h2>
-        <p style="color:#8b949e;font-size:12px;margin-top:4px">Search Modrinth — 50,000+ mods available</p>
+        <h2>🧩 Java Mods</h2>
+        <p style="color:#8b949e;font-size:12px;margin-top:4px">Search Modrinth — mods &amp; modpacks</p>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button id="mods-tab-mods" style="padding:7px 18px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:7px;color:#3fb950;font-size:13px;font-weight:600;cursor:pointer;">🧩 Mods</button>
+          <button id="mods-tab-packs" style="padding:7px 18px;background:#21262d;border:1px solid #30363d;border-radius:7px;color:#8b949e;font-size:13px;cursor:pointer;">📦 Modpacks</button>
+        </div>
         <input id="mods-search" type="text" placeholder="🔍  Search mods…"
-          style="margin-top:14px;width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;"
+          style="margin-top:12px;width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;"
           onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
       </div>
       <div id="mods-loading" style="display:none;align-items:center;justify-content:center;gap:10px;padding:32px;color:#484f58;font-size:13px;">
@@ -383,6 +575,222 @@
       </div>
     </div>
 
+    <!-- PvP Mods panel -->
+    <div id="pvp-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="padding:24px 32px 20px;border-bottom:1px solid #21262d;background:linear-gradient(135deg,#1a0a0a,#0d1117);flex-shrink:0;">
+        <h2 style="font-size:20px;font-weight:700;">⚔️ PvP Mods</h2>
+        <p style="color:#8b949e;font-size:12px;margin-top:4px;">Curated HUD, performance &amp; utility mods — like Lunar Client &amp; Feather Client</p>
+        <p style="color:#d29922;font-size:11px;margin-top:6px;">⚠ Requires Fabric Loader — enable it in Settings before launching</p>
+      </div>
+      <div id="pvp-list" style="flex:1;overflow-y:auto;padding:20px 32px;display:flex;flex-direction:column;gap:24px;">
+        <!-- Populated by game.ts -->
+      </div>
+    </div>
+
+    <!-- Bedrock Mods panel -->
+    <div id="bedrock-mods-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div id="bedrock-mods-hero" style="padding:24px 32px 20px;border-bottom:1px solid #21262d;background:linear-gradient(135deg,#1a1228,#0d1117);">
+        <h2 style="font-size:20px;font-weight:700;">📦 Bedrock Mods</h2>
+        <p style="color:#8b949e;font-size:12px;margin-top:4px;">Resource packs &amp; shaders from Modrinth — plus browse MCPEDL &amp; CurseForge</p>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <a href="https://mcpedl.com" target="_blank"
+            style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(121,192,255,0.08);border:1px solid rgba(121,192,255,0.25);border-radius:7px;color:#79c0ff;font-size:12px;text-decoration:none;white-space:nowrap;">
+            🌐 MCPEDL ↗
+          </a>
+          <a href="https://www.curseforge.com/minecraft-bedrock" target="_blank"
+            style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(255,120,50,0.08);border:1px solid rgba(255,120,50,0.25);border-radius:7px;color:#f0883e;font-size:12px;text-decoration:none;white-space:nowrap;">
+            🔥 CurseForge ↗
+          </a>
+        </div>
+        <input id="bedrock-mods-search" type="text" placeholder="🔍  Search resource packs &amp; shaders…"
+          style="margin-top:14px;width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;"
+          onfocus="this.style.borderColor='#a371f7'" onblur="this.style.borderColor='#30363d'" />
+      </div>
+      <div id="bedrock-mods-loading" style="display:none;align-items:center;justify-content:center;gap:10px;padding:32px;color:#484f58;font-size:13px;">
+        <div style="width:16px;height:16px;border:2px solid #30363d;border-top-color:#a371f7;border-radius:50%;animation:spin 0.7s linear infinite"></div>
+        Loading from Modrinth…
+      </div>
+      <div id="bedrock-mods-list" style="flex:1;overflow-y:auto;padding:20px 32px;display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+    <!-- Server Host panel -->
+    <div id="server-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="padding:24px 32px 20px;border-bottom:1px solid rgba(33,38,45,0.5);background:rgba(8,12,20,0.45);backdrop-filter:blur(4px);">
+        <h2 style="font-size:20px;font-weight:700;">🖥️ Host a Server</h2>
+        <p style="font-size:12px;color:#8b949e;margin-top:4px;">Run a server on your PC or save one to the community list 24/7</p>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Config row -->
+        <div class="control-grid" style="grid-template-columns:1fr 1fr 1fr;">
+          <div class="control-card">
+            <label>Server Name</label>
+            <input id="srv-name" type="text" value="My Server" placeholder="My Server"
+              style="width:100%;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:13px;outline:none;margin-top:6px;"
+              onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
+          </div>
+          <div class="control-card">
+            <label>IP Address</label>
+            <input id="srv-ip" type="text" placeholder="Auto-detected when started" value=""
+              style="width:100%;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:13px;outline:none;margin-top:6px;font-family:monospace;"
+              onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
+          </div>
+          <div class="control-card">
+            <label>Version</label>
+            <select id="srv-version" style="width:100%;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:13px;outline:none;margin-top:6px;">
+              <option disabled>Loading versions…</option>
+            </select>
+          </div>
+          <div class="control-card">
+            <label>RAM &nbsp;<span id="srv-mem-val" style="color:#3fb950;font-weight:600;">2</span>GB</label>
+            <input type="range" id="srv-mem" min="1" max="8" value="2" style="width:100%;margin-top:10px;accent-color:#3fb950;" />
+          </div>
+          <div class="control-card" style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:12px;font-weight:600;color:#e6edf3;">24/7 Community Listing</div>
+              <div style="font-size:11px;color:#484f58;margin-top:2px;">Always visible even when offline</div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="srv-247-toggle" /><span class="toggle-slider"></span></label>
+          </div>
+          <div class="control-card" style="display:flex;flex-direction:column;justify-content:center;gap:8px;">
+            <button id="srv-save-btn" style="padding:8px 0;background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.35);border-radius:7px;color:#3fb950;font-size:12px;font-weight:600;cursor:pointer;width:100%;">💾 Save Server</button>
+            <div id="srv-save-status" style="font-size:11px;color:#484f58;text-align:center;"></div>
+          </div>
+        </div>
+
+        <!-- Start/Stop button -->
+        <button id="srv-start-btn" style="width:100%;padding:14px;font-size:16px;font-weight:700;background:linear-gradient(135deg,#238636,#2ea043);border:1px solid #3fb950;border-radius:10px;color:#fff;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:10px;">
+          ▶ &nbsp;Start Server Locally
+        </button>
+
+        <!-- Connection info (shown when running) -->
+        <div id="srv-info" style="display:none;background:rgba(13,40,24,0.8);border:1px solid rgba(63,185,80,0.35);border-radius:10px;padding:16px 20px;">
+          <div style="font-size:13px;font-weight:600;color:#3fb950;margin-bottom:10px;">🟢 Server Online</div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:12px;align-items:center;">
+            <span style="color:#484f58;">Address</span>
+            <span id="srv-address" style="color:#e6edf3;font-family:monospace;font-weight:600;">loading…</span>
+            <span style="color:#484f58;">Port</span>
+            <span style="color:#e6edf3;font-family:monospace;">25565</span>
+            <span style="color:#484f58;">Version</span>
+            <span id="srv-ver-display" style="color:#e6edf3;font-family:monospace;"></span>
+          </div>
+          <div style="margin-top:12px;font-size:11px;color:#484f58;">Friends need port 25565 forwarded on your router — or use <a href="https://playit.gg" target="_blank" style="color:#79c0ff;">playit.gg</a> for zero config.</div>
+          <div style="margin-top:12px;display:flex;gap:8px;">
+            <input id="srv-cmd-input" type="text" placeholder="Server command (e.g. list, say Hello)"
+              style="flex:1;background:rgba(1,4,9,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;font-size:12px;font-family:monospace;outline:none;"
+              onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
+            <button id="srv-cmd-btn" style="padding:7px 16px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:12px;cursor:pointer;">Send</button>
+          </div>
+        </div>
+
+        <!-- Server log -->
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:11px;color:#484f58;letter-spacing:2px;text-transform:uppercase;">Server Console</div>
+          <button id="srv-log-copy" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;font-size:11px;cursor:pointer;padding:3px 10px;border-radius:4px;">📋 Copy Log</button>
+        </div>
+        <div id="srv-log" style="background:rgba(1,4,9,0.9);border:1px solid rgba(33,38,45,0.6);border-radius:8px;padding:12px 16px;height:160px;overflow-y:auto;font-family:monospace;font-size:11px;color:#484f58;cursor:text;">
+          <div style="color:#30363d;">Server not running</div>
+        </div>
+
+        <!-- Saved Servers -->
+        <div style="font-size:11px;color:#484f58;letter-spacing:2px;text-transform:uppercase;margin-top:4px;">Saved Servers</div>
+        <div id="saved-servers" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="color:#30363d;font-size:12px;" id="saved-servers-empty">No saved servers yet — fill in the config above and click Save</div>
+        </div>
+
+        <!-- Community Servers -->
+        <div style="font-size:11px;color:#484f58;letter-spacing:2px;text-transform:uppercase;margin-top:4px;">Community Servers</div>
+        <div style="font-size:12px;color:#484f58;margin-bottom:4px;">All Voxel Client users with servers saved or running</div>
+        <div id="community-servers" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="color:#30363d;font-size:12px;">Loading…</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Cosmetics panel -->
+    <div id="cosmetics-panel">
+      <div id="cosmetics-hero">
+        <h2>🧣 Cosmetics</h2>
+        <p>Custom capes visible to all other Voxel Client players in-game</p>
+      </div>
+      <div id="cosmetics-body">
+
+        <!-- Current cape status -->
+        <div class="control-card" style="display:flex;align-items:center;gap:16px;">
+          <div id="cosmetics-preview" style="width:40px;height:56px;border-radius:6px;border:2px solid rgba(255,255,255,0.1);flex-shrink:0;"></div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;color:#e6edf3;">Equipped: <span id="cosmetics-equipped-name" style="color:#3fb950">None</span></div>
+            <div id="cosmetics-status" style="color:#8b949e;font-size:12px;margin-top:2px;">Sign in with Microsoft to equip a cape</div>
+          </div>
+          <button id="cosmetics-remove-btn" style="display:none;padding:7px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:12px;cursor:pointer;">Remove</button>
+        </div>
+
+        <!-- Token balance + daily claim -->
+        <div class="control-card" style="display:flex;align-items:center;gap:16px;">
+          <div style="font-size:24px;">🪙</div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;color:#d29922;">Balance: <span id="token-balance-display">0</span> Tokens</div>
+            <div style="font-size:11px;color:#484f58;margin-top:2px;">Earn 50 tokens daily — redeem for exclusive capes</div>
+          </div>
+          <button id="claim-tokens-btn" style="padding:8px 16px;background:rgba(210,153,34,0.15);border:1px solid rgba(210,153,34,0.4);border-radius:7px;color:#d29922;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+            Claim Daily (+50)
+          </button>
+        </div>
+
+        <!-- Cape grid -->
+        <div>
+          <div class="section-label" style="margin-top:0">Choose a Cape</div>
+          <div class="cape-grid" id="cape-grid"></div>
+        </div>
+
+        <!-- Fabric mod install card (optional) -->
+        <div id="mod-install-card">
+          <div style="font-size:13px;font-weight:600;color:#a371f7;margin-bottom:6px;">🔌 Optional: In-Game Cape Rendering</div>
+          <div style="font-size:12px;color:#8b949e;line-height:1.6;margin-bottom:10px;">
+            Your cape is already saved above — no mod needed. Install this only if you want to see capes <em>inside Minecraft</em> on Fabric. Requires <a href="https://fabricmc.net/use/installer/" target="_blank" style="color:#a371f7;">Fabric Loader</a>.
+          </div>
+          <button id="mod-install-btn" style="padding:8px 18px;background:rgba(163,113,247,0.15);border:1px solid rgba(163,113,247,0.4);border-radius:7px;color:#a371f7;font-size:12px;font-weight:600;cursor:pointer;">
+            ⬇ Install Cosmetics Mod (optional)
+          </button>
+          <span id="mod-install-status" style="margin-left:10px;font-size:12px;color:#8b949e;"></span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Friends panel -->
+    <div id="friends-panel">
+      <div style="padding:24px 32px 20px;border-bottom:1px solid rgba(33,38,45,0.5);background:rgba(8,12,20,0.45);backdrop-filter:blur(4px);">
+        <h2 style="font-size:20px;font-weight:700;">👥 Friends</h2>
+        <p style="font-size:12px;color:#8b949e;margin-top:4px;">Add friends by Minecraft username — see when they're online and copy their server IP</p>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <input id="friend-add-input" type="text" placeholder="Minecraft username…" maxlength="16"
+            style="flex:1;padding:9px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:13px;outline:none;"
+            onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
+          <button id="friend-add-btn" style="padding:9px 18px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:8px;color:#3fb950;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">Add Friend</button>
+        </div>
+        <div id="friend-add-status" style="font-size:12px;color:#484f58;margin-top:8px;min-height:18px;"></div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Incoming requests -->
+        <div id="friend-requests-section" style="display:none;">
+          <div class="section-label" style="margin-top:0;">Friend Requests</div>
+          <div id="friend-requests-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+
+        <!-- Friends list -->
+        <div>
+          <div class="section-label" style="margin-top:0;">Friends</div>
+          <div id="friends-list" style="display:flex;flex-direction:column;gap:8px;">
+            <div style="color:#30363d;font-size:12px;" id="friends-empty">No friends yet — add someone above</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- Customize panel -->
     <div id="customize-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
       <div style="padding:24px 32px 20px;border-bottom:1px solid #21262d;background:linear-gradient(135deg,#0d1b12,#0a1628);">
@@ -391,9 +799,23 @@
       </div>
       <div style="flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:24px;">
 
+        <!-- Game background -->
+        <div>
+          <div class="section-label" style="margin-top:0">In-Game Background</div>
+          <div class="control-card" style="display:flex;align-items:center;gap:16px;">
+            <div style="font-size:28px;">🖼️</div>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:600;color:#e6edf3;">Voxel Client Panorama</div>
+              <div style="font-size:12px;color:#8b949e;margin-top:3px;">Replaces the Minecraft main menu background — then enable "VoxelClient" in Options › Resource Packs</div>
+              <div id="install-bg-status" style="font-size:11px;margin-top:5px;color:#484f58;"></div>
+            </div>
+            <button id="install-bg-btn" style="padding:8px 16px;background:rgba(163,113,247,0.15);border:1px solid rgba(163,113,247,0.4);border-radius:7px;color:#a371f7;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;">Install Background</button>
+          </div>
+        </div>
+
         <!-- Skin editor -->
         <div>
-          <div class="section-label" style="margin-top:0">Your Skin</div>
+          <div class="section-label">Your Skin</div>
           <div style="display:flex;gap:20px;align-items:flex-start;">
             <!-- Preview -->
             <div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;min-width:140px;">
@@ -460,9 +882,12 @@
         <div class="control-card" style="display:flex;align-items:center;gap:16px;">
           <div style="flex:1">
             <div style="font-size:14px;font-weight:600;">Auto-update</div>
-            <div style="font-size:12px;color:#8b949e;margin-top:3px;">Updates download automatically in the background</div>
+            <div style="font-size:12px;color:#8b949e;margin-top:3px;" id="update-settings-sub">Updates download automatically in the background</div>
           </div>
-          <button id="check-updates-btn" style="padding:8px 18px;background:#21262d;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-size:13px;cursor:pointer;white-space:nowrap;">Check for Updates</button>
+          <div style="display:flex;gap:8px;flex-shrink:0;">
+            <button id="check-updates-btn" style="padding:8px 18px;background:#21262d;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-size:13px;cursor:pointer;white-space:nowrap;">Check for Updates</button>
+            <button id="restart-update-btn" disabled style="padding:8px 18px;background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:7px;color:#3fb950;font-size:13px;cursor:not-allowed;white-space:nowrap;opacity:0.4;">↺ Restart & Update</button>
+          </div>
         </div>
 
         <div class="section-label" style="margin-top:24px;">Game Files</div>
@@ -487,8 +912,17 @@
 
   </div><!-- end #launcher -->
 
-  <!-- Log panel (slide up) -->
-  <div id="log-panel"></div>
+  <!-- Log panel -->
+  <div id="log-panel">
+    <div id="log-header">
+      <span>Console Output</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button id="log-copy" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;font-size:10px;cursor:pointer;padding:2px 8px;border-radius:4px;">📋 Copy</button>
+        <button id="log-close" title="Close (Esc)">✕</button>
+      </div>
+    </div>
+    <div id="log-body"></div>
+  </div>
 
   <script type="module" src="./game.ts"></script>
 </body>
