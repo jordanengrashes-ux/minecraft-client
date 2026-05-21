@@ -1833,6 +1833,7 @@ function populateSrvVersions() {
     sel.appendChild(opt);
   });
   if (filtered.find(v => v.id === prev)) sel.value = prev;
+  loadSrvSettings();
 }
 
 // Populate server version dropdown from Mojang manifest
@@ -1857,6 +1858,31 @@ async function loadServerVersions() {
 
 document.getElementById('srv-snapshots-toggle')?.addEventListener('change', populateSrvVersions);
 
+// ── Persist server settings across sessions ────────────────────────────────────
+const SRV_SETTINGS_KEY = 'voxel_srv_settings';
+function loadSrvSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SRV_SETTINGS_KEY) || '{}');
+    const nameEl = document.getElementById('srv-name') as HTMLInputElement;
+    const verSel = document.getElementById('srv-version') as HTMLSelectElement;
+    if (s.name) nameEl.value = s.name;
+    if (s.version && Array.from(verSel.options).find(o => o.value === s.version)) verSel.value = s.version;
+    if (s.mem) { srvMemSlider.value = s.mem; srvMemVal.textContent = s.mem; }
+  } catch {}
+}
+function saveSrvSettings() {
+  const nameEl = document.getElementById('srv-name') as HTMLInputElement;
+  const verSel = document.getElementById('srv-version') as HTMLSelectElement;
+  localStorage.setItem(SRV_SETTINGS_KEY, JSON.stringify({
+    name: nameEl.value,
+    version: verSel.value,
+    mem: srvMemSlider.value,
+  }));
+}
+document.getElementById('srv-name')?.addEventListener('input', saveSrvSettings);
+document.getElementById('srv-version')?.addEventListener('change', saveSrvSettings);
+srvMemSlider?.addEventListener('input', saveSrvSettings);
+
 document.getElementById('srv-preset-btn')?.addEventListener('click', () => {
   (document.getElementById('srv-name') as HTMLInputElement).value = 'Voxels Default';
   const sel = document.getElementById('srv-version') as HTMLSelectElement;
@@ -1864,6 +1890,7 @@ document.getElementById('srv-preset-btn')?.addEventListener('click', () => {
   if (latest) sel.value = latest.value;
   srvMemSlider.value = '4';
   srvMemVal.textContent = '4';
+  saveSrvSettings();
 });
 
 // Load community servers from Firebase RTDB (online OR 24/7 published)
