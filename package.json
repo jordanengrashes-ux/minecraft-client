@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "minecraft-client",
-  "version": "1.0.58",
+  "version": "1.0.62",
   "description": "Voxel game client",
   "author": {
     "name": "Voxel Client",
@@ -45,7 +45,9 @@
     "publish": {
       "provider": "github",
       "owner": "jordanengrashes-ux",
-      "repo": "minecraft-client"
+      "repo": "minecraft-client",
+      "draft": false,
+      "prerelease": false
     },
     "win": {
       "target": [
@@ -115,3 +117,5 @@
     "three": "^0.184.0"
   }
 }
+
+

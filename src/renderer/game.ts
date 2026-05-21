@@ -65,6 +65,10 @@ const fabricToggle      = document.getElementById('fabric-toggle') as HTMLInputE
 const fabricStatus      = document.getElementById('fabric-status')!;
 const mcForceQuitBtn    = document.getElementById('mc-force-quit-btn') as HTMLButtonElement;
 
+declare const __APP_VERSION__: string;
+const appVersionEl = document.getElementById('app-version');
+if (appVersionEl) appVersionEl.textContent = `v${__APP_VERSION__}`;
+
 let authed = false;
 let running = false;
 let logVisible = false;
