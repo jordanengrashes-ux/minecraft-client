@@ -433,6 +433,7 @@
             <div style="font-size:13px;font-weight:600;color:#a371f7;">🧵 Fabric Loader</div>
             <div style="font-size:11px;color:#484f58;margin-top:2px;">Auto-installs Fabric for the selected version — required for mods</div>
             <div id="fabric-status" style="font-size:11px;color:#484f58;margin-top:2px;"></div>
+            <div id="mods-badge" style="display:none;font-size:10px;margin-top:5px;padding:2px 8px;border-radius:10px;border:1px solid rgba(63,185,80,0.3);background:rgba(63,185,80,0.1);color:#3fb950;font-weight:600;letter-spacing:0.3px;width:fit-content;"></div>
           </div>
           <label class="toggle"><input type="checkbox" id="fabric-toggle" /><span class="toggle-slider"></span></label>
         </div>
@@ -447,6 +448,15 @@
         <div class="section-label" style="grid-column:1/-1">Microsoft Account</div>
         <div style="grid-column:1/-1">
           <button id="mc-auth-btn">🔐 &nbsp;Login with Microsoft to Play</button>
+        </div>
+      </div>
+
+      <!-- Offline banner — shown when offline mode is active -->
+      <div id="offline-banner" style="display:none;padding:0 32px 10px;">
+        <div style="background:rgba(210,153,34,0.12);border:1px solid rgba(210,153,34,0.4);border-radius:7px;padding:8px 14px;font-size:12px;color:#d29922;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;">⚠️</span>
+          <span><strong>Offline Mode is active</strong> — you won't be able to join online servers</span>
+          <button onclick="document.getElementById('offline-toggle').click()" style="margin-left:auto;background:none;border:1px solid rgba(210,153,34,0.5);border-radius:5px;color:#d29922;font-size:11px;padding:2px 8px;cursor:pointer;">Disable</button>
         </div>
       </div>
 

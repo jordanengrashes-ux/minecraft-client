@@ -780,6 +780,13 @@ ipcMain.handle('mc-install-mod', async (_e, opts: { url: string; filename: strin
   }
 });
 
+ipcMain.handle('mc-list-mods', async () => {
+  const modsDir = path.join(app.getPath('userData'), '.minecraft', 'mods');
+  try {
+    return fs.existsSync(modsDir) ? fs.readdirSync(modsDir).filter((f: string) => f.endsWith('.jar')) : [];
+  } catch { return []; }
+});
+
 ipcMain.handle('mc-remove-mod', async (_e, opts: { filename: string }) => {
   try {
     const dest = path.join(app.getPath('userData'), '.minecraft', 'mods', opts.filename);

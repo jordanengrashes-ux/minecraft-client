@@ -219,11 +219,12 @@ function setProgress(pct: number | null) {
 const offlineToggle   = document.getElementById('offline-toggle') as HTMLInputElement;
 const offlineNameRow  = document.getElementById('offline-name-row')!;
 const offlineUsername = document.getElementById('offline-username') as HTMLInputElement;
+const offlineBanner   = document.getElementById('offline-banner')!;
 
-offlineToggle.addEventListener('change', () => {
-  const on = offlineToggle.checked;
-  offlineNameRow.style.display = on ? 'block' : 'none';
-  mcAuthBtn.style.display      = on ? 'none'  : 'block';
+function applyOfflineState(on: boolean) {
+  offlineNameRow.style.display   = on ? 'block'  : 'none';
+  mcAuthBtn.style.display        = on ? 'none'   : 'block';
+  offlineBanner.style.display    = on ? 'block'  : 'none';
   if (on) {
     mcPlayBtn.disabled = false;
     setStatus('Offline mode — only LAN/offline servers work', 'yellow');
@@ -231,7 +232,62 @@ offlineToggle.addEventListener('change', () => {
     mcPlayBtn.disabled = !authed;
     setStatus(authed ? `Authenticated as ${mcIgnSpan.textContent}` : 'Ready', authed ? 'green' : '');
   }
+  localStorage.setItem('voxel_offline_mode', String(on));
+}
+
+offlineToggle.addEventListener('change', () => applyOfflineState(offlineToggle.checked));
+
+// ── Mods badge (shows installed mod count near the Fabric toggle) ─────────────
+const modsBadge = document.getElementById('mods-badge') as HTMLElement;
+
+function updateModsBadge() {
+  const count = Object.keys(loadInstalledMods()).length;
+  if (count === 0) { modsBadge.style.display = 'none'; return; }
+  modsBadge.style.display    = 'inline-block';
+  const fabricOn = fabricToggle.checked;
+  modsBadge.textContent     = fabricOn
+    ? `✓ ${count} mod${count !== 1 ? 's' : ''} ready`
+    : `⚠ ${count} mod${count !== 1 ? 's' : ''} installed — enable Fabric above`;
+  modsBadge.style.color      = fabricOn ? '#3fb950'                  : '#d29922';
+  modsBadge.style.background = fabricOn ? 'rgba(63,185,80,0.10)'     : 'rgba(210,153,34,0.10)';
+  modsBadge.style.borderColor= fabricOn ? 'rgba(63,185,80,0.30)'     : 'rgba(210,153,34,0.35)';
+}
+
+fabricToggle.addEventListener('change', () => {
+  localStorage.setItem('voxel_fabric_on', String(fabricToggle.checked));
+  updateModsBadge();
 });
+
+// ── Restore saved settings on launch ─────────────────────────────────────────
+{
+  const savedFabric  = localStorage.getItem('voxel_fabric_on')    === 'true';
+  const savedOffline = localStorage.getItem('voxel_offline_mode') === 'true';
+  if (savedFabric)  fabricToggle.checked = true;
+  if (savedOffline) { offlineToggle.checked = true; applyOfflineState(true); }
+  updateModsBadge();
+}
+
+// ── Sync localStorage with actual mods on disk ────────────────────────────────
+// Removes entries from the installed-mods map when the JAR is no longer on disk
+// (e.g. after Repair Game or manual deletion) so the UI reflects reality.
+async function syncModsWithDisk() {
+  if (!mc?.listMods) return;
+  try {
+    const diskFiles: string[] = await mc.listMods();
+    const installed = loadInstalledMods();
+    let changed = false;
+    for (const slug of Object.keys(installed)) {
+      if (!diskFiles.includes(installed[slug].filename)) {
+        delete installed[slug];
+        enabledMods.delete(slug);
+        changed = true;
+      }
+    }
+    if (changed) { saveInstalledMods(installed); updateModsBadge(); }
+  } catch {}
+}
+// Delay slightly so the window finishes loading before the IPC round-trip
+setTimeout(syncModsWithDisk, 1500);
 
 // ── Microsoft auth ─────────────────────────────────────────────────────────────
 mcAuthBtn.addEventListener('click', async () => {
@@ -1126,6 +1182,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
         enabledMods.add(mod.slug);
         card.className = 'mod-card enabled';
         statusEl.textContent = '✓'; statusEl.style.color = '#3fb950';
+        updateModsBadge();
       } catch (err: any) {
         input.checked = false;
         card.className = 'mod-card';
@@ -1142,6 +1199,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
       enabledMods.delete(mod.slug);
       card.className = 'mod-card';
       statusEl.textContent = ''; statusEl.style.color = 'transparent';
+      updateModsBadge();
     }
     input.disabled = false;
   });
