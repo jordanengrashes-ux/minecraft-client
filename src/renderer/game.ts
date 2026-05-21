@@ -879,24 +879,33 @@ const modsLoading = document.getElementById('mods-loading')!;
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let modsTabType: 'mod' | 'modpack' = 'mod';
 
-const modsTabMods  = document.getElementById('mods-tab-mods')  as HTMLButtonElement;
-const modsTabPacks = document.getElementById('mods-tab-packs') as HTMLButtonElement;
+const modsTypeSwitch = document.getElementById('mods-type-switch') as HTMLInputElement;
+const modsLabelMods  = document.getElementById('mods-label-mods')!;
+const modsLabelPacks = document.getElementById('mods-label-packs')!;
+
+// Restore saved mods/modpacks tab choice
+if (localStorage.getItem('voxel_mods_tab') === 'modpack') {
+  modsTypeSwitch.checked = true; modsTabType = 'modpack';
+  modsLabelMods.style.color = '#484f58'; modsLabelMods.style.fontWeight = '400';
+  modsLabelPacks.style.color = '#3fb950'; modsLabelPacks.style.fontWeight = '700';
+}
 
 function setModsTab(type: 'mod' | 'modpack') {
   modsTabType = type;
   const isMod = type === 'mod';
-  modsTabMods.style.background  = isMod ? 'rgba(63,185,80,0.15)' : '#21262d';
-  modsTabMods.style.borderColor = isMod ? 'rgba(63,185,80,0.4)'  : '#30363d';
-  modsTabMods.style.color       = isMod ? '#3fb950' : '#8b949e';
-  modsTabPacks.style.background  = !isMod ? 'rgba(63,185,80,0.15)' : '#21262d';
-  modsTabPacks.style.borderColor = !isMod ? 'rgba(63,185,80,0.4)'  : '#30363d';
-  modsTabPacks.style.color       = !isMod ? '#3fb950' : '#8b949e';
+  modsTypeSwitch.checked         = !isMod;
+  modsLabelMods.style.color      = isMod  ? '#3fb950' : '#484f58';
+  modsLabelMods.style.fontWeight = isMod  ? '700'     : '400';
+  modsLabelPacks.style.color     = !isMod ? '#3fb950' : '#484f58';
+  modsLabelPacks.style.fontWeight= !isMod ? '700'     : '400';
   modsSearch.placeholder = isMod ? '🔍  Search mods…' : '🔍  Search modpacks…';
+  localStorage.setItem('voxel_mods_tab', type);
   searchModrinth(modsSearch.value.trim());
 }
 
-modsTabMods .addEventListener('click', () => setModsTab('mod'));
-modsTabPacks.addEventListener('click', () => setModsTab('modpack'));
+modsTypeSwitch.addEventListener('change', () => setModsTab(modsTypeSwitch.checked ? 'modpack' : 'mod'));
+modsLabelMods .addEventListener('click',  () => setModsTab('mod'));
+modsLabelPacks.addEventListener('click',  () => setModsTab('modpack'));
 
 interface ModrinthHit {
   project_id: string;

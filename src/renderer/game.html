@@ -580,9 +580,13 @@
       <div id="mods-hero">
         <h2>🧩 Java Mods</h2>
         <p style="color:#8b949e;font-size:12px;margin-top:4px">Search Modrinth — mods &amp; modpacks</p>
-        <div style="display:flex;gap:8px;margin-top:14px;">
-          <button id="mods-tab-mods" style="padding:7px 18px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:7px;color:#3fb950;font-size:13px;font-weight:600;cursor:pointer;">🧩 Mods</button>
-          <button id="mods-tab-packs" style="padding:7px 18px;background:#21262d;border:1px solid #30363d;border-radius:7px;color:#8b949e;font-size:13px;cursor:pointer;">📦 Modpacks</button>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
+          <span id="mods-label-mods"  style="font-size:13px;font-weight:700;color:#3fb950;transition:color 0.15s,font-weight 0.15s;cursor:pointer;">🧩 Mods</span>
+          <label class="toggle" style="cursor:pointer;">
+            <input type="checkbox" id="mods-type-switch"/>
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="mods-label-packs" style="font-size:13px;font-weight:400;color:#484f58;transition:color 0.15s;cursor:pointer;">📦 Modpacks</span>
         </div>
         <input id="mods-search" type="text" placeholder="🔍  Search mods…"
           style="margin-top:12px;width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;"
