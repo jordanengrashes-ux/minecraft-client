@@ -29,6 +29,7 @@ jobs:
       - run: npm run dist:mac
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
   build-linux:
     runs-on: ubuntu-latest
