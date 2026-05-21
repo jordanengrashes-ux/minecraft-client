@@ -1033,35 +1033,42 @@ interface PvpModDef {
 
 const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
   {
+    label: '📦 Required',
+    color: '#d29922',
+    mods: [
+      { slug: 'fabric-api', emoji: '🔧', name: 'Fabric API', desc: 'Required dependency — all Fabric mods need this to run', group: 'Utility' },
+    ],
+  },
+  {
     label: '⌨️ HUD & Info',
     color: '#58a6ff',
     mods: [
-      { slug: 'keystrokes+',          emoji: '⌨️', name: 'Keystrokes+',        desc: 'Live WASD + click display — exactly like Lunar Client', group: 'HUD' },
-      { slug: 'appleskin',           emoji: '🍎', name: 'AppleSkin',          desc: 'Shows exact saturation & exhaustion on the hunger bar', group: 'HUD' },
-      { slug: 'armor-status',        emoji: '🛡️', name: 'Armor Status',       desc: 'Armor & held item durability HUD', group: 'HUD' },
-      { slug: 'status-effect-bars',  emoji: '🧪', name: 'Status Effect Bars', desc: 'Duration bars under every active potion effect', group: 'HUD' },
-      { slug: 'coordinates-display', emoji: '📍', name: 'Coordinates',        desc: 'Clean XYZ + direction overlay — no F3 needed', group: 'HUD' },
-      { slug: 'xaeros-minimap',      emoji: '🗺️', name: "Xaero's Minimap",   desc: 'Minimap with player dots & waypoints', group: 'HUD' },
-      { slug: 'betterf3',            emoji: '📊', name: 'BetterF3',           desc: 'Color-coded F3 screen with FPS, ping & TPS', group: 'HUD' },
+      { slug: 'keystrokes',          emoji: '⌨️', name: 'Keystrokes',          desc: 'Live WASD + click counter overlay', group: 'HUD' },
+      { slug: 'appleskin',           emoji: '🍎', name: 'AppleSkin',           desc: 'Shows exact saturation & exhaustion on the hunger bar', group: 'HUD' },
+      { slug: 'armor-status',        emoji: '🛡️', name: 'Armor Status',        desc: 'Armor & held item durability HUD', group: 'HUD' },
+      { slug: 'status-effect-bars',  emoji: '🧪', name: 'Status Effect Bars',  desc: 'Duration bars under every active potion effect', group: 'HUD' },
+      { slug: 'coordinates-display', emoji: '📍', name: 'Coordinates',         desc: 'Clean XYZ + direction overlay — no F3 needed', group: 'HUD' },
+      { slug: 'xaeros-minimap',      emoji: '🗺️', name: "Xaero's Minimap",    desc: 'Minimap with player dots & waypoints', group: 'HUD' },
+      { slug: 'betterf3',            emoji: '📊', name: 'BetterF3',            desc: 'Color-coded F3 screen with FPS, ping & TPS', group: 'HUD' },
     ],
   },
   {
     label: '✨ Visual',
     color: '#a371f7',
     mods: [
-      { slug: 'custom-crosshair-mod', emoji: '🎯', name: 'Custom Crosshair',    desc: 'Change crosshair style, size, color & gap like Lunar', group: 'Visual' },
-      { slug: 'natural-motion-blur',   emoji: '💨', name: 'Motion Blur',         desc: 'Smooth camera motion blur when turning', group: 'Visual' },
-      { slug: 'not-enough-animations',emoji: '🏃', name: 'Not Enough Animations',desc: 'Restores eating, bow & item animations from older MC', group: 'Visual' },
-      { slug: 'damage-tilt',          emoji: '💥', name: 'Damage Tilt',         desc: 'Screen tilts in the direction you take damage', group: 'Visual' },
+      { slug: 'custom-crosshair-mod',  emoji: '🎯', name: 'Custom Crosshair',       desc: 'Change crosshair style, size, color & gap like Lunar', group: 'Visual' },
+      { slug: 'natural-motion-blur',   emoji: '💨', name: 'Motion Blur',             desc: 'Smooth camera motion blur when turning', group: 'Visual' },
+      { slug: 'not-enough-animations', emoji: '🏃', name: 'Not Enough Animations',   desc: 'Restores eating, bow & item animations from older MC', group: 'Visual' },
+      { slug: 'damage-tilt',           emoji: '💥', name: 'Damage Tilt',             desc: 'Screen tilts in the direction you take damage', group: 'Visual' },
     ],
   },
   {
     label: '⚙️ Utility',
     color: '#3fb950',
     mods: [
-      { slug: 'zebrastogglesneak-fabric', emoji: '🏃', name: 'Toggle Sprint', desc: 'Toggle sprint on/off — no need to hold Ctrl', group: 'Utility' },
-      { slug: 'no-chat-reports',   emoji: '🔇', name: 'No Chat Reports',  desc: 'Removes chat signing — prevents Microsoft report system', group: 'Utility' },
-      { slug: 'item-highlighter',  emoji: '🔆', name: 'Item Highlighter', desc: 'Highlights newly picked up items in your hotbar', group: 'Utility' },
+      { slug: 'sprinthop',          emoji: '🏃', name: 'Toggle Sprint',    desc: 'Toggle sprint & sneak on/off — no need to hold Ctrl', group: 'Utility' },
+      { slug: 'no-chat-reports',    emoji: '🔇', name: 'No Chat Reports',  desc: 'Removes chat signing — prevents Microsoft report system', group: 'Utility' },
+      { slug: 'item-highlighter',   emoji: '🔆', name: 'Item Highlighter', desc: 'Highlights newly picked up items in your hotbar', group: 'Utility' },
     ],
   },
 ];
@@ -1075,9 +1082,10 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
     <div class="mod-info">
       <div class="mod-name">${mod.name}</div>
       <div class="mod-desc">${mod.desc}</div>
+      <div class="pvp-err" style="font-size:11px;color:#f85149;margin-top:4px;display:none;"></div>
     </div>
     <div class="mod-right">
-      <div class="mod-version" id="pvpstatus-${mod.slug}" style="color:${on ? '#3fb950' : 'transparent'}">${on ? '✓' : '✓'}</div>
+      <div class="mod-version" style="color:${on ? '#3fb950' : 'transparent'}">${on ? '✓' : '✓'}</div>
       <label class="toggle">
         <input type="checkbox" ${on ? 'checked' : ''} />
         <span class="toggle-slider"></span>
@@ -1086,12 +1094,14 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
 
   const input    = card.querySelector('input') as HTMLInputElement;
   const statusEl = card.querySelector('.mod-version') as HTMLElement;
+  const errEl    = card.querySelector('.pvp-err') as HTMLElement;
   if (on) { statusEl.textContent = '✓'; statusEl.style.color = '#3fb950'; }
   else     { statusEl.textContent = '';  statusEl.style.color = 'transparent'; }
 
   input.addEventListener('change', async e => {
     const checked = (e.target as HTMLInputElement).checked;
     input.disabled = true;
+    errEl.style.display = 'none';
     if (checked) {
       statusEl.textContent = '⏳'; statusEl.style.color = '#d29922';
       try {
@@ -1100,13 +1110,14 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
         let versions: { files: { url: string; filename: string; primary: boolean }[] }[] = [];
         for (const tv of tryVersions) {
           const params = new URLSearchParams({ game_versions: `["${tv}"]`, loaders: '["fabric"]', limit: '5' });
-          const vRes = await fetch(`https://api.modrinth.com/v2/project/${mod.slug}/version?${params}`);
+          const vRes = await fetch(`https://api.modrinth.com/v2/project/${encodeURIComponent(mod.slug)}/version?${params}`);
           const data = await vRes.json();
           if (Array.isArray(data) && data.length) { versions = data; break; }
         }
-        if (!versions.length) throw new Error('No Fabric build available');
+        if (!versions.length) throw new Error(`No Fabric build found for ${mod.name}`);
         const file = versions[0].files.find(f => f.primary) ?? versions[0].files[0];
-        statusEl.textContent = '⬇';
+        if (!file) throw new Error('No download file found');
+        statusEl.textContent = '⬇'; statusEl.style.color = '#58a6ff';
         const res = await mc.installMod({ url: file.url, filename: file.filename });
         if (!res.ok) throw new Error(res.error);
         const installed = loadInstalledMods();
@@ -1119,7 +1130,8 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
         input.checked = false;
         card.className = 'mod-card';
         statusEl.textContent = '✗'; statusEl.style.color = '#f85149';
-        statusEl.title = err.message;
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
       }
     } else {
       const installed = loadInstalledMods();
