@@ -61,8 +61,9 @@ const logCopy       = document.getElementById('log-copy') as HTMLButtonElement;
 const logPanel      = document.getElementById('log-panel')!;
 const logBody       = document.getElementById('log-body')!;
 const logClose      = document.getElementById('log-close') as HTMLButtonElement;
-const fabricToggle  = document.getElementById('fabric-toggle') as HTMLInputElement;
-const fabricStatus  = document.getElementById('fabric-status')!;
+const fabricToggle      = document.getElementById('fabric-toggle') as HTMLInputElement;
+const fabricStatus      = document.getElementById('fabric-status')!;
+const mcForceQuitBtn    = document.getElementById('mc-force-quit-btn') as HTMLButtonElement;
 
 let authed = false;
 let running = false;
@@ -266,6 +267,7 @@ mcPlayBtn.addEventListener('click', async () => {
   mcPlayBtn.disabled = true;
   mcPlayBtn.classList.add('running');
   mcPlayBtn.textContent = '⏳  Launching…';
+  mcForceQuitBtn.style.display = 'inline-flex';
   setStatus(`Launching Minecraft ${version}…`, 'yellow');
   setProgress(0);
   logToggle.style.display = 'inline';
@@ -298,11 +300,20 @@ mcPlayBtn.addEventListener('click', async () => {
   }
 });
 
+mcForceQuitBtn.addEventListener('click', async () => {
+  mcForceQuitBtn.disabled = true;
+  mcForceQuitBtn.textContent = '⏳ Killing…';
+  await mc.kill();
+  mcForceQuitBtn.disabled = false;
+  mcForceQuitBtn.textContent = '⏹ Force Quit';
+});
+
 function resetPlay() {
   running = false;
   mcPlayBtn.disabled = false;
   mcPlayBtn.classList.remove('running');
   mcPlayBtn.textContent = '▶  PLAY';
+  mcForceQuitBtn.style.display = 'none';
   setProgress(null);
 }
 

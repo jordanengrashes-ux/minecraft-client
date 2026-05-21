@@ -440,8 +440,9 @@
       </div>
 
       <!-- Play button -->
-      <div id="play-row">
-        <button id="mc-play-btn">▶ &nbsp;PLAY</button>
+      <div id="play-row" style="display:flex;gap:10px;align-items:center;">
+        <button id="mc-play-btn" style="flex:1;">▶ &nbsp;PLAY</button>
+        <button id="mc-force-quit-btn" style="display:none;padding:0 18px;height:48px;background:#3a1010;border:1px solid #8b1a1a;border-radius:8px;color:#f85149;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background 0.15s;" onmouseover="this.style.background='#5a1a1a'" onmouseout="this.style.background='#3a1010'">⏹ Force Quit</button>
       </div>
 
       <!-- Status bar -->

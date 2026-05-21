@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, clipboard } from 'electron';
 
 contextBridge.exposeInMainWorld('electron', {
   loginSuccess: (userData: object) => ipcRenderer.send('login-success', userData),
@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electron', {
   close:        () => ipcRenderer.send('win-close'),
   minimize:     () => ipcRenderer.send('win-minimize'),
   maximize:     () => ipcRenderer.send('win-maximize'),
+  copyText:     (text: string) => clipboard.writeText(text),
 });
 
 contextBridge.exposeInMainWorld('updater', {
@@ -18,14 +19,33 @@ contextBridge.exposeInMainWorld('updater', {
   check:         () => ipcRenderer.send('check-for-updates'),
 });
 
+contextBridge.exposeInMainWorld('server', {
+  start:    (opts: any)    => ipcRenderer.invoke('server-start',   opts),
+  stop:     ()             => ipcRenderer.invoke('server-stop'),
+  command:  (cmd: string)  => ipcRenderer.invoke('server-command', cmd),
+  onLog:    (cb: (l: string) => void)  => ipcRenderer.on('server-log',    (_e, l) => cb(l)),
+  onClosed: (cb: (c: number) => void)  => ipcRenderer.on('server-closed', (_e, c) => cb(c)),
+});
+
+contextBridge.exposeInMainWorld('cosmetics', {
+  installMod: () => ipcRenderer.invoke('cosmetics-install-mod'),
+  getUuid:    () => ipcRenderer.invoke('mc-get-uuid'),
+});
+
 contextBridge.exposeInMainWorld('mc', {
   auth:            () => ipcRenderer.invoke('mc-auth'),
   reauth:          () => ipcRenderer.invoke('mc-reauth'),
   launch:          (opts: { version: string; maxMem: number }) => ipcRenderer.invoke('mc-launch', opts),
+  launchOffline:   (opts: { version: string; maxMem: number; username: string }) => ipcRenderer.invoke('mc-launch-offline', opts),
   uploadSkin:      (opts: { base64: string; variant: 'classic' | 'slim' }) => ipcRenderer.invoke('mc-upload-skin', opts),
+  kill:            () => ipcRenderer.invoke('mc-kill'),
   repair:          () => ipcRenderer.invoke('mc-repair'),
+  installFabric:   (opts: { mcVersion: string }) => ipcRenderer.invoke('mc-install-fabric', opts),
   crashReport:     () => ipcRenderer.invoke('mc-crash-report'),
   launchBedrock:   () => ipcRenderer.invoke('mc-launch-bedrock'),
+  installMod:      (opts: { url: string; filename: string })  => ipcRenderer.invoke('mc-install-mod', opts),
+  removeMod:       (opts: { filename: string })               => ipcRenderer.invoke('mc-remove-mod',  opts),
+  installBg:       (opts: { images: string[] })               => ipcRenderer.invoke('mc-install-bg',  opts),
   onAlreadyAuthed: (cb: (name: string) => void) => ipcRenderer.on('mc-already-authed', (_e, n) => cb(n)),
   onLog:           (cb: (line: string) => void) => ipcRenderer.on('mc-log',      (_e, l) => cb(l)),
   onProgress:      (cb: (e: any) => void)       => ipcRenderer.on('mc-progress', (_e, e) => cb(e)),
