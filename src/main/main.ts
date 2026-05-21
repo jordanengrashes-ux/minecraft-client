@@ -730,6 +730,28 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
     // Always accept EULA
     fs.writeFileSync(path.join(serverDir, 'eula.txt'), 'eula=true\n');
 
+    // Write server.properties — online-mode=false avoids Mojang auth socket errors
+    const propsPath = path.join(serverDir, 'server.properties');
+    if (!fs.existsSync(propsPath)) {
+      fs.writeFileSync(propsPath, [
+        'online-mode=false',
+        'server-port=25565',
+        'server-ip=',
+        'max-players=20',
+        'view-distance=10',
+        'motd=Voxel Client Server',
+      ].join('\n') + '\n');
+    } else {
+      // Patch online-mode in existing properties without clobbering other settings
+      let props = fs.readFileSync(propsPath, 'utf-8');
+      if (/^online-mode=/m.test(props)) {
+        props = props.replace(/^online-mode=.*/m, 'online-mode=false');
+      } else {
+        props = 'online-mode=false\n' + props;
+      }
+      fs.writeFileSync(propsPath, props);
+    }
+
     // Resolve Java the same way as game launch (bundled → cache → system → download)
     // Use java.exe not javaw.exe — server needs stdout
     const javawPath = await ensureJava21((msg) => gameWin?.webContents.send('server-log', msg));
