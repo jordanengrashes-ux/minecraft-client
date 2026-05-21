@@ -460,17 +460,17 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }
       }
     } catch {}
 
+    const isFabric = (opts.version || '').startsWith('fabric-loader-');
+    const mcVer    = isFabric ? opts.version.replace(/^fabric-loader-[\d.]+-/, '') : (opts.version || '1.21.4');
+
     mcProcess = launcher.launch({
       authorization: auth,
       root: mcRoot,
-      version: { number: opts.version || '1.21.4', type: 'release' },
+      version: { number: mcVer, type: 'release', ...(isFabric ? { custom: opts.version } : {}) },
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
-      overrides: {
-        maxSockets: 64,  // parallel download connections (default is 2 — way too slow)
-      },
+      overrides: { maxSockets: 64 },
     });
-    // Send every line so the renderer can detect crash causes
     launcher.on('data',     (d: string)  => gameWin?.webContents.send('mc-log',      d));
     launcher.on('progress', (e: any)     => gameWin?.webContents.send('mc-progress', e));
     launcher.on('close',    (c: number)  => { mcProcess = null; gameWin?.webContents.send('mc-closed',   c); });
@@ -499,10 +499,13 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
     const uuid = `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20,32)}`;
 
     gameWin?.webContents.send('mc-log', `[Launcher] Offline mode — user: ${opts.username}, uuid: ${uuid}`);
+    const isFabricOff = (opts.version || '').startsWith('fabric-loader-');
+    const mcVerOff    = isFabricOff ? opts.version.replace(/^fabric-loader-[\d.]+-/, '') : (opts.version || '1.21.4');
+
     mcProcess = launcher.launch({
       authorization: { access_token: 'offline', client_token: 'offline', uuid, name: opts.username, user_properties: '{}', meta: { type: 'mojang', demo: false } },
       root: mcRoot,
-      version: { number: opts.version || '1.21.4', type: 'release' },
+      version: { number: mcVerOff, type: 'release', ...(isFabricOff ? { custom: opts.version } : {}) },
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
       overrides: { maxSockets: 64 },
@@ -799,23 +802,47 @@ ipcMain.handle('mc-install-bg', async (_e, opts: { images: string[] }) => {
 ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
   try {
     const mcRoot = path.join(app.getPath('userData'), '.minecraft');
-    // Get latest stable Fabric loader version
     const loaders = await fetchJson('https://meta.fabricmc.net/v2/versions/loader');
-    const loader  = (loaders as any[]).find(l => l.stable) ?? loaders[0];
+    const loader  = (loaders as any[]).find((l: any) => l.stable) ?? loaders[0];
     if (!loader) throw new Error('No Fabric loader found');
     const loaderVer = loader.version as string;
 
-    const fabricId  = `fabric-loader-${loaderVer}-${opts.mcVersion}`;
+    const fabricId   = `fabric-loader-${loaderVer}-${opts.mcVersion}`;
     const versionDir = path.join(mcRoot, 'versions', fabricId);
     const profilePath = path.join(versionDir, `${fabricId}.json`);
 
-    if (!fs.existsSync(profilePath)) {
+    // Always reinstall if the saved profile is missing the merged vanilla fields
+    const needsInstall = !fs.existsSync(profilePath) ||
+      !JSON.parse(fs.readFileSync(profilePath, 'utf8')).downloads;
+
+    if (needsInstall) {
       gameWin?.webContents.send('mc-log', `[Fabric] Installing ${fabricId}…`);
-      const profile = await fetchJson(
+
+      // Fabric profile (has mainClass, Fabric libraries, inheritsFrom)
+      const fabricProfile = await fetchJson(
         `https://meta.fabricmc.net/v2/versions/loader/${opts.mcVersion}/${loaderVer}/profile/json`
-      );
+      ) as any;
+
+      // Vanilla MC manifest → get the specific version JSON (has downloads, assetIndex, vanilla libs)
+      const manifest = await fetchJson('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json') as any;
+      const entry = manifest.versions?.find((v: any) => v.id === opts.mcVersion);
+      if (!entry) throw new Error(`Vanilla ${opts.mcVersion} not in Mojang manifest`);
+      const vanilla = await fetchJson(entry.url) as any;
+
+      // Merge: vanilla base + Fabric mainClass + combined libraries + combined arguments
+      const merged = {
+        ...vanilla,
+        id: fabricId,
+        mainClass: fabricProfile.mainClass,
+        libraries: [...(vanilla.libraries ?? []), ...(fabricProfile.libraries ?? [])],
+        arguments: {
+          game: [...(vanilla.arguments?.game ?? []), ...(fabricProfile.arguments?.game ?? [])],
+          jvm:  [...(vanilla.arguments?.jvm  ?? []), ...(fabricProfile.arguments?.jvm  ?? [])],
+        },
+      };
+
       fs.mkdirSync(versionDir, { recursive: true });
-      fs.writeFileSync(profilePath, JSON.stringify(profile));
+      fs.writeFileSync(profilePath, JSON.stringify(merged));
       gameWin?.webContents.send('mc-log', `[Fabric] Installed ${fabricId}`);
     } else {
       gameWin?.webContents.send('mc-log', `[Fabric] ${fabricId} already installed`);
