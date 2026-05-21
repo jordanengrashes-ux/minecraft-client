@@ -360,6 +360,7 @@ function createGameWindow() {
     gameWin.loadFile(path.join(__dirname, '../dist/game.html'));
   }
   gameWin.on('closed', () => { gameWin = null; app.quit(); });
+  gameWin.webContents.once('did-finish-load', () => { if (!DEV) setupAutoUpdater(); });
 }
 
 // ── IPC: login / game window ──────────────────────────────────────────────────
@@ -853,7 +854,6 @@ ipcMain.on('check-for-updates', () => { autoUpdater.checkForUpdates().catch(() =
 app.whenReady().then(() => {
   loadCachedAuth();
   createLoginWindow();
-  if (!DEV) setupAutoUpdater();
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (!loginWin && !gameWin) createLoginWindow(); });
