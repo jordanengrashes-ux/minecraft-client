@@ -1810,33 +1810,57 @@ async function unpublishServer() {
   } catch {}
 }
 
+let srvAllVersions: { id: string; type: string }[] = [];
+
+function populateSrvVersions() {
+  const sel = document.getElementById('srv-version') as HTMLSelectElement;
+  const showSnaps = (document.getElementById('srv-snapshots-toggle') as HTMLInputElement)?.checked;
+  const prev = sel.value;
+  sel.innerHTML = '';
+  const filtered = srvAllVersions.filter(v =>
+    v.type === 'release' || (showSnaps && v.type === 'snapshot')
+  );
+  filtered.forEach((v, i) => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = i === 0
+      ? `${v.id} — ${v.type === 'snapshot' ? 'Latest Snapshot' : 'Latest'}`
+      : v.type === 'snapshot' ? `${v.id} ✦` : v.id;
+    sel.appendChild(opt);
+  });
+  if (filtered.find(v => v.id === prev)) sel.value = prev;
+}
+
 // Populate server version dropdown from Mojang manifest
 async function loadServerVersions() {
   const sel = document.getElementById('srv-version') as HTMLSelectElement;
-  if (!sel || sel.options.length > 1) return; // already loaded
+  if (!sel) return;
   try {
     const res  = await fetch('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json');
     const data = await res.json() as { versions: { id: string; type: string }[] };
-    const releases = data.versions.filter(v => v.type === 'release');
-    sel.innerHTML = '';
-    releases.forEach((v, i) => {
-      const opt = document.createElement('option');
-      opt.value = v.id;
-      opt.textContent = i === 0 ? `${v.id} — Latest` : v.id;
-      sel.appendChild(opt);
-    });
+    srvAllVersions = data.versions.filter(v => v.type === 'release' || v.type === 'snapshot');
+    populateSrvVersions();
   } catch {
-    // Static fallback if Mojang API is unreachable
-    const fallback = ['26.1.2','26.1.1','26.1','1.21.11','1.21.5','1.21.4','1.20.4','1.19.4'];
-    sel.innerHTML = '';
-    fallback.forEach((id, i) => {
-      const opt = document.createElement('option');
-      opt.value = id;
-      opt.textContent = i === 0 ? `${id} — Latest` : id;
-      sel.appendChild(opt);
-    });
+    srvAllVersions = [
+      { id: '26.1.2', type: 'release' }, { id: '26.1.1', type: 'release' },
+      { id: '26.1',   type: 'release' }, { id: '1.21.11', type: 'release' },
+      { id: '1.21.5', type: 'release' }, { id: '1.21.4',  type: 'release' },
+      { id: '1.20.4', type: 'release' }, { id: '1.19.4',  type: 'release' },
+    ];
+    populateSrvVersions();
   }
 }
+
+document.getElementById('srv-snapshots-toggle')?.addEventListener('change', populateSrvVersions);
+
+document.getElementById('srv-preset-btn')?.addEventListener('click', () => {
+  (document.getElementById('srv-name') as HTMLInputElement).value = 'Voxels Default';
+  const sel = document.getElementById('srv-version') as HTMLSelectElement;
+  const latest = Array.from(sel.options).find(o => o.value && !o.disabled);
+  if (latest) sel.value = latest.value;
+  srvMemSlider.value = '4';
+  srvMemVal.textContent = '4';
+});
 
 // Load community servers from Firebase RTDB (online OR 24/7 published)
 function loadCommunityServers() {
