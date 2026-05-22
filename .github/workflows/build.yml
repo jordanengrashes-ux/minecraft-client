@@ -85,7 +85,7 @@ jobs:
           if-no-files-found: error
 
   publish-release:
-    needs: [build-windows, build-linux, build-mac]
+    needs: [build-windows, build-linux]
     if: ${{ always() && needs.build-windows.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
