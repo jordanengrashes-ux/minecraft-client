@@ -18,6 +18,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.LOCALAPPDATA }}\electron\Cache
+            ${{ env.LOCALAPPDATA }}\electron-builder\Cache
+          key: ${{ runner.os }}-electron-30
       - name: Create resource stubs
         run: New-Item -ItemType Directory -Force -Path resources/java21,resources/mods
         shell: pwsh
@@ -37,6 +43,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-30
       - run: sudo apt-get install -y rpm fakeroot
       - name: Create resource stubs
         run: mkdir -p resources/java21 resources/mods
@@ -56,6 +68,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ runner.os }}-electron-30
       - name: Create resource stubs
         run: mkdir -p resources/java21 resources/mods
       - run: npm ci
