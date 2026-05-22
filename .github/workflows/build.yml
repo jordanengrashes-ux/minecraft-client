@@ -23,6 +23,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Create resource stubs
+        run: New-Item -ItemType Directory -Force -Path resources/java21,resources/mods
+        shell: pwsh
       - run: npm ci
       - run: npm run build && npx electron-builder --win --publish always
         env:
@@ -37,6 +40,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: sudo apt-get install -y rpm fakeroot
+      - name: Create resource stubs
+        run: mkdir -p resources/java21 resources/mods
       - run: npm ci
       - run: npm run build && npx electron-builder --linux --publish always
         env:
@@ -50,6 +55,8 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Create resource stubs
+        run: mkdir -p resources/java21 resources/mods
       - run: npm ci
       - run: npm run build && npx electron-builder --mac --publish always
         env:
