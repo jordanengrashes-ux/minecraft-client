@@ -1110,6 +1110,7 @@ modsSearch.addEventListener('input', () => {
 interface PvpModDef {
   slug: string; emoji: string; name: string; desc: string;
   group: 'HUD' | 'Visual' | 'Utility' | 'Performance';
+  deps?: string[];
 }
 
 const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
@@ -1130,7 +1131,7 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
       { slug: 'status-effect-bars',    emoji: '🧪', name: 'Status Effect Bars',   desc: 'Duration bars under every active potion effect', group: 'HUD' },
       { slug: 'coordinates-display',   emoji: '📍', name: 'Coordinates',          desc: 'Clean XYZ + direction overlay — no F3 needed', group: 'HUD' },
       { slug: 'xaeros-minimap',        emoji: '🗺️', name: "Xaero's Minimap",     desc: 'Minimap with player dots & waypoints', group: 'HUD' },
-      { slug: 'xaeros-world-map',      emoji: '🌍', name: "Xaero's World Map",    desc: 'Full world map — works with Xaero\'s Minimap', group: 'HUD' },
+      { slug: 'xaeros-world-map',      emoji: '🌍', name: "Xaero's World Map",    desc: 'Full world map — works with Xaero\'s Minimap', group: 'HUD', deps: ['xaeros-minimap'] },
       { slug: 'betterf3',              emoji: '📊', name: 'BetterF3',             desc: 'Color-coded F3 with FPS, ping & TPS (Feather HUD)', group: 'HUD' },
       { slug: 'zoomify',               emoji: '🔍', name: 'Zoomify',              desc: 'OptiFine-style smooth zoom key (Feather Zoom)', group: 'HUD' },
       { slug: 'ping-wheel',            emoji: '📡', name: 'Ping Wheel',           desc: 'Quick radial ping menu to mark locations (like Apex)', group: 'HUD' },
@@ -1150,9 +1151,9 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
       { slug: 'blur',                  emoji: '🌫️', name: 'Blur',               desc: 'Blurs the background when a menu is open', group: 'Visual' },
       { slug: 'cit-resewn',            emoji: '🎨', name: 'CIT Resewn',          desc: 'Custom Item Textures — rename items to change their look', group: 'Visual' },
       { slug: 'model-fix',             emoji: '🔲', name: 'Model Fix',           desc: 'Fixes gaps in held items & armor (like OptiFine)', group: 'Visual' },
-      { slug: 'entity-model-features', emoji: '🐾', name: 'Entity Model Features',desc: 'Custom entity models from resource packs (EMF)', group: 'Visual' },
+      { slug: 'entity-model-features', emoji: '🐾', name: 'Entity Model Features',desc: 'Custom entity models from resource packs (EMF)', group: 'Visual', deps: ['entity-texture-features'] },
       { slug: 'entity-texture-features',emoji: '🖼️', name: 'Entity Texture Features',desc: 'Random & custom entity textures (ETF)', group: 'Visual' },
-      { slug: 'continuity',            emoji: '🧱', name: 'Continuity',          desc: 'Connected textures like OptiFine (glass, bookshelves)', group: 'Visual' },
+      { slug: 'continuity',            emoji: '🧱', name: 'Continuity',          desc: 'Connected textures like OptiFine (glass, bookshelves)', group: 'Visual', deps: ['indium'] },
       { slug: 'lambdynamiclights',     emoji: '💡', name: 'Dynamic Lights',      desc: 'Held torches & glowstone light up surroundings', group: 'Visual' },
     ],
   },
@@ -1169,8 +1170,8 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
       { slug: 'inventory-profiles-next',emoji: '🗂️', name: 'Inventory Profiles', desc: 'Auto-sort inventory, replace broken tools automatically', group: 'Utility' },
       { slug: 'chat-heads',            emoji: '💬', name: 'Chat Heads',          desc: 'Shows player skin head next to their chat message', group: 'Utility' },
       { slug: 'tooltipfix',            emoji: '🔤', name: 'ToolTip Fix',         desc: 'Stops tooltips from going off-screen', group: 'Utility' },
-      { slug: 'reeses-sodium-options', emoji: '⚙️', name: 'Reese\'s Sodium Options',desc: 'Better settings screen for Sodium video options', group: 'Utility' },
-      { slug: 'sodium-extra',          emoji: '➕', name: 'Sodium Extra',        desc: 'Extra options for Sodium (animations, particles)', group: 'Utility' },
+      { slug: 'reeses-sodium-options', emoji: '⚙️', name: 'Reese\'s Sodium Options',desc: 'Better settings screen for Sodium video options', group: 'Utility', deps: ['sodium'] },
+      { slug: 'sodium-extra',          emoji: '➕', name: 'Sodium Extra',        desc: 'Extra options for Sodium (animations, particles)', group: 'Utility', deps: ['sodium'] },
     ],
   },
   {
@@ -1179,11 +1180,11 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
     mods: [
       { slug: 'sodium',                emoji: '⚡', name: 'Sodium',              desc: 'Major FPS boost — better rendering engine', group: 'Performance' },
       { slug: 'lithium',               emoji: '🪨', name: 'Lithium',             desc: 'Game logic & tick optimizations', group: 'Performance' },
-      { slug: 'iris',                  emoji: '🌈', name: 'Iris Shaders',        desc: 'Shader pack support (requires Sodium)', group: 'Performance' },
+      { slug: 'iris',                  emoji: '🌈', name: 'Iris Shaders',        desc: 'Shader pack support (requires Sodium)', group: 'Performance', deps: ['sodium'] },
       { slug: 'entityculling',         emoji: '👁️', name: 'Entity Culling',      desc: 'Skip rendering entities behind walls', group: 'Performance' },
       { slug: 'memoryleakfix',         emoji: '🧠', name: 'Memory Leak Fix',     desc: 'Fixes Minecraft memory leaks — fewer crashes', group: 'Performance' },
       { slug: 'ferrite-core',          emoji: '💾', name: 'Ferrite Core',        desc: 'Reduces RAM usage of block states (Feather perf)', group: 'Performance' },
-      { slug: 'indium',                emoji: '🔩', name: 'Indium',              desc: 'Sodium addon — enables Fabric Rendering API for other mods', group: 'Performance' },
+      { slug: 'indium',                emoji: '🔩', name: 'Indium',              desc: 'Sodium addon — enables Fabric Rendering API for other mods', group: 'Performance', deps: ['sodium'] },
       { slug: 'starlight',             emoji: '⭐', name: 'Starlight',           desc: 'Rewrites light engine for massive chunk load speedup', group: 'Performance' },
       { slug: 'c2me-fabric',           emoji: '🧵', name: 'C2ME',               desc: 'Multithreaded chunk generation & I/O', group: 'Performance' },
       { slug: 'noxesium',              emoji: '🚀', name: 'Noxesium',            desc: 'Reduces server-side lag on large servers', group: 'Performance' },
@@ -1192,19 +1193,53 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
   },
 ];
 
+const PVP_MOD_BY_SLUG = new Map<string, PvpModDef>(
+  PVP_MOD_GROUPS.flatMap(g => g.mods).map(m => [m.slug, m])
+);
+
+async function installOneMod(mod: PvpModDef, ver: string): Promise<void> {
+  const tryVersions = [ver, '1.21.4', '1.21.1', '1.21'];
+  let versions: { files: { url: string; filename: string; primary: boolean }[] }[] = [];
+  for (const tv of tryVersions) {
+    const params = new URLSearchParams({ game_versions: `["${tv}"]`, loaders: '["fabric"]', limit: '5' });
+    const vRes = await fetch(`https://api.modrinth.com/v2/project/${encodeURIComponent(mod.slug)}/version?${params}`);
+    const data = await vRes.json();
+    if (Array.isArray(data) && data.length) { versions = data; break; }
+  }
+  if (!versions.length) throw new Error(`No Fabric build found for ${mod.name}`);
+  const file = versions[0].files.find(f => f.primary) ?? versions[0].files[0];
+  if (!file) throw new Error(`No download file for ${mod.name}`);
+  const res = await mc.installMod({ url: file.url, filename: file.filename });
+  if (!res.ok) throw new Error(res.error);
+  const installed = loadInstalledMods();
+  installed[mod.slug] = { filename: file.filename, name: mod.name };
+  saveInstalledMods(installed);
+  enabledMods.add(mod.slug);
+  updateModsBadge();
+}
+
 function buildPvpCard(mod: PvpModDef): HTMLElement {
   const on   = enabledMods.has(mod.slug);
   const card = document.createElement('div');
   card.className = 'mod-card' + (on ? ' enabled' : '');
+
+  const depNames = (mod.deps || []).map(slug => PVP_MOD_BY_SLUG.get(slug)?.name ?? slug);
+  const depsHtml = depNames.length
+    ? `<div class="pvp-deps" style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;">${
+        depNames.map(n => `<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#21262d;color:#8b949e;border:1px solid #30363d;">Requires: ${n}</span>`).join('')
+      }</div>`
+    : '';
+
   card.innerHTML = `
     <div class="mod-icon" style="font-size:22px;background:none;">${mod.emoji}</div>
     <div class="mod-info">
       <div class="mod-name">${mod.name}</div>
       <div class="mod-desc">${mod.desc}</div>
+      ${depsHtml}
       <div class="pvp-err" style="font-size:11px;color:#f85149;margin-top:4px;display:none;"></div>
     </div>
     <div class="mod-right">
-      <div class="mod-version" style="color:${on ? '#3fb950' : 'transparent'}">${on ? '✓' : '✓'}</div>
+      <div class="mod-version" style="color:${on ? '#3fb950' : 'transparent'}">${on ? '✓' : ''}</div>
       <label class="toggle">
         <input type="checkbox" ${on ? 'checked' : ''} />
         <span class="toggle-slider"></span>
@@ -1214,8 +1249,6 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
   const input    = card.querySelector('input') as HTMLInputElement;
   const statusEl = card.querySelector('.mod-version') as HTMLElement;
   const errEl    = card.querySelector('.pvp-err') as HTMLElement;
-  if (on) { statusEl.textContent = '✓'; statusEl.style.color = '#3fb950'; }
-  else     { statusEl.textContent = '';  statusEl.style.color = 'transparent'; }
 
   input.addEventListener('change', async e => {
     const checked = (e.target as HTMLInputElement).checked;
@@ -1225,27 +1258,20 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
       statusEl.textContent = '⏳'; statusEl.style.color = '#d29922';
       try {
         const ver = mcVersion.value || '1.21.4';
-        const tryVersions = [ver, '1.21.4', '1.21.1', '1.21'];
-        let versions: { files: { url: string; filename: string; primary: boolean }[] }[] = [];
-        for (const tv of tryVersions) {
-          const params = new URLSearchParams({ game_versions: `["${tv}"]`, loaders: '["fabric"]', limit: '5' });
-          const vRes = await fetch(`https://api.modrinth.com/v2/project/${encodeURIComponent(mod.slug)}/version?${params}`);
-          const data = await vRes.json();
-          if (Array.isArray(data) && data.length) { versions = data; break; }
+        // install any uninstalled deps first
+        const uninstalledDeps = (mod.deps || [])
+          .map(slug => PVP_MOD_BY_SLUG.get(slug))
+          .filter((dep): dep is PvpModDef => !!dep && !enabledMods.has(dep.slug));
+        for (const dep of uninstalledDeps) {
+          statusEl.textContent = '⬇'; statusEl.style.color = '#58a6ff';
+          await installOneMod(dep, ver);
         }
-        if (!versions.length) throw new Error(`No Fabric build found for ${mod.name}`);
-        const file = versions[0].files.find(f => f.primary) ?? versions[0].files[0];
-        if (!file) throw new Error('No download file found');
         statusEl.textContent = '⬇'; statusEl.style.color = '#58a6ff';
-        const res = await mc.installMod({ url: file.url, filename: file.filename });
-        if (!res.ok) throw new Error(res.error);
-        const installed = loadInstalledMods();
-        installed[mod.slug] = { filename: file.filename, name: mod.name };
-        saveInstalledMods(installed);
-        enabledMods.add(mod.slug);
+        await installOneMod(mod, ver);
         card.className = 'mod-card enabled';
         statusEl.textContent = '✓'; statusEl.style.color = '#3fb950';
-        updateModsBadge();
+        // re-render so dep cards show as installed
+        if (uninstalledDeps.length) renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
       } catch (err: any) {
         input.checked = false;
         card.className = 'mod-card';
