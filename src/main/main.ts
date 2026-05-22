@@ -912,6 +912,59 @@ ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
   }
 });
 
+// ── IPC: screenshots ──────────────────────────────────────────────────────────
+ipcMain.handle('mc-list-screenshots', async () => {
+  const dir = path.join(app.getPath('userData'), '.minecraft', 'screenshots');
+  try {
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+      .filter((f: string) => /\.(png|jpg|jpeg)$/i.test(f))
+      .map((f: string) => {
+        const p = path.join(dir, f);
+        const stat = fs.statSync(p);
+        return { name: f, path: p, mtime: stat.mtimeMs, sizeKb: Math.round(stat.size / 1024) };
+      })
+      .sort((a: any, b: any) => b.mtime - a.mtime);
+  } catch { return []; }
+});
+
+ipcMain.handle('mc-open-screenshot', async (_e, filePath: string) => {
+  try { await shell.openPath(filePath); return { ok: true }; }
+  catch (err: any) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('mc-show-screenshots-folder', async () => {
+  const dir = path.join(app.getPath('userData'), '.minecraft', 'screenshots');
+  fs.mkdirSync(dir, { recursive: true });
+  shell.openPath(dir);
+});
+
+// ── IPC: resource packs ───────────────────────────────────────────────────────
+ipcMain.handle('mc-list-resourcepacks', async () => {
+  const dir = path.join(app.getPath('userData'), '.minecraft', 'resourcepacks');
+  try {
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir).filter((f: string) => f.endsWith('.zip'));
+  } catch { return []; }
+});
+
+ipcMain.handle('mc-install-resourcepack', async (_e, opts: { url: string; filename: string }) => {
+  try {
+    const dir = path.join(app.getPath('userData'), '.minecraft', 'resourcepacks');
+    fs.mkdirSync(dir, { recursive: true });
+    await downloadFileTo(opts.url, path.join(dir, opts.filename));
+    return { ok: true };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('mc-remove-resourcepack', async (_e, opts: { filename: string }) => {
+  try {
+    const fp = path.join(app.getPath('userData'), '.minecraft', 'resourcepacks', opts.filename);
+    if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    return { ok: true };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
 // ── IPC: window controls ──────────────────────────────────────────────────────
 ipcMain.on('win-close',    () => BrowserWindow.getFocusedWindow()?.close());
 ipcMain.on('win-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());

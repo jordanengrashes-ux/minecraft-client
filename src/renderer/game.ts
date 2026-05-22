@@ -453,28 +453,36 @@ if (mc) {
 setStatus('Ready — login with Microsoft to play');
 
 // ── Nav switching ─────────────────────────────────────────────────────────────
-const contentEl         = document.getElementById('content')!;
-const bedrockPanelEl    = document.getElementById('bedrock-panel')!;
-const modsPanelEl       = document.getElementById('mods-panel')!;
-const pvpPanelEl        = document.getElementById('pvp-panel')!;
-const bedrockModsPanelEl= document.getElementById('bedrock-mods-panel')!;
-const customizePanelEl  = document.getElementById('customize-panel')!;
-const settingsPanelEl   = document.getElementById('settings-panel')!;
-const navPlay           = document.getElementById('nav-play')!;
-const navBedrock        = document.getElementById('nav-bedrock')!;
-const navMods           = document.getElementById('nav-mods')!;
-const navPvp            = document.getElementById('nav-pvp')!;
-const navBedrockMods    = document.getElementById('nav-bedrock-mods')!;
-const navCustomize      = document.getElementById('nav-customize')!;
-const navSettings       = document.getElementById('nav-settings')!;
+const contentEl           = document.getElementById('content')!;
+const bedrockPanelEl      = document.getElementById('bedrock-panel')!;
+const modsPanelEl         = document.getElementById('mods-panel')!;
+const pvpPanelEl          = document.getElementById('pvp-panel')!;
+const bedrockModsPanelEl  = document.getElementById('bedrock-mods-panel')!;
+const resourcePacksPanelEl= document.getElementById('resourcepacks-panel')!;
+const skinsPanelEl        = document.getElementById('skins-panel')!;
+const screenshotsPanelEl  = document.getElementById('screenshots-panel')!;
+const accountsPanelEl     = document.getElementById('accounts-panel')!;
+const customizePanelEl    = document.getElementById('customize-panel')!;
+const settingsPanelEl     = document.getElementById('settings-panel')!;
+const navPlay             = document.getElementById('nav-play')!;
+const navBedrock          = document.getElementById('nav-bedrock')!;
+const navMods             = document.getElementById('nav-mods')!;
+const navPvp              = document.getElementById('nav-pvp')!;
+const navBedrockMods      = document.getElementById('nav-bedrock-mods')!;
+const navResourcePacks    = document.getElementById('nav-resourcepacks')!;
+const navSkins            = document.getElementById('nav-skins')!;
+const navScreenshots      = document.getElementById('nav-screenshots')!;
+const navAccounts         = document.getElementById('nav-accounts')!;
+const navCustomize        = document.getElementById('nav-customize')!;
+const navSettings         = document.getElementById('nav-settings')!;
 const navServer         = document.getElementById('nav-server')!;
 const navCosmetics      = document.getElementById('nav-cosmetics')!;
 const navFriends        = document.getElementById('nav-friends')!;
 const serverPanelEl     = document.getElementById('server-panel')!;
 const cosmeticsPanelEl  = document.getElementById('cosmetics-panel')!;
 const friendsPanelEl    = document.getElementById('friends-panel')!;
-const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, pvpPanelEl, bedrockModsPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl];
-const allNavs   = [navPlay, navBedrock, navMods, navPvp, navBedrockMods, navServer, navCosmetics, navFriends, navCustomize, navSettings];
+const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl];
+const allNavs   = [navPlay, navBedrock, navMods, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navServer, navCosmetics, navFriends, navCustomize, navSettings];
 
 function showPanel(panel: HTMLElement, nav: HTMLElement) {
   allPanels.forEach(p => p.style.display = 'none');
@@ -482,16 +490,20 @@ function showPanel(panel: HTMLElement, nav: HTMLElement) {
   panel.style.display = 'flex';
   nav.classList.add('active');
 }
-navPlay       .addEventListener('click', () => showPanel(contentEl,          navPlay));
-navBedrock    .addEventListener('click', () => { showPanel(bedrockPanelEl,   navBedrock); initBedrock(); if (!bedrockPanelEl.dataset.loaded) { searchBedrockAddons(''); bedrockPanelEl.dataset.loaded = '1'; } });
-navMods       .addEventListener('click', () => { showPanel(modsPanelEl, navMods); if (!modsPanelEl.dataset.loaded) { loadRecommendedMods(); modsPanelEl.dataset.loaded = '1'; } });
-navPvp        .addEventListener('click', () => { showPanel(pvpPanelEl, navPvp); if (!pvpPanelEl.dataset.loaded) { initPvpMods(); pvpPanelEl.dataset.loaded = '1'; } });
-navBedrockMods.addEventListener('click', () => { showPanel(bedrockModsPanelEl, navBedrockMods); if (!bedrockModsPanelEl.dataset.loaded) { searchBedrockMods(''); bedrockModsPanelEl.dataset.loaded = '1'; } });
-navServer     .addEventListener('click', () => { showPanel(serverPanelEl, navServer); if (!serverPanelEl.dataset.loaded) { loadServerVersions(); loadCommunityServers(); serverPanelEl.dataset.loaded = '1'; } });
-navCosmetics  .addEventListener('click', () => { showPanel(cosmeticsPanelEl, navCosmetics); if (!cosmeticsPanelEl.dataset.loaded) { initCosmetics(); cosmeticsPanelEl.dataset.loaded = '1'; } });
-navFriends    .addEventListener('click', () => { showPanel(friendsPanelEl,   navFriends);   if (!friendsPanelEl.dataset.loaded) { initFriendsPanel(); friendsPanelEl.dataset.loaded = '1'; } });
-navCustomize  .addEventListener('click', () => { showPanel(customizePanelEl, navCustomize); if (!customizePanelEl.dataset.loaded) { initCustomize(); searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
-navSettings   .addEventListener('click', () => showPanel(settingsPanelEl,    navSettings));
+navPlay          .addEventListener('click', () => showPanel(contentEl,             navPlay));
+navBedrock       .addEventListener('click', () => { showPanel(bedrockPanelEl,      navBedrock); initBedrock(); if (!bedrockPanelEl.dataset.loaded) { searchBedrockAddons(''); bedrockPanelEl.dataset.loaded = '1'; } });
+navMods          .addEventListener('click', () => { showPanel(modsPanelEl,         navMods); if (!modsPanelEl.dataset.loaded) { loadRecommendedMods(); modsPanelEl.dataset.loaded = '1'; } });
+navPvp           .addEventListener('click', () => { showPanel(pvpPanelEl,          navPvp); if (!pvpPanelEl.dataset.loaded) { initPvpMods(); pvpPanelEl.dataset.loaded = '1'; } });
+navBedrockMods   .addEventListener('click', () => { showPanel(bedrockModsPanelEl,  navBedrockMods); if (!bedrockModsPanelEl.dataset.loaded) { searchBedrockMods(''); bedrockModsPanelEl.dataset.loaded = '1'; } });
+navResourcePacks .addEventListener('click', () => { showPanel(resourcePacksPanelEl,navResourcePacks); if (!resourcePacksPanelEl.dataset.loaded) { initResourcePacks(); resourcePacksPanelEl.dataset.loaded = '1'; } });
+navSkins         .addEventListener('click', () => { showPanel(skinsPanelEl,        navSkins); if (!skinsPanelEl.dataset.loaded) { initSkins(); skinsPanelEl.dataset.loaded = '1'; } });
+navScreenshots   .addEventListener('click', () => { showPanel(screenshotsPanelEl,  navScreenshots); if (!screenshotsPanelEl.dataset.loaded) { initScreenshots(); screenshotsPanelEl.dataset.loaded = '1'; } });
+navAccounts      .addEventListener('click', () => { showPanel(accountsPanelEl,     navAccounts); if (!accountsPanelEl.dataset.loaded) { initAccounts(); accountsPanelEl.dataset.loaded = '1'; } });
+navServer        .addEventListener('click', () => { showPanel(serverPanelEl,       navServer); if (!serverPanelEl.dataset.loaded) { loadServerVersions(); loadCommunityServers(); serverPanelEl.dataset.loaded = '1'; } });
+navCosmetics     .addEventListener('click', () => { showPanel(cosmeticsPanelEl,    navCosmetics); if (!cosmeticsPanelEl.dataset.loaded) { initCosmetics(); cosmeticsPanelEl.dataset.loaded = '1'; } });
+navFriends       .addEventListener('click', () => { showPanel(friendsPanelEl,      navFriends);   if (!friendsPanelEl.dataset.loaded) { initFriendsPanel(); friendsPanelEl.dataset.loaded = '1'; } });
+navCustomize     .addEventListener('click', () => { showPanel(customizePanelEl,    navCustomize); if (!customizePanelEl.dataset.loaded) { initCustomize(); searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
+navSettings      .addEventListener('click', () => showPanel(settingsPanelEl,       navSettings));
 
 // ── Bedrock Edition ────────────────────────────────────────────────────────────
 const bedrockIcon       = document.getElementById('bedrock-icon')!;
@@ -1286,6 +1298,253 @@ function initPvpMods() {
   renderPvpMods('');
   const searchEl = document.getElementById('pvp-search') as HTMLInputElement;
   searchEl.addEventListener('input', () => renderPvpMods(searchEl.value));
+}
+
+// ── Resource Packs panel ──────────────────────────────────────────────────────
+const RP_STORAGE_KEY = 'voxel_installed_rps';
+function loadInstalledRPs(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(RP_STORAGE_KEY) || '{}'); } catch { return {}; }
+}
+function saveInstalledRPs(data: Record<string, string>) {
+  localStorage.setItem(RP_STORAGE_KEY, JSON.stringify(data));
+}
+
+function buildRPCard(name: string, slug: string, icon: string, desc: string, installed: boolean, url: string, filename: string): HTMLElement {
+  const card = document.createElement('div');
+  card.className = 'mod-card' + (installed ? ' enabled' : '');
+  card.innerHTML = `
+    <div class="mod-icon" style="font-size:22px;background:none;">${icon}</div>
+    <div class="mod-info">
+      <div class="mod-name">${name}</div>
+      <div class="mod-desc">${desc}</div>
+      <div class="pvp-err" style="font-size:11px;color:#f85149;margin-top:4px;display:none;"></div>
+    </div>
+    <div class="mod-right">
+      <div class="mod-version" style="color:${installed ? '#3fb950' : 'transparent'}">✓</div>
+      <label class="toggle"><input type="checkbox" ${installed ? 'checked' : ''} /><span class="toggle-slider"></span></label>
+    </div>`;
+  const input    = card.querySelector('input') as HTMLInputElement;
+  const statusEl = card.querySelector('.mod-version') as HTMLElement;
+  const errEl    = card.querySelector('.pvp-err') as HTMLElement;
+  input.addEventListener('change', async e => {
+    const checked = (e.target as HTMLInputElement).checked;
+    input.disabled = true;
+    errEl.style.display = 'none';
+    const rps = loadInstalledRPs();
+    if (checked) {
+      statusEl.textContent = '⬇'; statusEl.style.color = '#58a6ff';
+      try {
+        const res = await mc.installResourcePack({ url, filename });
+        if (!res.ok) throw new Error(res.error);
+        rps[slug] = filename;
+        saveInstalledRPs(rps);
+        card.className = 'mod-card enabled';
+        statusEl.textContent = '✓'; statusEl.style.color = '#3fb950';
+      } catch (err: any) {
+        input.checked = false;
+        card.className = 'mod-card';
+        statusEl.textContent = '✗'; statusEl.style.color = '#f85149';
+        errEl.textContent = err.message; errEl.style.display = 'block';
+      }
+    } else {
+      if (rps[slug]) await mc.removeResourcePack({ filename: rps[slug] });
+      delete rps[slug];
+      saveInstalledRPs(rps);
+      card.className = 'mod-card';
+      statusEl.textContent = ''; statusEl.style.color = 'transparent';
+    }
+    input.disabled = false;
+  });
+  return card;
+}
+
+async function searchResourcePacks(query: string) {
+  const rpList    = document.getElementById('rp-list')!;
+  const rpLoading = document.getElementById('rp-loading')!;
+  rpList.innerHTML = '';
+  rpLoading.style.display = 'block';
+  try {
+    const facets = JSON.stringify([['project_type:resourcepack']]);
+    const params = new URLSearchParams({ query, facets, limit: '20' });
+    const res  = await fetch(`https://api.modrinth.com/v2/search?${params}`);
+    const data = await res.json();
+    const rps  = loadInstalledRPs();
+    rpLoading.style.display = 'none';
+    for (const hit of (data.hits || [])) {
+      const installed = !!rps[hit.slug];
+      const filename  = `${hit.slug}.zip`;
+      const dlUrl     = `https://cdn.modrinth.com/data/${hit.project_id}/featured`;
+      const card = buildRPCard(hit.title, hit.slug, '🎨', hit.description, installed, dlUrl, filename);
+      rpList.appendChild(card);
+    }
+    if (!data.hits?.length) rpList.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:20px 0;">No results</div>';
+  } catch { rpLoading.style.display = 'none'; rpList.innerHTML = '<div style="color:#f85149;font-size:13px;text-align:center;padding:20px 0;">Search failed</div>'; }
+}
+
+function initResourcePacks() {
+  const rps = loadInstalledRPs();
+  const installedEl = document.getElementById('rp-installed')!;
+  installedEl.innerHTML = '';
+  if (Object.keys(rps).length) {
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:13px;font-weight:700;color:#3fb950;margin-bottom:8px;';
+    label.textContent = '✓ Installed';
+    installedEl.appendChild(label);
+    for (const [slug, filename] of Object.entries(rps)) {
+      installedEl.appendChild(buildRPCard(filename.replace('.zip',''), slug, '🎨', filename, true, '', filename));
+    }
+    const sep = document.createElement('div');
+    sep.style.cssText = 'border-top:1px solid #21262d;margin:8px 0 4px;';
+    installedEl.appendChild(sep);
+  }
+  const searchEl = document.getElementById('rp-search') as HTMLInputElement;
+  let rpTimer: ReturnType<typeof setTimeout> | null = null;
+  searchEl.addEventListener('input', () => {
+    if (rpTimer) clearTimeout(rpTimer);
+    rpTimer = setTimeout(() => searchResourcePacks(searchEl.value), 400);
+  });
+  searchResourcePacks('');
+}
+
+// ── Skins panel ───────────────────────────────────────────────────────────────
+function initSkins() {
+  const previewImg   = document.getElementById('skin-preview') as HTMLImageElement;
+  const skinNameEl   = document.getElementById('skin-name')!;
+  const fileInput    = document.getElementById('skin-file-input') as HTMLInputElement;
+  const uploadBtn    = document.getElementById('skin-upload-btn') as HTMLButtonElement;
+  const fileNameEl   = document.getElementById('skin-file-name')!;
+  const applyBtn     = document.getElementById('skin-apply-btn') as HTMLButtonElement;
+  const statusEl     = document.getElementById('skin-status')!;
+  let selectedBase64 = '';
+
+  const cosmetics = (window as any).cosmetics;
+  cosmetics.getUuid().then((uuid: string | null) => {
+    if (uuid) {
+      previewImg.src = `https://crafatar.com/renders/body/${uuid}?size=200&overlay`;
+      skinNameEl.textContent = uuid;
+    } else {
+      previewImg.src = 'https://crafatar.com/renders/body/MHF_Steve?size=200&overlay';
+      skinNameEl.textContent = 'Offline — sign in to change skin';
+    }
+  });
+
+  uploadBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    fileNameEl.textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target?.result as string;
+      selectedBase64 = dataUrl.split(',')[1];
+      previewImg.src = dataUrl;
+      applyBtn.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  applyBtn.addEventListener('click', async () => {
+    const variant = (document.querySelector('input[name="skin-variant"]:checked') as HTMLInputElement)?.value as 'classic' | 'slim' || 'classic';
+    applyBtn.disabled = true;
+    statusEl.textContent = 'Uploading...'; statusEl.style.color = '#d29922';
+    const res = await mc.uploadSkin({ base64: selectedBase64, variant });
+    applyBtn.disabled = false;
+    if (res.ok) { statusEl.textContent = '✓ Skin applied!'; statusEl.style.color = '#3fb950'; }
+    else         { statusEl.textContent = `✗ ${res.error}`; statusEl.style.color = '#f85149'; }
+  });
+}
+
+// ── Screenshots panel ─────────────────────────────────────────────────────────
+function initScreenshots() {
+  const listEl = document.getElementById('screenshots-list')!;
+  document.getElementById('screenshots-open-folder')!.addEventListener('click', () => mc.showScreenshotsFolder());
+
+  listEl.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:30px 0;">Loading...</div>';
+  mc.listScreenshots().then((shots: { name: string; path: string; mtime: number; sizeKb: number }[]) => {
+    listEl.innerHTML = '';
+    if (!shots.length) {
+      listEl.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:40px 0;">No screenshots yet — press <strong style="color:#e6edf3;">F2</strong> in-game to take one</div>';
+      return;
+    }
+    for (const s of shots) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:14px;background:rgba(13,17,23,0.6);border:1px solid #21262d;border-radius:10px;padding:12px 16px;cursor:pointer;transition:background 0.15s;';
+      row.innerHTML = `
+        <span style="font-size:20px;">🖼️</span>
+        <div style="flex:1;min-width:0;">
+          <div style="color:#e6edf3;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
+          <div style="color:#6e7681;font-size:11px;margin-top:2px;">${new Date(s.mtime).toLocaleString()} · ${s.sizeKb} KB</div>
+        </div>
+        <button style="background:#21262d;border:1px solid #30363d;color:#8b949e;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;">Open</button>`;
+      row.querySelector('button')!.addEventListener('click', e => { e.stopPropagation(); mc.openScreenshot(s.path); });
+      row.addEventListener('click', () => mc.openScreenshot(s.path));
+      row.addEventListener('mouseover', () => row.style.background = 'rgba(33,38,45,0.6)');
+      row.addEventListener('mouseout',  () => row.style.background = 'rgba(13,17,23,0.6)');
+      listEl.appendChild(row);
+    }
+  });
+}
+
+// ── Accounts panel ────────────────────────────────────────────────────────────
+const ACCOUNTS_KEY = 'voxel_saved_accounts';
+function loadAccounts(): { name: string; added: number }[] {
+  try { return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || '[]'); } catch { return []; }
+}
+function saveAccountsList(list: { name: string; added: number }[]) {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
+}
+
+function renderAccountsList() {
+  const listEl  = document.getElementById('accounts-list')!;
+  const accounts = loadAccounts();
+  listEl.innerHTML = '';
+  if (!accounts.length) {
+    listEl.innerHTML = '<div style="color:#6e7681;font-size:13px;">No saved accounts yet — add one above</div>';
+    return;
+  }
+  const offlineInput = document.getElementById('offline-username') as HTMLInputElement | null;
+  for (const acc of accounts) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:12px;background:rgba(13,17,23,0.6);border:1px solid #21262d;border-radius:10px;padding:11px 16px;';
+    const isActive = offlineInput?.value === acc.name;
+    row.innerHTML = `
+      <img src="https://crafatar.com/avatars/${encodeURIComponent(acc.name)}?size=32&overlay" onerror="this.src=''" style="width:32px;height:32px;border-radius:4px;image-rendering:pixelated;background:#21262d;" />
+      <div style="flex:1;">
+        <div style="color:#e6edf3;font-size:13px;font-weight:600;">${acc.name}</div>
+        <div style="color:#6e7681;font-size:11px;">Added ${new Date(acc.added).toLocaleDateString()}</div>
+      </div>
+      ${isActive ? '<span style="color:#3fb950;font-size:12px;font-weight:600;">● Active</span>' : '<button class="switch-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;">Switch</button>'}
+      <button class="remove-btn" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:16px;padding:0 4px;" title="Remove">✕</button>`;
+    row.querySelector('.switch-btn')?.addEventListener('click', () => {
+      if (offlineInput) { offlineInput.value = acc.name; offlineInput.dispatchEvent(new Event('input')); }
+      (document.getElementById('offline-toggle') as HTMLInputElement | null)?.dispatchEvent(new Event('change'));
+      renderAccountsList();
+    });
+    row.querySelector('.remove-btn')!.addEventListener('click', () => {
+      const list = loadAccounts().filter(a => a.name !== acc.name);
+      saveAccountsList(list);
+      renderAccountsList();
+    });
+    listEl.appendChild(row);
+  }
+}
+
+function initAccounts() {
+  renderAccountsList();
+  const input  = document.getElementById('account-name-input') as HTMLInputElement;
+  const addBtn = document.getElementById('account-add-btn') as HTMLButtonElement;
+  const doAdd = () => {
+    const name = input.value.trim();
+    if (!name || name.length < 2) return;
+    const list = loadAccounts();
+    if (list.find(a => a.name === name)) return;
+    list.unshift({ name, added: Date.now() });
+    saveAccountsList(list);
+    input.value = '';
+    renderAccountsList();
+  };
+  addBtn.addEventListener('click', doAdd);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
 }
 
 // ── Cosmetics panel ───────────────────────────────────────────────────────────
