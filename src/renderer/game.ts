@@ -1118,8 +1118,12 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
       { slug: 'status-effect-bars',    emoji: '🧪', name: 'Status Effect Bars',   desc: 'Duration bars under every active potion effect', group: 'HUD' },
       { slug: 'coordinates-display',   emoji: '📍', name: 'Coordinates',          desc: 'Clean XYZ + direction overlay — no F3 needed', group: 'HUD' },
       { slug: 'xaeros-minimap',        emoji: '🗺️', name: "Xaero's Minimap",     desc: 'Minimap with player dots & waypoints', group: 'HUD' },
+      { slug: 'xaeros-world-map',      emoji: '🌍', name: "Xaero's World Map",    desc: 'Full world map — works with Xaero\'s Minimap', group: 'HUD' },
       { slug: 'betterf3',              emoji: '📊', name: 'BetterF3',             desc: 'Color-coded F3 with FPS, ping & TPS (Feather HUD)', group: 'HUD' },
       { slug: 'zoomify',               emoji: '🔍', name: 'Zoomify',              desc: 'OptiFine-style smooth zoom key (Feather Zoom)', group: 'HUD' },
+      { slug: 'ping-wheel',            emoji: '📡', name: 'Ping Wheel',           desc: 'Quick radial ping menu to mark locations (like Apex)', group: 'HUD' },
+      { slug: 'fps-display',           emoji: '🖥️', name: 'FPS Display',          desc: 'Simple corner FPS counter overlay', group: 'HUD' },
+      { slug: 'held-item-info',        emoji: 'ℹ️', name: 'Held Item Info',       desc: 'Shows name & enchantments of held item', group: 'HUD' },
     ],
   },
   {
@@ -1132,6 +1136,12 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
       { slug: 'damage-tilt',           emoji: '💥', name: 'Damage Tilt',         desc: 'Screen tilts when you take damage (Feather)', group: 'Visual' },
       { slug: '3dskinlayers',          emoji: '🧍', name: '3D Skin Layers',      desc: 'Renders skin as 3D geometry like Feather Client', group: 'Visual' },
       { slug: 'blur',                  emoji: '🌫️', name: 'Blur',               desc: 'Blurs the background when a menu is open', group: 'Visual' },
+      { slug: 'cit-resewn',            emoji: '🎨', name: 'CIT Resewn',          desc: 'Custom Item Textures — rename items to change their look', group: 'Visual' },
+      { slug: 'model-fix',             emoji: '🔲', name: 'Model Fix',           desc: 'Fixes gaps in held items & armor (like OptiFine)', group: 'Visual' },
+      { slug: 'entity-model-features', emoji: '🐾', name: 'Entity Model Features',desc: 'Custom entity models from resource packs (EMF)', group: 'Visual' },
+      { slug: 'entity-texture-features',emoji: '🖼️', name: 'Entity Texture Features',desc: 'Random & custom entity textures (ETF)', group: 'Visual' },
+      { slug: 'continuity',            emoji: '🧱', name: 'Continuity',          desc: 'Connected textures like OptiFine (glass, bookshelves)', group: 'Visual' },
+      { slug: 'lambdynamiclights',     emoji: '💡', name: 'Dynamic Lights',      desc: 'Held torches & glowstone light up surroundings', group: 'Visual' },
     ],
   },
   {
@@ -1143,6 +1153,12 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
       { slug: 'item-highlighter',      emoji: '🔆', name: 'Item Highlighter',    desc: 'Highlights newly picked up items in hotbar', group: 'Utility' },
       { slug: 'shulkerboxtooltip',     emoji: '📦', name: 'Shulker Tooltips',    desc: 'Preview shulker box contents on hover', group: 'Utility' },
       { slug: 'perspectivemod',        emoji: '📷', name: 'Perspective Mod',     desc: 'Feather Freelook — look around without turning body', group: 'Utility' },
+      { slug: 'mousewheelie',          emoji: '🖱️', name: 'Mouse Wheelie',       desc: 'Scroll to move items between inventory & chest', group: 'Utility' },
+      { slug: 'inventory-profiles-next',emoji: '🗂️', name: 'Inventory Profiles', desc: 'Auto-sort inventory, replace broken tools automatically', group: 'Utility' },
+      { slug: 'chat-heads',            emoji: '💬', name: 'Chat Heads',          desc: 'Shows player skin head next to their chat message', group: 'Utility' },
+      { slug: 'tooltipfix',            emoji: '🔤', name: 'ToolTip Fix',         desc: 'Stops tooltips from going off-screen', group: 'Utility' },
+      { slug: 'reeses-sodium-options', emoji: '⚙️', name: 'Reese\'s Sodium Options',desc: 'Better settings screen for Sodium video options', group: 'Utility' },
+      { slug: 'sodium-extra',          emoji: '➕', name: 'Sodium Extra',        desc: 'Extra options for Sodium (animations, particles)', group: 'Utility' },
     ],
   },
   {
@@ -1155,6 +1171,11 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
       { slug: 'entityculling',         emoji: '👁️', name: 'Entity Culling',      desc: 'Skip rendering entities behind walls', group: 'Performance' },
       { slug: 'memoryleakfix',         emoji: '🧠', name: 'Memory Leak Fix',     desc: 'Fixes Minecraft memory leaks — fewer crashes', group: 'Performance' },
       { slug: 'ferrite-core',          emoji: '💾', name: 'Ferrite Core',        desc: 'Reduces RAM usage of block states (Feather perf)', group: 'Performance' },
+      { slug: 'indium',                emoji: '🔩', name: 'Indium',              desc: 'Sodium addon — enables Fabric Rendering API for other mods', group: 'Performance' },
+      { slug: 'starlight',             emoji: '⭐', name: 'Starlight',           desc: 'Rewrites light engine for massive chunk load speedup', group: 'Performance' },
+      { slug: 'c2me-fabric',           emoji: '🧵', name: 'C2ME',               desc: 'Multithreaded chunk generation & I/O', group: 'Performance' },
+      { slug: 'noxesium',              emoji: '🚀', name: 'Noxesium',            desc: 'Reduces server-side lag on large servers', group: 'Performance' },
+      { slug: 'immediatelyfast',       emoji: '💨', name: 'ImmediatelyFast',     desc: 'Optimizes immediate mode rendering (GUI, maps, text)', group: 'Performance' },
     ],
   },
 ];
@@ -1237,18 +1258,34 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
   return card;
 }
 
-function initPvpMods() {
+function renderPvpMods(query: string) {
   const list = document.getElementById('pvp-list')!;
+  const q = query.trim().toLowerCase();
   list.innerHTML = '';
+  let anyVisible = false;
   for (const group of PVP_MOD_GROUPS) {
+    const filtered = q ? group.mods.filter(m =>
+      m.name.toLowerCase().includes(q) || m.desc.toLowerCase().includes(q) || m.slug.includes(q)
+    ) : group.mods;
+    if (!filtered.length) continue;
+    anyVisible = true;
     const section = document.createElement('div');
     section.innerHTML = `<div style="font-size:13px;font-weight:700;color:${group.color};letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #21262d;">${group.label}</div>`;
     const grid = document.createElement('div');
     grid.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
-    for (const mod of group.mods) grid.appendChild(buildPvpCard(mod));
+    for (const mod of filtered) grid.appendChild(buildPvpCard(mod));
     section.appendChild(grid);
     list.appendChild(section);
   }
+  if (!anyVisible) {
+    list.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:40px 0;">No mods match your search</div>';
+  }
+}
+
+function initPvpMods() {
+  renderPvpMods('');
+  const searchEl = document.getElementById('pvp-search') as HTMLInputElement;
+  searchEl.addEventListener('input', () => renderPvpMods(searchEl.value));
 }
 
 // ── Cosmetics panel ───────────────────────────────────────────────────────────
