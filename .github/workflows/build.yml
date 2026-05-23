@@ -29,83 +29,15 @@ jobs:
         shell: pwsh
       - run: npm ci
       - run: npm run build && npx electron-builder --win --publish never
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-artifacts
-          path: release/
-          if-no-files-found: error
-
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/electron
-            ~/.cache/electron-builder
-          key: ${{ runner.os }}-electron-30
-      - run: sudo apt-get install -y rpm fakeroot
-      - name: Create resource stubs
-        run: mkdir -p resources/java21 resources/mods
-      - run: npm ci
-      - run: npm run build && npx electron-builder --linux --publish never
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-artifacts
-          path: release/
-          if-no-files-found: error
-
-  build-mac:
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/Library/Caches/electron
-            ~/Library/Caches/electron-builder
-          key: ${{ runner.os }}-electron-30
-      - name: Create resource stubs
-        run: mkdir -p resources/java21 resources/mods
-      - run: npm ci
-      - run: npm run build && npx electron-builder --mac --publish never
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mac-artifacts
-          path: release/
-          if-no-files-found: error
-
-  publish-release:
-    needs: [build-windows, build-linux]
-    if: ${{ always() && needs.build-windows.result == 'success' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-      - name: Create & publish GitHub release
+      - name: Publish GitHub release
+        shell: pwsh
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          TAG="v${VERSION}"
-          echo "Publishing release for tag: ${TAG}"
-          FILES=$(find artifacts/ -type f \( -name "*.exe" -o -name "*.blockmap" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.dmg" -o -name "*.yml" \))
-          echo "Files to upload:"
-          echo "${FILES}"
-          gh release delete "${TAG}" --yes 2>/dev/null || true
-          gh release create "${TAG}" \
-            --title "${TAG}" \
-            --notes "Voxel Client ${TAG}" \
-            --draft=false \
-            ${FILES}
+          $version = node -p "require('./package.json').version"
+          $tag = "v$version"
+          Write-Host "Publishing $tag"
+          $files = Get-ChildItem -Path release -Recurse -Include *.exe,*.blockmap,*.yml | Select-Object -ExpandProperty FullName
+          Write-Host "Files: $files"
+          gh release delete $tag --yes 2>$null; $true
+          gh release create $tag --title $tag --notes "Voxel Client $tag" --draft=false $files
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
