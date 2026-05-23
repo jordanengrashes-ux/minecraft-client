@@ -527,6 +527,8 @@ const navResourcePacks    = document.getElementById('nav-resourcepacks')!;
 const navSkins            = document.getElementById('nav-skins')!;
 const navScreenshots      = document.getElementById('nav-screenshots')!;
 const navAccounts         = document.getElementById('nav-accounts')!;
+const navFiles            = document.getElementById('nav-files')!;
+const filesPanelEl        = document.getElementById('files-panel')!;
 const navCustomize        = document.getElementById('nav-customize')!;
 const navSettings         = document.getElementById('nav-settings')!;
 const navServer         = document.getElementById('nav-server')!;
@@ -535,8 +537,8 @@ const navFriends        = document.getElementById('nav-friends')!;
 const serverPanelEl     = document.getElementById('server-panel')!;
 const cosmeticsPanelEl  = document.getElementById('cosmetics-panel')!;
 const friendsPanelEl    = document.getElementById('friends-panel')!;
-const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl];
-const allNavs   = [navPlay, navBedrock, navMods, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navServer, navCosmetics, navFriends, navCustomize, navSettings];
+const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl];
+const allNavs   = [navPlay, navBedrock, navMods, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navServer, navCosmetics, navFriends, navCustomize, navSettings];
 
 function showPanel(panel: HTMLElement, nav: HTMLElement) {
   allPanels.forEach(p => p.style.display = 'none');
@@ -553,6 +555,7 @@ navResourcePacks .addEventListener('click', () => { showPanel(resourcePacksPanel
 navSkins         .addEventListener('click', () => { showPanel(skinsPanelEl,        navSkins); if (!skinsPanelEl.dataset.loaded) { initSkins(); skinsPanelEl.dataset.loaded = '1'; } });
 navScreenshots   .addEventListener('click', () => { showPanel(screenshotsPanelEl,  navScreenshots); if (!screenshotsPanelEl.dataset.loaded) { initScreenshots(); screenshotsPanelEl.dataset.loaded = '1'; } });
 navAccounts      .addEventListener('click', () => { showPanel(accountsPanelEl,     navAccounts); if (!accountsPanelEl.dataset.loaded) { initAccounts(); accountsPanelEl.dataset.loaded = '1'; } });
+navFiles         .addEventListener('click', () => { showPanel(filesPanelEl,        navFiles);  if (!filesPanelEl.dataset.loaded)  { initFiles(); filesPanelEl.dataset.loaded = '1'; } });
 navServer        .addEventListener('click', () => { showPanel(serverPanelEl,       navServer); if (!serverPanelEl.dataset.loaded) { loadServerVersions(); loadCommunityServers(); serverPanelEl.dataset.loaded = '1'; } });
 navCosmetics     .addEventListener('click', () => { showPanel(cosmeticsPanelEl,    navCosmetics); if (!cosmeticsPanelEl.dataset.loaded) { initCosmetics(); cosmeticsPanelEl.dataset.loaded = '1'; } });
 navFriends       .addEventListener('click', () => { showPanel(friendsPanelEl,      navFriends);   if (!friendsPanelEl.dataset.loaded) { initFriendsPanel(); friendsPanelEl.dataset.loaded = '1'; } });
@@ -2452,4 +2455,99 @@ if (updater) {
 
   installBtn.addEventListener('click', () => updater.install());
   checkBtn?.addEventListener('click', () => updater.check());
+}
+
+// ── Files panel ───────────────────────────────────────────────────────────────
+function makeDropZone(zoneId: string, accept: string[], onDrop: (paths: string[]) => void) {
+  const zone = document.getElementById(zoneId)!;
+  const highlight = () => { zone.style.borderColor = '#58a6ff'; zone.style.background = 'rgba(88,166,255,0.06)'; };
+  const unhighlight = () => { zone.style.borderColor = '#30363d'; zone.style.background = 'rgba(13,17,23,0.5)'; };
+  zone.addEventListener('dragover',  e => { e.preventDefault(); highlight(); });
+  zone.addEventListener('dragleave', () => unhighlight());
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); unhighlight();
+    const paths: string[] = [];
+    if (e.dataTransfer?.files) {
+      for (const f of Array.from(e.dataTransfer.files)) {
+        const fp = (f as any).path as string;
+        if (fp) paths.push(fp);
+      }
+    }
+    if (paths.length) onDrop(paths);
+  });
+  zone.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    if (accept.length) input.accept = accept.join(',');
+    input.multiple = true;
+    input.addEventListener('change', () => {
+      const paths = Array.from(input.files || []).map(f => (f as any).path as string).filter(Boolean);
+      if (paths.length) onDrop(paths);
+    });
+    input.click();
+  });
+}
+
+function renderFileList(listId: string, items: string[], icon: string, onOpen?: (name: string) => void) {
+  const list = document.getElementById(listId)!;
+  list.innerHTML = '';
+  if (!items.length) {
+    list.innerHTML = `<div style="color:#484f58;font-size:12px;padding:4px 0;">No files yet — drop one above</div>`;
+    return;
+  }
+  for (const name of items) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(13,17,23,0.6);border:1px solid #21262d;border-radius:8px;';
+    row.innerHTML = `<span style="font-size:16px;">${icon}</span><span style="flex:1;font-size:12px;color:#e6edf3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>`;
+    list.appendChild(row);
+  }
+}
+
+async function refreshFileLists() {
+  const filesApi = (window as any).files;
+  if (!filesApi) return;
+  const [worlds, schematics] = await Promise.all([filesApi.listWorlds(), filesApi.listSchematics()]);
+  renderFileList('worlds-list',     worlds,     '🌍');
+  renderFileList('schematics-list', schematics, '📐');
+}
+
+function initFiles() {
+  const filesApi = (window as any).files;
+
+  // Drop zones
+  makeDropZone('worlds-dropzone', ['.zip'], async (paths) => {
+    if (!filesApi) return;
+    for (const p of paths) {
+      const res = await filesApi.installWorld(p);
+      if (!res?.ok) alert(`Failed to install world: ${res?.error}`);
+    }
+    refreshFileLists();
+  });
+
+  makeDropZone('schematics-dropzone', ['.schematic', '.litematic', '.schem', '.nbt'], async (paths) => {
+    if (!filesApi) return;
+    for (const p of paths) {
+      const ext = p.split('.').pop()?.toLowerCase() || '';
+      if (!['schematic','litematic','schem','nbt'].includes(ext)) continue;
+      const res = await filesApi.installSchematic(p);
+      if (!res?.ok) alert(`Failed: ${res?.error}`);
+    }
+    refreshFileLists();
+  });
+
+  // Open folder buttons
+  document.getElementById('files-open-saves')?.addEventListener('click', () => filesApi?.openFolder('saves'));
+  document.getElementById('files-open-schematics')?.addEventListener('click', () => filesApi?.openFolder('schematics'));
+  document.querySelectorAll('.files-folder-btn').forEach(btn => {
+    btn.addEventListener('click', () => filesApi?.openFolder((btn as HTMLElement).dataset.folder || 'root'));
+  });
+
+  // Quick-open button styles
+  document.querySelectorAll<HTMLElement>('.files-folder-btn').forEach(btn => {
+    btn.style.cssText = 'padding:7px 14px;background:rgba(33,38,45,0.6);border:1px solid #30363d;border-radius:7px;color:#8b949e;font-size:12px;cursor:pointer;';
+    btn.onmouseenter = () => { btn.style.borderColor = '#58a6ff'; btn.style.color = '#58a6ff'; };
+    btn.onmouseleave = () => { btn.style.borderColor = '#30363d'; btn.style.color = '#8b949e'; };
+  });
+
+  refreshFileLists();
 }

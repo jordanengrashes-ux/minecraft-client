@@ -989,6 +989,65 @@ ipcMain.handle('mc-remove-resourcepack', async (_e, opts: { filename: string }) 
   } catch (err: any) { return { ok: false, error: err.message }; }
 });
 
+// ── IPC: file manager (worlds, schematics) ────────────────────────────────────
+const mcRoot = () => path.join(app.getPath('userData'), '.minecraft');
+
+ipcMain.handle('mc-list-worlds', async () => {
+  const dir = path.join(mcRoot(), 'saves');
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((f: string) => fs.statSync(path.join(dir, f)).isDirectory());
+});
+
+ipcMain.handle('mc-install-world', async (_e, filePath: string) => {
+  try {
+    const savesDir = path.join(mcRoot(), 'saves');
+    fs.mkdirSync(savesDir, { recursive: true });
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.zip') {
+      execSync(`powershell -Command "Expand-Archive -LiteralPath '${filePath}' -DestinationPath '${savesDir}' -Force"`, { timeout: 30000 });
+    } else {
+      const dest = path.join(savesDir, path.basename(filePath));
+      if (fs.statSync(filePath).isDirectory()) {
+        fs.cpSync(filePath, dest, { recursive: true });
+      } else {
+        fs.copyFileSync(filePath, dest);
+      }
+    }
+    return { ok: true };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('mc-list-schematics', async () => {
+  const dir = path.join(mcRoot(), 'schematics');
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((f: string) =>
+    ['.schematic', '.litematic', '.schem', '.nbt'].includes(path.extname(f).toLowerCase())
+  );
+});
+
+ipcMain.handle('mc-install-schematic', async (_e, filePath: string) => {
+  try {
+    const dir = path.join(mcRoot(), 'schematics');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(filePath, path.join(dir, path.basename(filePath)));
+    return { ok: true };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('mc-open-folder', async (_e, type: string) => {
+  const dirs: Record<string, string> = {
+    saves:        path.join(mcRoot(), 'saves'),
+    schematics:   path.join(mcRoot(), 'schematics'),
+    mods:         path.join(mcRoot(), 'mods'),
+    screenshots:  path.join(mcRoot(), 'screenshots'),
+    resourcepacks:path.join(mcRoot(), 'resourcepacks'),
+    root:         mcRoot(),
+  };
+  const dir = dirs[type] || mcRoot();
+  fs.mkdirSync(dir, { recursive: true });
+  shell.openPath(dir);
+});
+
 // ── IPC: window controls ──────────────────────────────────────────────────────
 ipcMain.on('win-close',    () => BrowserWindow.getFocusedWindow()?.close());
 ipcMain.on('win-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());

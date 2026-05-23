@@ -33,6 +33,14 @@ contextBridge.exposeInMainWorld('overlay', {
   close:    () => ipcRenderer.send('overlay-close'),
 });
 
+contextBridge.exposeInMainWorld('files', {
+  listWorlds:       () => ipcRenderer.invoke('mc-list-worlds'),
+  installWorld:     (p: string) => ipcRenderer.invoke('mc-install-world', p),
+  listSchematics:   () => ipcRenderer.invoke('mc-list-schematics'),
+  installSchematic: (p: string) => ipcRenderer.invoke('mc-install-schematic', p),
+  openFolder:       (type: string) => ipcRenderer.invoke('mc-open-folder', type),
+});
+
 contextBridge.exposeInMainWorld('cosmetics', {
   installMod: () => ipcRenderer.invoke('cosmetics-install-mod'),
   getUuid:    () => ipcRenderer.invoke('mc-get-uuid'),
