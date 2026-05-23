@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('mc', {
   launchBedrock:   () => ipcRenderer.invoke('mc-launch-bedrock'),
   installMod:      (opts: { url: string; filename: string })  => ipcRenderer.invoke('mc-install-mod',  opts),
   removeMod:       (opts: { filename: string })               => ipcRenderer.invoke('mc-remove-mod',   opts),
+  toggleMod:       (opts: { filename: string; enable: boolean }) => ipcRenderer.invoke('mc-toggle-mod', opts),
   listMods:        ()                                         => ipcRenderer.invoke('mc-list-mods'),
   installBg:             (opts: { images: string[] })               => ipcRenderer.invoke('mc-install-bg',  opts),
   listScreenshots:       () => ipcRenderer.invoke('mc-list-screenshots'),

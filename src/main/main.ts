@@ -818,8 +818,25 @@ ipcMain.handle('mc-list-mods', async () => {
 
 ipcMain.handle('mc-remove-mod', async (_e, opts: { filename: string }) => {
   try {
-    const dest = path.join(app.getPath('userData'), '.minecraft', 'mods', opts.filename);
+    const modsDir = path.join(app.getPath('userData'), '.minecraft', 'mods');
+    const dest = path.join(modsDir, opts.filename);
     if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    const disabledDest = path.join(modsDir, '.disabled', opts.filename);
+    if (fs.existsSync(disabledDest)) fs.unlinkSync(disabledDest);
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mc-toggle-mod', async (_e, opts: { filename: string; enable: boolean }) => {
+  try {
+    const modsDir     = path.join(app.getPath('userData'), '.minecraft', 'mods');
+    const disabledDir = path.join(modsDir, '.disabled');
+    if (!fs.existsSync(disabledDir)) fs.mkdirSync(disabledDir, { recursive: true });
+    const src = opts.enable ? path.join(disabledDir, opts.filename) : path.join(modsDir, opts.filename);
+    const dst = opts.enable ? path.join(modsDir, opts.filename)     : path.join(disabledDir, opts.filename);
+    if (fs.existsSync(src)) fs.renameSync(src, dst);
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: err.message };

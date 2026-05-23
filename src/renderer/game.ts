@@ -328,6 +328,7 @@ mcPlayBtn.addEventListener('click', async () => {
   mcPlayBtn.classList.add('running');
   mcPlayBtn.textContent = '⏳  Launching…';
   mcForceQuitBtn.style.display = 'inline-flex';
+  showMcOverlay();
   setStatus(`Launching Minecraft ${version}…`, 'yellow');
   setProgress(0);
   logToggle.style.display = 'inline';
@@ -375,8 +376,61 @@ function resetPlay() {
   mcPlayBtn.textContent = '▶  PLAY';
   mcForceQuitBtn.style.display = 'none';
   setProgress(null);
+  hideMcOverlay();
 }
 
+// ── In-game mods overlay ───────────────────────────────────────────────────────
+const mcRunningOverlay = document.getElementById('mc-running-overlay')!;
+const overlayModsList  = document.getElementById('overlay-mods-list')!;
+let overlayCollapsed = false;
+
+function renderOverlayMods() {
+  const installed = loadInstalledMods();
+  overlayModsList.innerHTML = '';
+  const entries = Object.entries(installed);
+  if (!entries.length) {
+    overlayModsList.innerHTML = '<div style="color:#484f58;font-size:12px;">No mods installed</div>';
+    return;
+  }
+  for (const [slug, info] of entries) {
+    const isDisabled = !!(info as any).disabled;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    const verBadge = (info as any).mcVersion ? '<span style="font-size:10px;color:#3a4048;">' + (info as any).mcVersion + '</span>' : '';
+    row.innerHTML = '<div style="flex:1;font-size:12px;color:' + (isDisabled ? '#484f58' : '#e6edf3') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + info.name + '">' + info.name + '</div>' + verBadge + '<label class="toggle" style="width:34px;height:18px;flex-shrink:0;"><input type="checkbox" ' + (isDisabled ? '' : 'checked') + ' /><span class="toggle-slider"></span></label>';
+    const cb = row.querySelector('input') as HTMLInputElement;
+    cb.addEventListener('change', async () => {
+      const enable = cb.checked;
+      cb.disabled = true;
+      const res = await mc.toggleMod({ filename: info.filename, enable });
+      if (res && res.ok) {
+        const mods = loadInstalledMods();
+        if (mods[slug]) { (mods[slug] as any).disabled = !enable; saveInstalledMods(mods); }
+        renderOverlayMods();
+      } else {
+        cb.checked = !enable;
+        cb.disabled = false;
+      }
+    });
+    overlayModsList.appendChild(row);
+  }
+}
+
+function showMcOverlay() {
+  renderOverlayMods();
+  mcRunningOverlay.style.display = 'block';
+}
+function hideMcOverlay() {
+  mcRunningOverlay.style.display = 'none';
+}
+
+document.getElementById('overlay-mods-toggle-btn')?.addEventListener('click', () => {
+  overlayCollapsed = !overlayCollapsed;
+  const body = document.getElementById('overlay-mods-body')!;
+  const btn  = document.getElementById('overlay-mods-toggle-btn')!;
+  body.style.display = overlayCollapsed ? 'none' : 'block';
+  btn.textContent    = overlayCollapsed ? '>' : 'v';
+});
 // ── Progress events ────────────────────────────────────────────────────────────
 if (mc) {
   mc.onProgress((e: any) => {
@@ -879,7 +933,7 @@ tpSearch.addEventListener('input', () => {
 });
 
 // ── Installed mods (persisted) ────────────────────────────────────────────────
-interface InstalledMod { filename: string; name: string; }
+interface InstalledMod { filename: string; name: string; mcVersion?: string; disabled?: boolean; }
 function loadInstalledMods(): Record<string, InstalledMod> {
   try { return JSON.parse(localStorage.getItem('voxel_installed_mods') || '{}'); } catch { return {}; }
 }
@@ -1933,6 +1987,7 @@ async function initCosmetics() {
 
 // ── Server Host panel ─────────────────────────────────────────────────────────
 const srvStartBtn  = document.getElementById('srv-start-btn') as HTMLButtonElement;
+const srvStopBtn   = document.getElementById('srv-stop-btn')  as HTMLButtonElement;
 const srvInfo      = document.getElementById('srv-info')!;
 const srvAddress   = document.getElementById('srv-address')!;
 const srvVerDisplay= document.getElementById('srv-ver-display')!;
@@ -2143,8 +2198,13 @@ function populateSrvVersions() {
   const showSnaps = (document.getElementById('srv-snapshots-toggle') as HTMLInputElement)?.checked;
   const prev = sel.value;
   sel.innerHTML = '';
+  function parseMcVer(id: string): number[] { return id.split('.').map(n => parseInt(n,10)||0); }
+  function mcVerLte(id: string): boolean {
+    const v = parseMcVer(id); const m = [1,21,1];
+    for (let i=0;i<3;i++) { if((v[i]??0)<m[i]) return true; if((v[i]??0)>m[i]) return false; } return true;
+  }
   const filtered = srvAllVersions.filter(v =>
-    v.type === 'release' || (showSnaps && v.type === 'snapshot')
+    (v.type === 'release' || (showSnaps && v.type === 'snapshot')) && mcVerLte(v.id)
   );
   filtered.forEach((v, i) => {
     const opt = document.createElement('option');
@@ -2272,6 +2332,8 @@ srvStartBtn?.addEventListener('click', async () => {
   const maxMem  = parseInt(srvMemSlider.value, 10);
 
   srvRunning = true;
+  srvStopBtn.style.display = 'inline-flex';
+  srvStartBtn.style.display = 'none';
   srvStartBtn.style.background = 'linear-gradient(135deg,#8b1a1a,#da3633)';
   srvStartBtn.style.borderColor = '#f85149';
   srvStartBtn.textContent = '⏳ Starting…';
@@ -2285,6 +2347,10 @@ srvStartBtn?.addEventListener('click', async () => {
   if (!res.ok) {
     srvAddLog(`[Error] ${res.error}`);
     srvRunning = false;
+    srvStopBtn.style.display = 'none';
+    srvStartBtn.style.display = 'inline-flex';
+    srvStopBtn.style.display = 'none';
+    srvStartBtn.style.display = 'inline-flex';
     srvStartBtn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
     srvStartBtn.style.borderColor = '#3fb950';
     srvStartBtn.textContent = '▶ Start Server Locally';
@@ -2300,12 +2366,24 @@ srvStartBtn?.addEventListener('click', async () => {
   // IP + publish happen in srvAddLog when MC logs "Done"
 });
 
+srvStopBtn?.addEventListener('click', async () => {
+  if (!server || !srvRunning) return;
+  srvStopBtn.disabled = true;
+  srvStopBtn.textContent = '⏳ Stopping…';
+  await server.stop();
+  srvStopBtn.disabled = false;
+});
+
 // Handle server log events
 if (server) {
   server.onLog((line: string) => srvAddLog(line));
   server.onClosed((_code: number) => {
     srvRunning = false;
     srvInfo.style.display = 'none';
+    srvStopBtn.style.display = 'none';
+    srvStartBtn.style.display = 'inline-flex';
+    srvStopBtn.style.display = 'none';
+    srvStartBtn.style.display = 'inline-flex';
     srvStartBtn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
     srvStartBtn.style.borderColor = '#3fb950';
     srvStartBtn.textContent = '▶ Start Server Locally';
