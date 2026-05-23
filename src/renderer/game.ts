@@ -2231,10 +2231,10 @@ async function loadServerVersions() {
     populateSrvVersions();
   } catch {
     srvAllVersions = [
-      { id: '26.1.2', type: 'release' }, { id: '26.1.1', type: 'release' },
-      { id: '26.1',   type: 'release' }, { id: '1.21.11', type: 'release' },
-      { id: '1.21.5', type: 'release' }, { id: '1.21.4',  type: 'release' },
-      { id: '1.20.4', type: 'release' }, { id: '1.19.4',  type: 'release' },
+      { id: '1.21.4', type: 'release' }, { id: '1.21.3', type: 'release' },
+      { id: '1.21.1', type: 'release' }, { id: '1.21',   type: 'release' },
+      { id: '1.20.6', type: 'release' }, { id: '1.20.4', type: 'release' },
+      { id: '1.20.1', type: 'release' }, { id: '1.19.4', type: 'release' },
     ];
     populateSrvVersions();
   }
@@ -2327,6 +2327,7 @@ srvStartBtn?.addEventListener('click', async () => {
 
   srvRunning = true;
   srvStopBtn.style.display = 'inline-flex';
+  srvStopBtn.disabled = false;
   srvStartBtn.style.display = 'none';
   srvStartBtn.style.background = 'linear-gradient(135deg,#8b1a1a,#da3633)';
   srvStartBtn.style.borderColor = '#f85149';
