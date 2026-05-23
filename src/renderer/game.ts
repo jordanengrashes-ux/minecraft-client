@@ -1341,20 +1341,24 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
       statusEl.textContent = '⏳'; statusEl.style.color = '#d29922';
       try {
         const ver = mcVersion.value || '1.21.4';
-        // install any uninstalled deps first
-        const uninstalledDeps = (mod.deps || [])
+        const curInstalled = loadInstalledMods();
+        // Install deps that are missing OR installed for the wrong MC version
+        const depsToInstall = (mod.deps || [])
           .map(slug => PVP_MOD_BY_SLUG.get(slug))
-          .filter((dep): dep is PvpModDef => !!dep && !enabledMods.has(dep.slug));
-        for (const dep of uninstalledDeps) {
-          statusEl.textContent = '⬇'; statusEl.style.color = '#58a6ff';
+          .filter((dep): dep is PvpModDef => {
+            if (!dep) return false;
+            const info = curInstalled[dep.slug];
+            return !info || info.mcVersion !== ver;
+          });
+        for (const dep of depsToInstall) {
+          statusEl.textContent = `⬇ ${dep.name}`; statusEl.style.color = '#58a6ff';
           await installOneMod(dep, ver);
         }
         statusEl.textContent = '⬇'; statusEl.style.color = '#58a6ff';
         await installOneMod(mod, ver);
         card.className = 'mod-card enabled';
         statusEl.textContent = '✓'; statusEl.style.color = '#3fb950';
-        // re-render so dep cards show as installed
-        if (uninstalledDeps.length) renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
+        if (depsToInstall.length) renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
       } catch (err: any) {
         input.checked = false;
         card.className = 'mod-card';
