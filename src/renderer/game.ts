@@ -2424,12 +2424,12 @@ srvStartBtn?.addEventListener('click', async () => {
     srvStartBtn.style.display = 'inline-flex';
     srvStartBtn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
     srvStartBtn.style.borderColor = '#3fb950';
-    srvStartBtn.textContent = '▶ Start Server Locally';
+    srvStartBtn.textContent = '▶ Start Server';
     srvStartBtn.disabled = false;
     return;
   }
 
-  srvInfo.style.display = 'block';
+  srvInfo.style.display = 'flex';
   srvVerDisplay.textContent = version;
   srvAddress.textContent = '⏳ Starting… use localhost:25565 once ready';
   // IP + publish happen in srvAddLog when MC logs "Done"
@@ -2453,7 +2453,7 @@ if (server) {
     srvStartBtn.style.display = 'inline-flex';
     srvStartBtn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
     srvStartBtn.style.borderColor = '#3fb950';
-    srvStartBtn.textContent = '▶ Start Server Locally';
+    srvStartBtn.textContent = '▶ Start Server';
     srvStartBtn.disabled = false;
     srvAddLog('[Host] Server stopped.');
     unpublishServer();
