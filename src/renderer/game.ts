@@ -1254,7 +1254,7 @@ const PVP_MOD_BY_SLUG = new Map<string, PvpModDef>(
 
 async function installOneMod(mod: PvpModDef, ver: string): Promise<void> {
   async function queryModrinth(gameVer?: string): Promise<any[]> {
-    const p: Record<string, string> = { loaders: '["fabric"]', limit: '20' };
+    const p: Record<string, string> = { loaders: '["fabric"]', limit: gameVer ? '20' : '50' };
     if (gameVer) p.game_versions = `["${gameVer}"]`;
     const r = await fetch(`https://api.modrinth.com/v2/project/${encodeURIComponent(mod.slug)}/version?${new URLSearchParams(p)}`);
     const d = await r.json();
@@ -1263,12 +1263,13 @@ async function installOneMod(mod: PvpModDef, ver: string): Promise<void> {
 
   let data = await queryModrinth(ver);
   if (!data.length) {
-    // Exact version returned nothing — fetch all fabric versions and pick the
-    // latest one whose game_versions overlap with the major.minor of our target
-    data = await queryModrinth();
-    const prefix = ver.split('.').slice(0, 2).join('.');
-    const compat = data.filter((v: any) =>
-      Array.isArray(v.game_versions) && v.game_versions.some((gv: string) => gv.startsWith(prefix))
+    // Exact version returned nothing — fetch all fabric versions but only
+    // accept builds that are tagged for exactly this MC version.
+    // Do NOT use startsWith/prefix — that causes 26.x builds (Java 25+) to
+    // be installed when the user is on 1.21.x (Java 21).
+    const allData = await queryModrinth();
+    const compat = allData.filter((v: any) =>
+      Array.isArray(v.game_versions) && v.game_versions.includes(ver)
     );
     if (compat.length) data = compat;
   }
@@ -1295,7 +1296,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
   const installed = loadInstalledMods();
   const installedInfo = installed[mod.slug];
   const curVer = mcVersion.value;
-  const wrongVer = on && installedInfo?.mcVersion && installedInfo.mcVersion !== curVer;
+  const wrongVer = on && !!installedInfo && (!installedInfo.mcVersion || installedInfo.mcVersion !== curVer);
 
   const depNames = (mod.deps || []).map(slug => PVP_MOD_BY_SLUG.get(slug)?.name ?? slug);
   const depsHtml = depNames.length
@@ -1410,13 +1411,13 @@ function renderPvpMods(query: string) {
 function countStaleMods(): number {
   const cur = mcVersion.value;
   const installed = loadInstalledMods();
-  return Object.values(installed).filter((m: any) => m.mcVersion && m.mcVersion !== cur).length;
+  return Object.values(installed).filter((m: any) => !m.mcVersion || m.mcVersion !== cur).length;
 }
 
 async function reinstallAllMods(btn: HTMLElement) {
   const ver = mcVersion.value;
   const installed = loadInstalledMods();
-  const stale = Object.entries(installed).filter(([, m]) => (m as any).mcVersion && (m as any).mcVersion !== ver);
+  const stale = Object.entries(installed).filter(([, m]) => !(m as any).mcVersion || (m as any).mcVersion !== ver);
   if (!stale.length) { btn.textContent = '✓ Up to date'; return; }
   btn.textContent = `⏳ Updating 0/${stale.length}…`;
   btn.setAttribute('disabled', '');
