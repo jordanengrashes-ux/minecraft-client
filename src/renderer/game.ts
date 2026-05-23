@@ -2200,7 +2200,7 @@ function populateSrvVersions() {
   sel.innerHTML = '';
   function parseMcVer(id: string): number[] { return id.split('.').map(n => parseInt(n,10)||0); }
   function mcVerLte(id: string): boolean {
-    const v = parseMcVer(id); const m = [1,21,1];
+    const v = parseMcVer(id); const m = [1,21,11];
     for (let i=0;i<3;i++) { if((v[i]??0)<m[i]) return true; if((v[i]??0)>m[i]) return false; } return true;
   }
   const filtered = srvAllVersions.filter(v =>
