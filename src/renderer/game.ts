@@ -1253,15 +1253,29 @@ const PVP_MOD_BY_SLUG = new Map<string, PvpModDef>(
 );
 
 async function installOneMod(mod: PvpModDef, ver: string): Promise<void> {
-  const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '20' });
-  const vRes = await fetch(`https://api.modrinth.com/v2/project/${encodeURIComponent(mod.slug)}/version?${params}`);
-  const data: any[] = await vRes.json();
-  if (!Array.isArray(data) || !data.length) throw new Error(`No Fabric build for ${mod.name} on MC ${ver}`);
-  // Prefer the version whose version_number actually contains the MC version string (e.g. "+1.21.11")
-  // This avoids Modrinth mis-tagging newer builds (e.g. +26.1.2) as compatible with older MC versions
+  async function queryModrinth(gameVer?: string): Promise<any[]> {
+    const p: Record<string, string> = { loaders: '["fabric"]', limit: '20' };
+    if (gameVer) p.game_versions = `["${gameVer}"]`;
+    const r = await fetch(`https://api.modrinth.com/v2/project/${encodeURIComponent(mod.slug)}/version?${new URLSearchParams(p)}`);
+    const d = await r.json();
+    return Array.isArray(d) ? d : [];
+  }
+
+  let data = await queryModrinth(ver);
+  if (!data.length) {
+    // Exact version returned nothing — fetch all fabric versions and pick the
+    // latest one whose game_versions overlap with the major.minor of our target
+    data = await queryModrinth();
+    const prefix = ver.split('.').slice(0, 2).join('.');
+    const compat = data.filter((v: any) =>
+      Array.isArray(v.game_versions) && v.game_versions.some((gv: string) => gv.startsWith(prefix))
+    );
+    if (compat.length) data = compat;
+  }
+  if (!data.length) throw new Error(`No Fabric build found for ${mod.name} (MC ${ver})`);
+
   const byVerNum = data.find((v: any) => typeof v.version_number === 'string' && v.version_number.includes(ver));
-  const byExact  = data.find((v: any) => Array.isArray(v.game_versions) && v.game_versions.length === 1 && v.game_versions[0] === ver);
-  const chosen   = byVerNum ?? byExact ?? data[0];
+  const chosen   = byVerNum ?? data[0];
   const file = chosen.files.find((f: any) => f.primary) ?? chosen.files[0];
   if (!file) throw new Error(`No download file for ${mod.name}`);
   const res = await mc.installMod({ url: file.url, filename: file.filename });
@@ -1278,23 +1292,37 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
   const card = document.createElement('div');
   card.className = 'mod-card' + (on ? ' enabled' : '');
 
+  const installed = loadInstalledMods();
+  const installedInfo = installed[mod.slug];
+  const curVer = mcVersion.value;
+  const wrongVer = on && installedInfo?.mcVersion && installedInfo.mcVersion !== curVer;
+
   const depNames = (mod.deps || []).map(slug => PVP_MOD_BY_SLUG.get(slug)?.name ?? slug);
   const depsHtml = depNames.length
-    ? `<div class="pvp-deps" style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;">${
-        depNames.map(n => `<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#21262d;color:#8b949e;border:1px solid #30363d;">Requires: ${n}</span>`).join('')
+    ? `<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;">${
+        depNames.map(n => `<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#21262d;color:#8b949e;border:1px solid #30363d;">Needs: ${n}</span>`).join('')
       }</div>`
     : '';
+
+  const verBadge = wrongVer
+    ? `<span style="font-size:10px;color:#d29922;background:rgba(210,153,34,0.12);border:1px solid rgba(210,153,34,0.3);border-radius:10px;padding:1px 6px;">⚠ v${installedInfo!.mcVersion}</span>`
+    : on && installedInfo?.mcVersion
+      ? `<span style="font-size:10px;color:#484f58;">v${installedInfo.mcVersion}</span>`
+      : '';
 
   card.innerHTML = `
     <div class="mod-icon" style="font-size:22px;background:none;">${mod.emoji}</div>
     <div class="mod-info">
-      <div class="mod-name">${mod.name}</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div class="mod-name">${mod.name}</div>
+        ${verBadge}
+      </div>
       <div class="mod-desc">${mod.desc}</div>
       ${depsHtml}
       <div class="pvp-err" style="font-size:11px;color:#f85149;margin-top:4px;display:none;"></div>
     </div>
     <div class="mod-right">
-      <div class="mod-version" style="color:${on ? '#3fb950' : 'transparent'}">${on ? '✓' : ''}</div>
+      <div class="mod-version" style="color:${on ? (wrongVer ? '#d29922' : '#3fb950') : 'transparent'}">${on ? (wrongVer ? '↻' : '✓') : ''}</div>
       <label class="toggle">
         <input type="checkbox" ${on ? 'checked' : ''} />
         <span class="toggle-slider"></span>
@@ -1375,10 +1403,55 @@ function renderPvpMods(query: string) {
   }
 }
 
+function countStaleMods(): number {
+  const cur = mcVersion.value;
+  const installed = loadInstalledMods();
+  return Object.values(installed).filter((m: any) => m.mcVersion && m.mcVersion !== cur).length;
+}
+
+async function reinstallAllMods(btn: HTMLElement) {
+  const ver = mcVersion.value;
+  const installed = loadInstalledMods();
+  const stale = Object.entries(installed).filter(([, m]) => (m as any).mcVersion && (m as any).mcVersion !== ver);
+  if (!stale.length) { btn.textContent = '✓ Up to date'; return; }
+  btn.textContent = `⏳ Updating 0/${stale.length}…`;
+  btn.setAttribute('disabled', '');
+  let done = 0;
+  for (const [slug] of stale) {
+    const mod = PVP_MOD_BY_SLUG.get(slug);
+    if (!mod) continue;
+    try {
+      await installOneMod(mod, ver);
+      done++;
+      btn.textContent = `⏳ Updating ${done}/${stale.length}…`;
+    } catch {}
+  }
+  btn.textContent = `✓ Updated ${done}/${stale.length}`;
+  btn.removeAttribute('disabled');
+  renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
+}
+
 function initPvpMods() {
   renderPvpMods('');
   const searchEl = document.getElementById('pvp-search') as HTMLInputElement;
   searchEl.addEventListener('input', () => renderPvpMods(searchEl.value));
+
+  // Re-render mod cards when MC version changes so stale badges update
+  mcVersion.addEventListener('change', () => {
+    if (pvpPanelEl.style.display !== 'none') renderPvpMods(searchEl.value);
+    updateReinstallBtn();
+  });
+
+  // Reinstall button (shown when mods are stale)
+  const reinstallBtn = document.getElementById('pvp-reinstall-btn') as HTMLButtonElement | null;
+  function updateReinstallBtn() {
+    if (!reinstallBtn) return;
+    const stale = countStaleMods();
+    reinstallBtn.style.display = stale > 0 ? 'inline-flex' : 'none';
+    reinstallBtn.textContent = `↻ Update ${stale} mod${stale !== 1 ? 's' : ''} to MC ${mcVersion.value}`;
+  }
+  reinstallBtn?.addEventListener('click', () => reinstallAllMods(reinstallBtn));
+  updateReinstallBtn();
 }
 
 // ── Resource Packs panel ──────────────────────────────────────────────────────
