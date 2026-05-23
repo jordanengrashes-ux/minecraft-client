@@ -35,7 +35,7 @@ jobs:
           $version = node -p "require('./package.json').version"
           $tag = "v$version"
           Write-Host "Publishing $tag"
-          $files = Get-ChildItem -Path release -Include *.exe,*.blockmap,*.yml | Select-Object -ExpandProperty FullName
+          $files = Get-ChildItem -Path release -Recurse -Include *.exe,*.blockmap,*.yml | Where-Object { $_.DirectoryName -notlike "*win-unpacked*" } | Select-Object -ExpandProperty FullName
           Write-Host "Files: $files"
           gh release delete $tag --yes 2>$null; $true
           gh release create $tag --title $tag --notes "Voxel Client $tag" --draft=false $files
