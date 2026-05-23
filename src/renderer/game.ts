@@ -1037,12 +1037,13 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
       statusEl.style.color = '#d29922';
       try {
         const ver = mcVersion.value || '1.21.4';
-        const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '10' });
+        const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '20' });
         const vRes = await fetch(`https://api.modrinth.com/v2/project/${mod.project_id}/version?${params}`);
         const searchData: any[] = await vRes.json();
         if (!Array.isArray(searchData) || !searchData.length) throw new Error(`No Fabric build for MC ${ver}`);
-        const exactVer = searchData.find((v: any) => Array.isArray(v.game_versions) && v.game_versions.includes(ver));
-        const chosenVer = exactVer ?? searchData[0];
+        const byVerNum2  = searchData.find((v: any) => typeof v.version_number === 'string' && v.version_number.includes(ver));
+        const byExact2   = searchData.find((v: any) => Array.isArray(v.game_versions) && v.game_versions.length === 1 && v.game_versions[0] === ver);
+        const chosenVer  = byVerNum2 ?? byExact2 ?? searchData[0];
         const file = chosenVer.files.find((f: any) => f.primary) ?? chosenVer.files[0];
         if (!file) throw new Error('No download file found');
         statusEl.textContent = '⬇';
@@ -1252,12 +1253,15 @@ const PVP_MOD_BY_SLUG = new Map<string, PvpModDef>(
 );
 
 async function installOneMod(mod: PvpModDef, ver: string): Promise<void> {
-  const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '10' });
+  const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '20' });
   const vRes = await fetch(`https://api.modrinth.com/v2/project/${encodeURIComponent(mod.slug)}/version?${params}`);
   const data: any[] = await vRes.json();
   if (!Array.isArray(data) || !data.length) throw new Error(`No Fabric build for ${mod.name} on MC ${ver}`);
-  const exact = data.find((v: any) => Array.isArray(v.game_versions) && v.game_versions.includes(ver));
-  const chosen = exact ?? data[0];
+  // Prefer the version whose version_number actually contains the MC version string (e.g. "+1.21.11")
+  // This avoids Modrinth mis-tagging newer builds (e.g. +26.1.2) as compatible with older MC versions
+  const byVerNum = data.find((v: any) => typeof v.version_number === 'string' && v.version_number.includes(ver));
+  const byExact  = data.find((v: any) => Array.isArray(v.game_versions) && v.game_versions.length === 1 && v.game_versions[0] === ver);
+  const chosen   = byVerNum ?? byExact ?? data[0];
   const file = chosen.files.find((f: any) => f.primary) ?? chosen.files[0];
   if (!file) throw new Error(`No download file for ${mod.name}`);
   const res = await mc.installMod({ url: file.url, filename: file.filename });
