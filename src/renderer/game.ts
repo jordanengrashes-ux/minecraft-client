@@ -2194,16 +2194,17 @@ async function unpublishServer() {
 
 let srvAllVersions: { id: string; type: string }[] = [];
 
+function parseMcVer(id: string): number[] { return id.split('.').map(n => parseInt(n,10)||0); }
+function mcVerLte(id: string): boolean {
+  const v = parseMcVer(id); const m = [1,21,11];
+  for (let i=0;i<3;i++) { if((v[i]??0)<m[i]) return true; if((v[i]??0)>m[i]) return false; } return true;
+}
+
 function populateSrvVersions() {
   const sel = document.getElementById('srv-version') as HTMLSelectElement;
   const showSnaps = (document.getElementById('srv-snapshots-toggle') as HTMLInputElement)?.checked;
   const prev = sel.value;
   sel.innerHTML = '';
-  function parseMcVer(id: string): number[] { return id.split('.').map(n => parseInt(n,10)||0); }
-  function mcVerLte(id: string): boolean {
-    const v = parseMcVer(id); const m = [1,21,11];
-    for (let i=0;i<3;i++) { if((v[i]??0)<m[i]) return true; if((v[i]??0)>m[i]) return false; } return true;
-  }
   const filtered = srvAllVersions.filter(v =>
     (v.type === 'release' || (showSnaps && v.type === 'snapshot')) && mcVerLte(v.id)
   );
@@ -2320,14 +2321,6 @@ function loadCommunityServers() {
 srvStartBtn?.addEventListener('click', async () => {
   if (!server) return;
 
-  if (srvRunning) {
-    // Stop
-    srvStartBtn.disabled = true;
-    srvStartBtn.textContent = '⏹ Stopping…';
-    await server.stop();
-    return;
-  }
-
   const name    = (document.getElementById('srv-name') as HTMLInputElement).value.trim() || 'My Server';
   const version = (document.getElementById('srv-version') as HTMLSelectElement).value;
   const maxMem  = parseInt(srvMemSlider.value, 10);
@@ -2350,8 +2343,6 @@ srvStartBtn?.addEventListener('click', async () => {
     srvRunning = false;
     srvStopBtn.style.display = 'none';
     srvStartBtn.style.display = 'inline-flex';
-    srvStopBtn.style.display = 'none';
-    srvStartBtn.style.display = 'inline-flex';
     srvStartBtn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
     srvStartBtn.style.borderColor = '#3fb950';
     srvStartBtn.textContent = '▶ Start Server Locally';
@@ -2362,8 +2353,6 @@ srvStartBtn?.addEventListener('click', async () => {
   srvInfo.style.display = 'block';
   srvVerDisplay.textContent = version;
   srvAddress.textContent = '⏳ Starting… use localhost:25565 once ready';
-  srvStartBtn.textContent = '⏹ Stop Server';
-  srvStartBtn.disabled = false;
   // IP + publish happen in srvAddLog when MC logs "Done"
 });
 
@@ -2372,7 +2361,6 @@ srvStopBtn?.addEventListener('click', async () => {
   srvStopBtn.disabled = true;
   srvStopBtn.textContent = '⏳ Stopping…';
   await server.stop();
-  srvStopBtn.disabled = false;
 });
 
 // Handle server log events
@@ -2382,8 +2370,7 @@ if (server) {
     srvRunning = false;
     srvInfo.style.display = 'none';
     srvStopBtn.style.display = 'none';
-    srvStartBtn.style.display = 'inline-flex';
-    srvStopBtn.style.display = 'none';
+    srvStopBtn.textContent = '⏹ Stop Server';
     srvStartBtn.style.display = 'inline-flex';
     srvStartBtn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
     srvStartBtn.style.borderColor = '#3fb950';
