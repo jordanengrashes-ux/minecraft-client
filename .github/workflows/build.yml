@@ -25,19 +25,98 @@ jobs:
             ${{ env.LOCALAPPDATA }}\electron-builder\Cache
           key: ${{ runner.os }}-electron-30
       - name: Create resource stubs
-        run: New-Item -ItemType Directory -Force -Path resources/java21,resources/mods
         shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path resources/java21,resources/mods
       - run: npm ci
       - run: npm run build && npx electron-builder --win --publish never
-      - name: Publish GitHub release
+      - name: Collect artifacts
         shell: pwsh
         run: |
-          $version = node -p "require('./package.json').version"
-          $tag = "v$version"
-          Write-Host "Publishing $tag"
-          $files = Get-ChildItem -Path release -Recurse -Include *.exe,*.blockmap,*.yml | Where-Object { $_.DirectoryName -notlike "*win-unpacked*" } | Select-Object -ExpandProperty FullName
-          Write-Host "Files: $files"
-          gh release delete $tag --yes 2>$null; $true
-          gh release create $tag --title $tag --notes "Voxel Client $tag" --draft=false $files
+          New-Item -ItemType Directory -Force -Path dist-artifacts
+          Get-ChildItem -Path release\* -Include *.exe,*.blockmap,*.yml |
+            Copy-Item -Destination dist-artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist-artifacts/
+          if-no-files-found: error
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-30
+      - run: mkdir -p resources/java21 resources/mods
+      - run: npm ci
+      - run: npm run build && npx electron-builder --linux --publish never
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist-artifacts
+          find release -maxdepth 1 -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.blockmap" -o -name "*.yml" \) \
+            -exec cp {} dist-artifacts/ \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: dist-artifacts/
+          if-no-files-found: error
+
+  build-mac:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ runner.os }}-electron-30
+      - run: mkdir -p resources/java21 resources/mods
+      - run: npm ci
+      - name: Build
+        run: npm run build && npx electron-builder --mac --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist-artifacts
+          find release -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.blockmap" -o -name "*.yml" \) \
+            -exec cp {} dist-artifacts/ \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-mac
+          path: dist-artifacts/
+          if-no-files-found: error
+
+  publish:
+    needs: [build-windows, build-linux, build-mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish GitHub release
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          echo "Publishing $tag"
+          files=$(find dist -type f | tr '\n' ' ')
+          echo "Files: $files"
+          gh release delete "$tag" --yes 2>/dev/null || true
+          gh release create "$tag" --title "$tag" --notes "Voxel Client $tag" --draft=false $files
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
