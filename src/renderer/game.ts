@@ -2422,8 +2422,8 @@ srvStartBtn?.addEventListener('click', async () => {
     srvRunning = false;
     srvStopBtn.style.display = 'none';
     srvStartBtn.style.display = 'inline-flex';
-    srvStartBtn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
-    srvStartBtn.style.borderColor = '#3fb950';
+    srvStartBtn.style.background = 'linear-gradient(135deg,#3ab89a,#63d2b6)';
+    srvStartBtn.style.color = '#0f1318';
     srvStartBtn.textContent = '▶ Start Server';
     srvStartBtn.disabled = false;
     return;
@@ -2451,8 +2451,8 @@ if (server) {
     srvStopBtn.style.display = 'none';
     srvStopBtn.textContent = '⏹ Stop Server';
     srvStartBtn.style.display = 'inline-flex';
-    srvStartBtn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
-    srvStartBtn.style.borderColor = '#3fb950';
+    srvStartBtn.style.background = 'linear-gradient(135deg,#3ab89a,#63d2b6)';
+    srvStartBtn.style.color = '#0f1318';
     srvStartBtn.textContent = '▶ Start Server';
     srvStartBtn.disabled = false;
     srvAddLog('[Host] Server stopped.');

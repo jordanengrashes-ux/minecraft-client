@@ -759,83 +759,83 @@
     </div>
 
     <!-- Server Host panel -->
-    <div id="server-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+    <div id="server-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;background:#0f1318;background-image:radial-gradient(circle at top left,rgba(99,210,182,0.12),transparent 45%),radial-gradient(circle at 25% 0%,rgba(246,195,86,0.12),transparent 40%);font-family:'Roboto','Helvetica',sans-serif;">
 
-      <!-- Config header — two rows -->
-      <div style="padding:12px 20px;border-bottom:1px solid rgba(33,38,45,0.6);background:rgba(8,12,20,0.7);backdrop-filter:blur(8px);flex-shrink:0;display:flex;flex-direction:column;gap:10px;">
+      <!-- Config header -->
+      <div style="padding:16px 24px;border-bottom:1px solid rgba(58,65,76,0.5);flex-shrink:0;display:flex;flex-direction:column;gap:12px;">
 
-        <!-- Row 1: name + version + preset -->
-        <div style="display:flex;align-items:center;gap:8px;">
+        <!-- Row 1: name + version + snapshots + preset -->
+        <div style="display:flex;align-items:center;gap:10px;">
           <input id="srv-name" type="text" value="My Server" placeholder="Server name"
-            style="flex:2;min-width:100px;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 11px;font-size:13px;outline:none;"
-            onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
-          <select id="srv-version" style="flex:1;min-width:110px;background:rgba(13,17,23,0.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;font-size:13px;outline:none;cursor:pointer;">
+            style="flex:2;min-width:100px;background:rgba(255,255,255,0.05);border:1px solid rgba(58,65,76,0.8);border-radius:8px;color:#f2f5f7;padding:9px 13px;font-size:13px;outline:none;font-family:'Roboto',sans-serif;"
+            onfocus="this.style.borderColor='#63d2b6'" onblur="this.style.borderColor='rgba(58,65,76,0.8)'" />
+          <select id="srv-version" style="flex:1;min-width:110px;background:rgba(255,255,255,0.05);border:1px solid rgba(58,65,76,0.8);border-radius:8px;color:#f2f5f7;padding:9px 12px;font-size:13px;outline:none;cursor:pointer;font-family:'Roboto',sans-serif;">
             <option disabled selected>Loading…</option>
           </select>
           <label style="display:flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer;flex-shrink:0;">
-            <input type="checkbox" id="srv-snapshots-toggle" style="accent-color:#3fb950;" />
-            <span style="font-size:12px;color:#6e7681;">Snapshots</span>
+            <input type="checkbox" id="srv-snapshots-toggle" style="accent-color:#63d2b6;" />
+            <span style="font-size:12px;color:#a0aab4;">Snapshots</span>
           </label>
-          <button id="srv-preset-btn" title="Load defaults" style="padding:7px 12px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.25);border-radius:6px;color:#58a6ff;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">⚡ Defaults</button>
+          <button id="srv-preset-btn" title="Load defaults" style="padding:9px 14px;background:rgba(246,195,86,0.1);border:1px solid rgba(246,195,86,0.3);border-radius:8px;color:#f6c356;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'Roboto',sans-serif;">⚡ Defaults</button>
         </div>
 
         <!-- Row 2: RAM + start/stop -->
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:12px;color:#6e7681;white-space:nowrap;">RAM</span>
-          <input type="range" id="srv-mem" min="1" max="16" value="2" style="flex:1;max-width:140px;accent-color:#3fb950;" />
-          <span style="font-size:13px;color:#3fb950;font-weight:600;min-width:28px;"><span id="srv-mem-val">2</span>G</span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:12px;color:#a0aab4;white-space:nowrap;">RAM</span>
+          <input type="range" id="srv-mem" min="1" max="16" value="2" style="flex:1;max-width:140px;accent-color:#63d2b6;" />
+          <span style="font-size:13px;color:#63d2b6;font-weight:600;min-width:28px;"><span id="srv-mem-val">2</span>G</span>
           <div style="flex:1;"></div>
-          <button id="srv-start-btn" style="padding:8px 24px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#238636,#2ea043);border:1px solid #3fb950;border-radius:8px;color:#fff;cursor:pointer;transition:all 0.15s;white-space:nowrap;">▶ Start Server</button>
-          <button id="srv-stop-btn" style="display:none;padding:8px 24px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#8b1a1a,#da3633);border:1px solid #f85149;border-radius:8px;color:#fff;cursor:pointer;transition:all 0.15s;white-space:nowrap;">⏹ Stop Server</button>
+          <button id="srv-start-btn" style="padding:9px 28px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#3ab89a,#63d2b6);border:none;border-radius:8px;color:#0f1318;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;font-family:'Roboto',sans-serif;">▶ Start Server</button>
+          <button id="srv-stop-btn" style="display:none;padding:9px 28px;font-size:13px;font-weight:700;background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.35);border-radius:8px;color:#f85149;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;font-family:'Roboto',sans-serif;">⏹ Stop Server</button>
         </div>
 
         <!-- Status bar (shown when running) -->
-        <div id="srv-info" style="display:none;align-items:center;gap:12px;background:rgba(13,40,24,0.6);border:1px solid rgba(63,185,80,0.25);border-radius:8px;padding:8px 14px;">
-          <span style="color:#3fb950;font-size:12px;font-weight:600;white-space:nowrap;">🟢 Running</span>
-          <span style="color:#484f58;font-size:12px;">│</span>
-          <span style="color:#8b949e;font-size:12px;">Port <span style="color:#e6edf3;font-family:monospace;">25565</span></span>
-          <span style="color:#484f58;font-size:12px;">│</span>
-          <span style="color:#8b949e;font-size:12px;white-space:nowrap;">MC <span id="srv-ver-display" style="color:#e6edf3;font-family:monospace;"></span></span>
-          <span style="color:#484f58;font-size:12px;">│</span>
-          <span id="srv-address" style="color:#e6edf3;font-family:monospace;font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">localhost:25565</span>
-          <a href="https://playit.gg" target="_blank" style="font-size:11px;color:#79c0ff;white-space:nowrap;flex-shrink:0;">playit.gg →</a>
+        <div id="srv-info" style="display:none;align-items:center;gap:12px;background:rgba(99,210,182,0.06);border:1px solid rgba(99,210,182,0.2);border-radius:10px;padding:10px 16px;">
+          <span style="color:#63d2b6;font-size:12px;font-weight:600;white-space:nowrap;">● Running</span>
+          <span style="color:#3a414c;font-size:12px;">│</span>
+          <span style="color:#a0aab4;font-size:12px;">Port <span style="color:#f2f5f7;font-family:monospace;">25565</span></span>
+          <span style="color:#3a414c;font-size:12px;">│</span>
+          <span style="color:#a0aab4;font-size:12px;white-space:nowrap;">MC <span id="srv-ver-display" style="color:#f2f5f7;font-family:monospace;"></span></span>
+          <span style="color:#3a414c;font-size:12px;">│</span>
+          <span id="srv-address" style="color:#f2f5f7;font-family:monospace;font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">localhost:25565</span>
+          <a href="https://playit.gg" target="_blank" style="font-size:11px;color:#63d2b6;white-space:nowrap;flex-shrink:0;">playit.gg →</a>
         </div>
       </div>
 
       <!-- Console -->
-      <div style="flex:1;min-height:200px;display:flex;flex-direction:column;overflow:hidden;background:rgba(1,4,9,0.97);">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(33,38,45,0.4);flex-shrink:0;">
-          <span style="font-size:10px;color:#3a4048;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Console</span>
-          <button id="srv-log-copy" style="background:none;border:1px solid #30363d;color:#484f58;font-size:10px;cursor:pointer;padding:2px 8px;border-radius:4px;">Copy</button>
+      <div style="flex:1;min-height:200px;display:flex;flex-direction:column;overflow:hidden;background:rgba(0,0,0,0.45);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid rgba(58,65,76,0.4);flex-shrink:0;">
+          <span style="font-size:10px;color:#3a414c;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Console</span>
+          <button id="srv-log-copy" style="background:none;border:1px solid rgba(58,65,76,0.8);color:#6b7280;font-size:10px;cursor:pointer;padding:2px 10px;border-radius:5px;font-family:'Roboto',sans-serif;">Copy</button>
         </div>
-        <div id="srv-log" style="flex:1;overflow-y:auto;padding:10px 16px;font-family:'Consolas','Courier New',monospace;font-size:12px;color:#6e7681;line-height:1.7;">
-          <div style="color:#2a3038;">Select a version and click Start Server</div>
+        <div id="srv-log" style="flex:1;overflow-y:auto;padding:12px 18px;font-family:'Consolas','Courier New',monospace;font-size:12px;color:#a0aab4;line-height:1.7;scrollbar-color:#3a414c transparent;">
+          <div style="color:#3a414c;">Select a version and click Start Server</div>
         </div>
-        <div style="display:flex;border-top:1px solid rgba(33,38,45,0.4);flex-shrink:0;">
-          <span style="padding:8px 10px;font-family:monospace;font-size:13px;color:#3fb950;background:rgba(13,17,23,0.9);border-right:1px solid rgba(33,38,45,0.4);">›</span>
+        <div style="display:flex;border-top:1px solid rgba(58,65,76,0.4);flex-shrink:0;">
+          <span style="padding:9px 12px;font-family:monospace;font-size:13px;color:#63d2b6;background:rgba(0,0,0,0.3);border-right:1px solid rgba(58,65,76,0.4);">›</span>
           <input id="srv-cmd-input" type="text" placeholder="Command — e.g. list, say Hello, op player"
-            style="flex:1;background:rgba(13,17,23,0.9);border:none;color:#e6edf3;padding:8px 10px;font-size:12px;font-family:monospace;outline:none;" />
-          <button id="srv-cmd-btn" style="padding:8px 16px;background:rgba(63,185,80,0.08);border:none;border-left:1px solid rgba(33,38,45,0.4);color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">Send</button>
+            style="flex:1;background:rgba(0,0,0,0.3);border:none;color:#f2f5f7;padding:9px 12px;font-size:12px;font-family:monospace;outline:none;" />
+          <button id="srv-cmd-btn" style="padding:9px 18px;background:rgba(99,210,182,0.08);border:none;border-left:1px solid rgba(58,65,76,0.4);color:#63d2b6;font-size:12px;cursor:pointer;font-weight:600;font-family:'Roboto',sans-serif;">Send</button>
         </div>
       </div>
 
       <!-- Saved + Community -->
-      <div style="max-height:160px;overflow-y:auto;border-top:1px solid rgba(33,38,45,0.4);padding:10px 20px;display:flex;flex-direction:column;gap:8px;background:rgba(5,8,15,0.85);flex-shrink:0;">
+      <div style="max-height:160px;overflow-y:auto;border-top:1px solid rgba(58,65,76,0.4);padding:12px 24px;display:flex;flex-direction:column;gap:8px;background:rgba(0,0,0,0.25);flex-shrink:0;scrollbar-color:#3a414c transparent;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-          <span style="font-size:10px;color:#484f58;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Saved</span>
+          <span style="font-size:10px;color:#3a414c;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Saved</span>
           <div style="display:flex;align-items:center;gap:8px;">
             <label class="toggle" style="width:34px;height:18px;"><input type="checkbox" id="srv-247-toggle" /><span class="toggle-slider"></span></label>
-            <span style="font-size:11px;color:#6e7681;">24/7 list</span>
-            <button id="srv-save-btn" style="padding:3px 12px;background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.25);border-radius:5px;color:#3fb950;font-size:11px;font-weight:600;cursor:pointer;">Save</button>
-            <span id="srv-save-status" style="font-size:11px;color:#484f58;"></span>
+            <span style="font-size:11px;color:#6b7280;">24/7 list</span>
+            <button id="srv-save-btn" style="padding:3px 12px;background:rgba(99,210,182,0.08);border:1px solid rgba(99,210,182,0.25);border-radius:6px;color:#63d2b6;font-size:11px;font-weight:600;cursor:pointer;font-family:'Roboto',sans-serif;">Save</button>
+            <span id="srv-save-status" style="font-size:11px;color:#3a414c;"></span>
           </div>
         </div>
         <div id="saved-servers" style="display:flex;flex-direction:column;gap:5px;">
-          <div style="color:#2a3038;font-size:12px;" id="saved-servers-empty">No saved servers yet</div>
+          <div style="color:#3a414c;font-size:12px;" id="saved-servers-empty">No saved servers yet</div>
         </div>
-        <span style="font-size:10px;color:#484f58;letter-spacing:2px;text-transform:uppercase;font-weight:600;margin-top:2px;">Community</span>
+        <span style="font-size:10px;color:#3a414c;letter-spacing:2px;text-transform:uppercase;font-weight:600;margin-top:2px;">Community</span>
         <div id="community-servers" style="display:flex;flex-direction:column;gap:5px;">
-          <div style="color:#2a3038;font-size:12px;">Loading…</div>
+          <div style="color:#3a414c;font-size:12px;">Loading…</div>
         </div>
         <input id="srv-ip" type="hidden" value="" />
       </div>
