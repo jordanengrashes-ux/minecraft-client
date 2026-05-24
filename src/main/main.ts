@@ -239,8 +239,6 @@ function openMicrosoftAuthWindow(): Promise<string> {
 
     const win = new BrowserWindow({
       width: 500, height: 660,
-      parent: gameWin ?? undefined,
-      modal: true,
       title: 'Sign in with Microsoft',
       webPreferences: { nodeIntegration: false, contextIsolation: true },
     });
@@ -427,6 +425,8 @@ ipcMain.handle('mc-reauth', async () => {
     saveCachedAuth(token);
     return { ok: true, username: token.name };
   } catch (err: any) {
+    console.error('[Auth] reauth failed:', err.message);
+    gameWin?.webContents.send('mc-log', `[Auth] Login failed: ${err.message}`);
     return { ok: false, error: err.message };
   }
 });
