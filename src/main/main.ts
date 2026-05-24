@@ -470,6 +470,10 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }
     }
     gameWin?.webContents.send('mc-log', `[Launcher] version: ${opts.version || '1.21.4'}, mem: ${opts.maxMem || 4}G, user: ${auth.name}`);
 
+    // Re-apply resource pack enable so it survives Minecraft resetting options.txt
+    const packDir = path.join(mcRoot, 'resourcepacks', 'VoxelClient');
+    if (fs.existsSync(packDir)) enableVoxelResourcePack(mcRoot);
+
     // Auto-install cosmetics mod if bundled
     try {
       const modsDir = path.join(mcRoot, 'mods');
@@ -833,6 +837,49 @@ ipcMain.handle('mc-toggle-mod', async (_e, opts: { filename: string; enable: boo
     const src = opts.enable ? path.join(disabledDir, opts.filename) : path.join(modsDir, opts.filename);
     const dst = opts.enable ? path.join(modsDir, opts.filename)     : path.join(disabledDir, opts.filename);
     if (fs.existsSync(src)) fs.renameSync(src, dst);
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// ── Resource pack enable helper ───────────────────────────────────────────────
+function enableVoxelResourcePack(mcRoot: string) {
+  const optPath = path.join(mcRoot, 'options.txt');
+  let txt = fs.existsSync(optPath) ? fs.readFileSync(optPath, 'utf-8') : '';
+
+  function addToPackList(key: string, t: string): string {
+    const re = new RegExp(`${key}:\\[([^\\]]*)\\]`);
+    if (re.test(t)) {
+      return t.replace(re, (_m, inner) => {
+        const items = (inner as string).split(',').filter(s => s && !s.includes('VoxelClient'));
+        items.unshift('"file/VoxelClient"');
+        return `${key}:[${items.join(',')}]`;
+      });
+    }
+    return t + (t.endsWith('\n') || t === '' ? '' : '\n') + `${key}:["file/VoxelClient"]\n`;
+  }
+
+  txt = addToPackList('resourcePacks', txt);
+  txt = addToPackList('incompatibleResourcePacks', txt);
+  try { fs.writeFileSync(optPath, txt, 'utf-8'); } catch {}
+}
+
+// ── IPC: in-game background resource pack ─────────────────────────────────────
+ipcMain.handle('mc-install-bg', async (_e, opts: { images: string[] }) => {
+  try {
+    const mcRoot  = path.join(app.getPath('userData'), '.minecraft');
+    const packDir = path.join(mcRoot, 'resourcepacks', 'VoxelClient');
+    const texDir  = path.join(packDir, 'assets', 'minecraft', 'textures', 'gui', 'title', 'background');
+    fs.mkdirSync(texDir, { recursive: true });
+    fs.writeFileSync(path.join(packDir, 'pack.mcmeta'), JSON.stringify({
+      pack: { pack_format: 46, supported_formats: { min_inclusive: 1, max_inclusive: 9999 }, description: 'Voxel Client Theme' }
+    }));
+    for (let i = 0; i < 6 && i < opts.images.length; i++) {
+      fs.writeFileSync(path.join(texDir, `panorama_${i}.png`), Buffer.from(opts.images[i], 'base64'));
+    }
+    // Enable in options.txt — create the file if it doesn't exist yet
+    enableVoxelResourcePack(mcRoot);
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: err.message };
