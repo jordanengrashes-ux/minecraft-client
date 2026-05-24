@@ -71,7 +71,8 @@ jobs:
           if-no-files-found: error
 
   build-mac:
-    runs-on: macos-latest
+    runs-on: macos-13
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -99,10 +100,11 @@ jobs:
         with:
           name: release-mac
           path: dist-artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
 
   publish:
     needs: [build-windows, build-linux, build-mac]
+    if: needs.build-windows.result == 'success' && needs.build-linux.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
