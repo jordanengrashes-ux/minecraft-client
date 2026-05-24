@@ -505,7 +505,7 @@ navFiles         .addEventListener('click', () => { showPanel(filesPanelEl,     
 navServer        .addEventListener('click', () => { showPanel(serverPanelEl,       navServer); if (!serverPanelEl.dataset.loaded) { loadServerVersions(); loadCommunityServers(); serverPanelEl.dataset.loaded = '1'; } });
 navCosmetics     .addEventListener('click', () => { showPanel(cosmeticsPanelEl,    navCosmetics); if (!cosmeticsPanelEl.dataset.loaded) { initCosmetics(); cosmeticsPanelEl.dataset.loaded = '1'; } });
 navFriends       .addEventListener('click', () => { showPanel(friendsPanelEl,      navFriends);   if (!friendsPanelEl.dataset.loaded) { initFriendsPanel(); friendsPanelEl.dataset.loaded = '1'; } });
-navCustomize     .addEventListener('click', () => { showPanel(customizePanelEl,    navCustomize); if (!customizePanelEl.dataset.loaded) { initCustomize(); searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
+navCustomize     .addEventListener('click', () => { showPanel(customizePanelEl,    navCustomize); if (!customizePanelEl.dataset.loaded) { searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
 navSettings      .addEventListener('click', () => showPanel(settingsPanelEl,       navSettings));
 
 // ── Bedrock Edition ────────────────────────────────────────────────────────────
@@ -709,52 +709,6 @@ document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => 
   }
 });
 
-// ── In-game background (resource pack) ───────────────────────────────────────
-async function installGameBg(btn: HTMLButtonElement, statusEl: HTMLElement) {
-  btn.disabled = true;
-  statusEl.textContent = 'Generating panorama…';
-  statusEl.style.color = '#d29922';
-
-  // Six panorama faces — each a dark gradient with a coloured glow matching the launcher blobs
-  const glowColors = [
-    [68, 10, 130], [10, 40, 100], [10, 50, 32],
-    [40, 10, 90],  [8,  55, 80],  [68, 10, 130],
-  ];
-  const images: string[] = [];
-  for (let i = 0; i < 6; i++) {
-    const cv  = document.createElement('canvas');
-    cv.width  = 512; cv.height = 512;
-    const ctx = cv.getContext('2d')!;
-    ctx.fillStyle = '#080c14';
-    ctx.fillRect(0, 0, 512, 512);
-    const [r, g, b] = glowColors[i];
-    const glow = ctx.createRadialGradient(256, 256, 0, 256, 256, 300);
-    glow.addColorStop(0,   `rgba(${r},${g},${b},0.75)`);
-    glow.addColorStop(0.55,`rgba(${r},${g},${b},0.30)`);
-    glow.addColorStop(1,   'rgba(0,0,0,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, 512, 512);
-    images.push(cv.toDataURL('image/png').split(',')[1]);
-  }
-
-  statusEl.textContent = 'Installing resource pack…';
-  const res = await mc.installBg({ images });
-  if (res.ok) {
-    statusEl.textContent = '✅ Applied — auto-enables on next Minecraft launch';
-    statusEl.style.color = '#3fb950';
-    btn.textContent = '↺ Reinstall';
-  } else {
-    statusEl.textContent = `❌ ${res.error}`;
-    statusEl.style.color = '#f85149';
-  }
-  btn.disabled = false;
-}
-
-function initCustomize() {
-  const btn    = document.getElementById('install-bg-btn')    as HTMLButtonElement | null;
-  const status = document.getElementById('install-bg-status') as HTMLElement | null;
-  if (btn && status) btn.addEventListener('click', () => installGameBg(btn, status));
-}
 
 // ── Customize: Skin ───────────────────────────────────────────────────────────
 const skinCanvas   = document.getElementById('skin-canvas') as HTMLCanvasElement;
