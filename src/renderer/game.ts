@@ -710,12 +710,10 @@ document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => 
 });
 
 // ── In-game background (resource pack) ───────────────────────────────────────
-async function installGameBg(btn: HTMLButtonElement, statusEl: HTMLElement) {
-  btn.disabled = true;
+async function installGameBg(statusEl: HTMLElement) {
   statusEl.textContent = 'Generating panorama…';
   statusEl.style.color = '#d29922';
 
-  // Six panorama faces — each a dark gradient with a coloured glow matching the launcher blobs
   const glowColors = [
     [68, 10, 130], [10, 40, 100], [10, 50, 32],
     [40, 10, 90],  [8,  55, 80],  [68, 10, 130],
@@ -740,20 +738,39 @@ async function installGameBg(btn: HTMLButtonElement, statusEl: HTMLElement) {
   statusEl.textContent = 'Installing resource pack…';
   const res = await mc.installBg({ images });
   if (res.ok) {
-    statusEl.textContent = 'Applied — auto-enables on next Minecraft launch';
+    statusEl.textContent = 'Installed — enable "VoxelClient" in Options › Resource Packs';
     statusEl.style.color = '#3fb950';
-    btn.textContent = 'Reinstall';
+    localStorage.setItem('bg_installed', '1');
   } else {
     statusEl.textContent = res.error;
     statusEl.style.color = '#f85149';
   }
-  btn.disabled = false;
 }
 
 function initCustomize() {
-  const btn    = document.getElementById('install-bg-btn')    as HTMLButtonElement | null;
+  const toggle = document.getElementById('install-bg-toggle') as HTMLInputElement | null;
   const status = document.getElementById('install-bg-status') as HTMLElement | null;
-  if (btn && status) btn.addEventListener('click', () => installGameBg(btn, status));
+  if (!toggle || !status) return;
+
+  // Restore state
+  if (localStorage.getItem('bg_installed') === '1') {
+    toggle.checked = true;
+    status.textContent = 'Installed — enable "VoxelClient" in Options › Resource Packs';
+    status.style.color = '#3fb950';
+  }
+
+  toggle.addEventListener('change', async () => {
+    if (toggle.checked) {
+      toggle.disabled = true;
+      await installGameBg(status);
+      toggle.disabled = false;
+      if (localStorage.getItem('bg_installed') !== '1') toggle.checked = false;
+    } else {
+      localStorage.removeItem('bg_installed');
+      status.textContent = 'Background pack disabled';
+      status.style.color = '#484f58';
+    }
+  });
 }
 
 // ── Customize: Skin ───────────────────────────────────────────────────────────
