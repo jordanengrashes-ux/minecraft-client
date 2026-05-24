@@ -328,7 +328,6 @@ mcPlayBtn.addEventListener('click', async () => {
   mcPlayBtn.classList.add('running');
   mcPlayBtn.textContent = '⏳  Launching…';
   mcForceQuitBtn.style.display = 'inline-flex';
-  showMcOverlay();
   setStatus(`Launching Minecraft ${version}…`, 'yellow');
   setProgress(0);
   logToggle.style.display = 'inline';
@@ -376,61 +375,8 @@ function resetPlay() {
   mcPlayBtn.textContent = '▶  PLAY';
   mcForceQuitBtn.style.display = 'none';
   setProgress(null);
-  hideMcOverlay();
 }
 
-// ── In-game mods overlay ───────────────────────────────────────────────────────
-const mcRunningOverlay = document.getElementById('mc-running-overlay')!;
-const overlayModsList  = document.getElementById('overlay-mods-list')!;
-let overlayCollapsed = false;
-
-function renderOverlayMods() {
-  const installed = loadInstalledMods();
-  overlayModsList.innerHTML = '';
-  const entries = Object.entries(installed);
-  if (!entries.length) {
-    overlayModsList.innerHTML = '<div style="color:#484f58;font-size:12px;">No mods installed</div>';
-    return;
-  }
-  for (const [slug, info] of entries) {
-    const isDisabled = !!(info as any).disabled;
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;';
-    const verBadge = (info as any).mcVersion ? '<span style="font-size:10px;color:#3a4048;">' + (info as any).mcVersion + '</span>' : '';
-    row.innerHTML = '<div style="flex:1;font-size:12px;color:' + (isDisabled ? '#484f58' : '#e6edf3') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + info.name + '">' + info.name + '</div>' + verBadge + '<label class="toggle" style="width:34px;height:18px;flex-shrink:0;"><input type="checkbox" ' + (isDisabled ? '' : 'checked') + ' /><span class="toggle-slider"></span></label>';
-    const cb = row.querySelector('input') as HTMLInputElement;
-    cb.addEventListener('change', async () => {
-      const enable = cb.checked;
-      cb.disabled = true;
-      const res = await mc.toggleMod({ filename: info.filename, enable });
-      if (res && res.ok) {
-        const mods = loadInstalledMods();
-        if (mods[slug]) { (mods[slug] as any).disabled = !enable; saveInstalledMods(mods); }
-        renderOverlayMods();
-      } else {
-        cb.checked = !enable;
-        cb.disabled = false;
-      }
-    });
-    overlayModsList.appendChild(row);
-  }
-}
-
-function showMcOverlay() {
-  renderOverlayMods();
-  mcRunningOverlay.style.display = 'block';
-}
-function hideMcOverlay() {
-  mcRunningOverlay.style.display = 'none';
-}
-
-document.getElementById('overlay-mods-toggle-btn')?.addEventListener('click', () => {
-  overlayCollapsed = !overlayCollapsed;
-  const body = document.getElementById('overlay-mods-body')!;
-  const btn  = document.getElementById('overlay-mods-toggle-btn')!;
-  body.style.display = overlayCollapsed ? 'none' : 'block';
-  btn.textContent    = overlayCollapsed ? '>' : 'v';
-});
 // ── Progress events ────────────────────────────────────────────────────────────
 if (mc) {
   mc.onProgress((e: any) => {
