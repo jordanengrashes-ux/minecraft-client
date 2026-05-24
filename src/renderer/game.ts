@@ -1,4 +1,4 @@
-// Launcher logic — no Three.js, just UI wiring for Minecraft launch
+﻿// Launcher logic — no Three.js, just UI wiring for Minecraft launch
 
 import { ref, set, onValue, serverTimestamp, onDisconnect, update, get, increment } from 'firebase/database';
 import { rtdb } from './firebase';
@@ -88,7 +88,7 @@ if ((window as any).electron) {
 if (mc) {
   mc.onAlreadyAuthed((name: string) => {
     authed = true;
-    mcAuthBtn.textContent = `✅  Logged in as ${name}`;
+    mcAuthBtn.textContent = `Logged in as ${name}`;
     mcAuthBtn.classList.add('authed');
     mcIgnSpan.textContent = name;
     mcIgnBadge.style.display = 'inline-block';
@@ -251,7 +251,7 @@ function updateModsBadge() {
   const fabricOn = fabricToggle.checked;
   modsBadge.textContent     = fabricOn
     ? `✓ ${count} mod${count !== 1 ? 's' : ''} ready`
-    : `⚠ ${count} mod${count !== 1 ? 's' : ''} installed — enable Fabric above`;
+    : `${count} mod${count !== 1 ? 's' : ''} installed — enable Fabric above`;
   modsBadge.style.color      = fabricOn ? '#3fb950'                  : '#d29922';
   modsBadge.style.background = fabricOn ? 'rgba(63,185,80,0.10)'     : 'rgba(210,153,34,0.10)';
   modsBadge.style.borderColor= fabricOn ? 'rgba(63,185,80,0.30)'     : 'rgba(210,153,34,0.35)';
@@ -302,7 +302,7 @@ mcAuthBtn.addEventListener('click', async () => {
   mcAuthBtn.disabled = false;
   if (res.ok) {
     authed = true;
-    mcAuthBtn.textContent = `✅  Logged in as ${res.username}`;
+    mcAuthBtn.textContent = `Logged in as ${res.username}`;
     mcAuthBtn.classList.add('authed');
     mcIgnSpan.textContent = res.username;
     mcIgnBadge.style.display = 'inline-block';
@@ -326,7 +326,7 @@ mcPlayBtn.addEventListener('click', async () => {
   running = true;
   mcPlayBtn.disabled = true;
   mcPlayBtn.classList.add('running');
-  mcPlayBtn.textContent = '⏳  Launching…';
+  mcPlayBtn.textContent = 'Launching…';
   mcForceQuitBtn.style.display = 'inline-flex';
   setStatus(`Launching Minecraft ${version}…`, 'yellow');
   setProgress(0);
@@ -340,10 +340,10 @@ mcPlayBtn.addEventListener('click', async () => {
     const fab = await mc.installFabric({ mcVersion: version });
     if (fab.ok) {
       version = fab.fabricVersion; // launch with fabric version id
-      fabricStatus.textContent = `✅ Fabric ${fab.loaderVersion}`;
+      fabricStatus.textContent = `Fabric ${fab.loaderVersion}`;
       fabricStatus.style.color = '#3fb950';
     } else {
-      fabricStatus.textContent = `⚠ Fabric install failed — launching vanilla`;
+      fabricStatus.textContent = `Fabric install failed — launching vanilla`;
       fabricStatus.style.color = '#d29922';
     }
   }
@@ -362,7 +362,7 @@ mcPlayBtn.addEventListener('click', async () => {
 
 mcForceQuitBtn.addEventListener('click', async () => {
   mcForceQuitBtn.disabled = true;
-  mcForceQuitBtn.textContent = '⏳ Killing…';
+  mcForceQuitBtn.textContent = 'Killing…';
   await mc.kill();
   mcForceQuitBtn.disabled = false;
   mcForceQuitBtn.textContent = '⏹ Force Quit';
@@ -408,7 +408,7 @@ if (mc) {
     if (t.includes('Backend library') || t.includes('Game engine started')) {
       setStatus('Minecraft is running', 'green');
       setProgress(null);
-      mcPlayBtn.textContent = '🟢  Running';
+      mcPlayBtn.textContent = 'Running';
     }
   });
 
@@ -425,7 +425,7 @@ if (mc) {
         crashLines.some(l => l.includes('FileNotFoundException') || l.includes('corrupt')) ? 'Corrupt game files — use Repair in Settings' :
         `Exit code ${code}`;
 
-      addLog(`⚠ Crash: ${reason}`, 'error');
+      addLog(`Crash: ${reason}`, 'error');
       setStatus(`Crashed: ${reason}`, 'red');
       // Try to surface the actual Java crash report
       if (mc.crashReport) {
@@ -523,29 +523,29 @@ function initBedrock() {
   bedrockLaunchBtn.addEventListener('click', async () => {
     if (!mc) return;
     bedrockLaunchBtn.disabled = true;
-    bedrockLaunchBtn.textContent = '⏳  Launching…';
+    bedrockLaunchBtn.textContent = 'Launching…';
     const res = await mc.launchBedrock();
     bedrockLaunchBtn.disabled = false;
     if (res.ok) {
-      bedrockLaunchBtn.textContent = '✅  Bedrock launched!';
-      bedrockIcon.textContent = '✅';
+      bedrockLaunchBtn.textContent = 'Bedrock launched!';
+      bedrockIcon.textContent = '';
       bedrockStatusText.textContent = 'Minecraft Bedrock Edition launched';
       bedrockStatusSub.textContent = 'The game should open shortly';
-      setTimeout(() => { bedrockLaunchBtn.textContent = '🪨  Launch Bedrock Edition'; }, 3000);
+      setTimeout(() => { bedrockLaunchBtn.textContent = 'Launch Bedrock Edition'; }, 3000);
     } else if (res.notInstalled) {
-      bedrockIcon.textContent = '🛒';
+      bedrockIcon.textContent = '';
       bedrockStatusText.textContent = 'Bedrock not installed';
       bedrockStatusSub.textContent = 'Opening Microsoft Store to purchase/install Minecraft for Windows…';
-      bedrockLaunchBtn.textContent = '🛒  Get Bedrock Edition';
+      bedrockLaunchBtn.textContent = 'Get Bedrock Edition';
     } else {
       bedrockStatusText.textContent = `Error: ${res.error}`;
-      bedrockLaunchBtn.textContent = '🪨  Launch Bedrock Edition';
+      bedrockLaunchBtn.textContent = 'Launch Bedrock Edition';
     }
   });
 
   // Check install status without launching
   if (mc?.launchBedrock) {
-    bedrockIcon.textContent = '🪨';
+    bedrockIcon.textContent = '';
     bedrockStatusText.textContent = 'Minecraft Bedrock Edition';
     bedrockStatusSub.textContent = 'Click Launch to open Bedrock, or Get to install it from the Microsoft Store';
   }
@@ -580,8 +580,8 @@ async function searchBedrockAddons(query: string) {
       const card = document.createElement('div');
       card.className = 'mod-card';
       const icon = h.icon_url
-        ? `<img src="${h.icon_url}" class="mod-icon-img" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'mod-icon',textContent:'🪨'}))">`
-        : `<div class="mod-icon">🪨</div>`;
+        ? `<img src="${h.icon_url}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
+        : `<div class="mod-icon"></div>`;
       const type = h.categories.includes('shaders') ? 'Shader' : 'Resource Pack';
       const typeCls = h.categories.includes('shaders') ? 'visual' : 'util';
       card.innerHTML = `${icon}
@@ -639,8 +639,8 @@ async function searchBedrockMods(query: string) {
       const card = document.createElement('div');
       card.className = 'mod-card';
       const iconHtml = h.icon_url
-        ? `<img src="${h.icon_url}" class="mod-icon-img" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'mod-icon',textContent:'📦'}))">`
-        : `<div class="mod-icon">📦</div>`;
+        ? `<img src="${h.icon_url}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
+        : `<div class="mod-icon"></div>`;
       const tagHtml = h.categories.slice(0, 3).map(cat => {
         const cls = ['shaders'].includes(cat) ? 'visual' : ['optimization','performance'].includes(cat) ? 'perf' : 'util';
         return `<span class="mod-tag ${cls}">${cat}</span>`;
@@ -691,14 +691,14 @@ document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => 
   if (!mc) return;
   authed = false;
   mcPlayBtn.disabled = true;
-  mcAuthBtn.textContent = '🔐  Login with Microsoft to Play';
+  mcAuthBtn.textContent = 'Login with Microsoft to Play';
   mcAuthBtn.classList.remove('authed');
   mcIgnBadge.style.display = 'none';
   setStatus('Opening Microsoft login…', 'yellow');
   const res = await mc.reauth();
   if (res?.ok) {
     authed = true;
-    mcAuthBtn.textContent = `✅  Logged in as ${res.username}`;
+    mcAuthBtn.textContent = `Logged in as ${res.username}`;
     mcAuthBtn.classList.add('authed');
     mcIgnSpan.textContent = res.username;
     mcIgnBadge.style.display = 'inline-block';
@@ -740,11 +740,11 @@ async function installGameBg(btn: HTMLButtonElement, statusEl: HTMLElement) {
   statusEl.textContent = 'Installing resource pack…';
   const res = await mc.installBg({ images });
   if (res.ok) {
-    statusEl.textContent = '✅ Applied — auto-enables on next Minecraft launch';
+    statusEl.textContent = 'Applied — auto-enables on next Minecraft launch';
     statusEl.style.color = '#3fb950';
-    btn.textContent = '↺ Reinstall';
+    btn.textContent = 'Reinstall';
   } else {
-    statusEl.textContent = `❌ ${res.error}`;
+    statusEl.textContent = res.error;
     statusEl.style.color = '#f85149';
   }
   btn.disabled = false;
@@ -857,7 +857,7 @@ async function searchTexturePacks(query: string) {
     data.hits.forEach(h => {
       const row = document.createElement('div');
       row.className = 'mod-card';
-      const icon = h.icon_url ? `<img src="${h.icon_url}" class="mod-icon-img" alt="">` : `<div class="mod-icon">🎨</div>`;
+      const icon = h.icon_url ? `<img src="${h.icon_url}" class="mod-icon-img" alt="">` : `<div class="mod-icon"></div>`;
       row.innerHTML = `${icon}
         <div class="mod-info">
           <div class="mod-name">${h.title}</div>
@@ -917,7 +917,7 @@ function setModsTab(type: 'mod' | 'modpack') {
   modsLabelMods.style.fontWeight = isMod  ? '700'     : '400';
   modsLabelPacks.style.color     = !isMod ? '#3fb950' : '#484f58';
   modsLabelPacks.style.fontWeight= !isMod ? '700'     : '400';
-  modsSearch.placeholder = isMod ? '🔍  Search mods…' : '🔍  Search modpacks…';
+  modsSearch.placeholder = isMod ? 'Search mods…' : 'Search modpacks…';
   localStorage.setItem('voxel_mods_tab', type);
   searchModrinth(modsSearch.value.trim());
 }
@@ -947,8 +947,8 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
   card.className = 'mod-card' + (on ? ' enabled' : '');
 
   const iconHtml = mod.icon_url
-    ? `<img src="${mod.icon_url}" class="mod-icon-img" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'mod-icon',textContent:'🧩'}))">`
-    : `<div class="mod-icon">🧩</div>`;
+    ? `<img src="${mod.icon_url}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
+    : `<div class="mod-icon"></div>`;
 
   const tagHtml = mod.categories.slice(0, 3).map(cat => {
     const cls = ['optimization','performance'].includes(cat) ? 'perf'
@@ -979,7 +979,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
     input.disabled = true;
 
     if (checked) {
-      statusEl.textContent = '⏳';
+      statusEl.textContent = '…';
       statusEl.style.color = '#d29922';
       try {
         const ver = mcVersion.value || '1.21.4';
@@ -1030,8 +1030,8 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
   const card = document.createElement('div');
   card.className = 'mod-card';
   const iconHtml = mod.icon_url
-    ? `<img src="${mod.icon_url}" class="mod-icon-img" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'mod-icon',textContent:'📦'}))">`
-    : `<div class="mod-icon">📦</div>`;
+    ? `<img src="${mod.icon_url}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
+    : `<div class="mod-icon"></div>`;
   const tagHtml = mod.categories.slice(0, 3).map(cat =>
     `<span class="mod-tag util">${cat}</span>`
   ).join('') + `<span class="mod-tag" style="margin-left:auto">⬇ ${fmtDownloads(mod.downloads)}</span>`;
@@ -1116,14 +1116,14 @@ interface PvpModDef {
 
 const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
   {
-    label: '📦 Required',
+    label: 'Required',
     color: '#d29922',
     mods: [
       { slug: 'fabric-api',            emoji: '🔧', name: 'Fabric API',           desc: 'Required dependency — all Fabric mods need this', group: 'Utility' },
     ],
   },
   {
-    label: '⌨️ HUD & Info',
+    label: 'HUD & Info',
     color: '#58a6ff',
     mods: [
       { slug: 'keystrokes',            emoji: '⌨️', name: 'Keystrokes',           desc: 'Live WASD + CPS overlay (Feather Keystrokes)', group: 'HUD' },
@@ -1141,7 +1141,7 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
     ],
   },
   {
-    label: '✨ Visual',
+    label: 'Visual',
     color: '#a371f7',
     mods: [
       { slug: 'custom-crosshair-mod',  emoji: '🎯', name: 'Custom Crosshair',    desc: 'Crosshair style, size, color & gap (Feather Crosshair)', group: 'Visual' },
@@ -1159,7 +1159,7 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
     ],
   },
   {
-    label: '⚙️ Utility',
+    label: 'Utility',
     color: '#3fb950',
     mods: [
       { slug: 'sprinthop',             emoji: '🏃', name: 'Toggle Sprint',       desc: 'Toggle sprint & sneak — no need to hold Ctrl', group: 'Utility' },
@@ -1176,7 +1176,7 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
     ],
   },
   {
-    label: '⚡ Performance',
+    label: 'Performance',
     color: '#f97316',
     mods: [
       { slug: 'sodium',                emoji: '⚡', name: 'Sodium',              desc: 'Major FPS boost — better rendering engine', group: 'Performance' },
@@ -1252,13 +1252,13 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
     : '';
 
   const verBadge = wrongVer
-    ? `<span style="font-size:10px;color:#d29922;background:rgba(210,153,34,0.12);border:1px solid rgba(210,153,34,0.3);border-radius:10px;padding:1px 6px;">⚠ v${installedInfo!.mcVersion}</span>`
+    ? `<span style="font-size:10px;color:#d29922;background:rgba(210,153,34,0.12);border:1px solid rgba(210,153,34,0.3);border-radius:10px;padding:1px 6px;">v${installedInfo!.mcVersion}</span>`
     : on && installedInfo?.mcVersion
       ? `<span style="font-size:10px;color:#484f58;">v${installedInfo.mcVersion}</span>`
       : '';
 
   card.innerHTML = `
-    <div class="mod-icon" style="font-size:22px;background:none;">${mod.emoji}</div>
+    <div class="mod-icon" style="background:none;"></div>
     <div class="mod-info">
       <div style="display:flex;align-items:center;gap:6px;">
         <div class="mod-name">${mod.name}</div>
@@ -1285,7 +1285,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
     input.disabled = true;
     errEl.style.display = 'none';
     if (checked) {
-      statusEl.textContent = '⏳'; statusEl.style.color = '#d29922';
+      statusEl.textContent = '…'; statusEl.style.color = '#d29922';
       try {
         const ver = mcVersion.value || '1.21.4';
         const curInstalled = loadInstalledMods();
@@ -1298,10 +1298,10 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
             return !info || info.mcVersion !== ver;
           });
         for (const dep of depsToInstall) {
-          statusEl.textContent = `⬇ ${dep.name}`; statusEl.style.color = '#58a6ff';
+          statusEl.textContent = dep.name; statusEl.style.color = '#58a6ff';
           await installOneMod(dep, ver);
         }
-        statusEl.textContent = '⬇'; statusEl.style.color = '#58a6ff';
+        statusEl.textContent = '…'; statusEl.style.color = '#58a6ff';
         await installOneMod(mod, ver);
         card.className = 'mod-card enabled';
         statusEl.textContent = '✓'; statusEl.style.color = '#3fb950';
@@ -1365,7 +1365,7 @@ async function reinstallAllMods(btn: HTMLElement) {
   const installed = loadInstalledMods();
   const stale = Object.entries(installed).filter(([, m]) => !(m as any).mcVersion || (m as any).mcVersion !== ver);
   if (!stale.length) { btn.textContent = '✓ Up to date'; return; }
-  btn.textContent = `⏳ Updating 0/${stale.length}…`;
+  btn.textContent = `Updating 0/${stale.length}…`;
   btn.setAttribute('disabled', '');
   let done = 0;
   for (const [slug] of stale) {
@@ -1374,10 +1374,10 @@ async function reinstallAllMods(btn: HTMLElement) {
     try {
       await installOneMod(mod, ver);
       done++;
-      btn.textContent = `⏳ Updating ${done}/${stale.length}…`;
+      btn.textContent = `Updating ${done}/${stale.length}…`;
     } catch {}
   }
-  btn.textContent = `✓ Updated ${done}/${stale.length}`;
+  btn.textContent = `Updated ${done}/${stale.length}`;
   btn.removeAttribute('disabled');
   renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
 }
@@ -1437,7 +1437,7 @@ function buildRPCard(name: string, slug: string, icon: string, desc: string, ins
     errEl.style.display = 'none';
     const rps = loadInstalledRPs();
     if (checked) {
-      statusEl.textContent = '⬇'; statusEl.style.color = '#58a6ff';
+      statusEl.textContent = '…'; statusEl.style.color = '#58a6ff';
       try {
         const res = await mc.installResourcePack({ url, filename });
         if (!res.ok) throw new Error(res.error);
@@ -1479,7 +1479,7 @@ async function searchResourcePacks(query: string) {
       const installed = !!rps[hit.slug];
       const filename  = `${hit.slug}.zip`;
       const dlUrl     = `https://cdn.modrinth.com/data/${hit.project_id}/featured`;
-      const card = buildRPCard(hit.title, hit.slug, '🎨', hit.description, installed, dlUrl, filename);
+      const card = buildRPCard(hit.title, hit.slug, '', hit.description, installed, dlUrl, filename);
       rpList.appendChild(card);
     }
     if (!data.hits?.length) rpList.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:20px 0;">No results</div>';
@@ -1496,7 +1496,7 @@ function initResourcePacks() {
     label.textContent = '✓ Installed';
     installedEl.appendChild(label);
     for (const [slug, filename] of Object.entries(rps)) {
-      installedEl.appendChild(buildRPCard(filename.replace('.zip',''), slug, '🎨', filename, true, '', filename));
+      installedEl.appendChild(buildRPCard(filename.replace('.zip',''), slug, '', filename, true, '', filename));
     }
     const sep = document.createElement('div');
     sep.style.cssText = 'border-top:1px solid #21262d;margin:8px 0 4px;';
@@ -1575,7 +1575,6 @@ function initScreenshots() {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:14px;background:rgba(13,17,23,0.6);border:1px solid #21262d;border-radius:10px;padding:12px 16px;cursor:pointer;transition:background 0.15s;';
       row.innerHTML = `
-        <span style="font-size:20px;">🖼️</span>
         <div style="flex:1;min-width:0;">
           <div style="color:#e6edf3;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
           <div style="color:#6e7681;font-size:11px;margin-top:2px;">${new Date(s.mtime).toLocaleString()} · ${s.sizeKb} KB</div>
@@ -1707,7 +1706,7 @@ function initTokens(uid: string) {
 async function claimDailyTokens(uid: string) {
   const claimBtn = document.getElementById('claim-tokens-btn') as HTMLButtonElement | null;
   const today = new Date().toISOString().slice(0, 10);
-  if (claimBtn) { claimBtn.disabled = true; claimBtn.textContent = '⏳ Claiming…'; }
+  if (claimBtn) { claimBtn.disabled = true; claimBtn.textContent = 'Claiming…'; }
   try {
     const snap = await get(ref(rtdb, `voxel_tokens/${uid}/lastClaim`));
     if (snap.val() === today) {
@@ -1716,13 +1715,13 @@ async function claimDailyTokens(uid: string) {
     }
     await update(ref(rtdb, `voxel_tokens/${uid}`), { balance: increment(50), lastClaim: today });
     if (claimBtn) {
-      claimBtn.textContent = '✅ +50 Tokens claimed!';
+      claimBtn.textContent = '+50 Tokens claimed!';
       setTimeout(() => { claimBtn.textContent = '✓ Claimed today'; }, 2500);
     }
   } catch (err: any) {
     if (claimBtn) {
       claimBtn.disabled = false;
-      claimBtn.textContent = '❌ ' + (err?.message ?? 'Failed');
+      claimBtn.textContent = 'Error: ' + (err?.message ?? 'Failed');
       setTimeout(() => { claimBtn.textContent = 'Claim Daily (+50)'; claimBtn.disabled = false; }, 3000);
     }
   }
@@ -1837,7 +1836,7 @@ async function sendFriendRequest(uid: string, targetName: string) {
   const statusEl = document.getElementById('friend-add-status');
   const addBtn   = document.getElementById('friend-add-btn') as HTMLButtonElement;
   if (!statusEl || !addBtn) return;
-  if (!uid) { statusEl.style.color = '#f85149'; statusEl.textContent = '⚠ Sign in first'; return; }
+  if (!uid) { statusEl.style.color = '#f85149'; statusEl.textContent = 'Sign in first'; return; }
   const name = targetName.trim().toLowerCase();
   if (!name) return;
   addBtn.disabled = true;
@@ -1847,7 +1846,7 @@ async function sendFriendRequest(uid: string, targetName: string) {
   const target = snap.val();
   if (!target) {
     statusEl.style.color = '#f85149';
-    statusEl.textContent = `⚠ "${targetName}" hasn't used Voxel Client yet`;
+    statusEl.textContent = `"${targetName}" hasn't used Voxel Client yet`;
     addBtn.disabled = false;
     return;
   }
@@ -1860,7 +1859,7 @@ async function sendFriendRequest(uid: string, targetName: string) {
   await set(ref(rtdb, `voxel_friends/${targetUid}/requests/incoming/${uid}`), { name: mcIgnSpan.textContent || uid, sentAt: serverTimestamp() });
   await set(ref(rtdb, `voxel_friends/${uid}/requests/outgoing/${targetUid}`), { name: target.name, sentAt: serverTimestamp() });
   statusEl.style.color = '#3fb950';
-  statusEl.textContent = `✅ Request sent to ${target.name}`;
+  statusEl.textContent = `Request sent to ${target.name}`;
   (document.getElementById('friend-add-input') as HTMLInputElement).value = '';
   addBtn.disabled = false;
 }
@@ -1889,11 +1888,11 @@ function renderCapeGrid() {
     const equipped = cape.id === equippedCapeId;
     const card     = document.createElement('div');
     card.className = 'cape-card' + (equipped ? ' equipped' : '');
-    const costLabel = cape.cost === 0 ? 'Free' : `🪙 ${cape.cost}`;
+    const costLabel = cape.cost === 0 ? 'Free' : `${cape.cost} tokens`;
     const canAfford = tokenBalance >= cape.cost;
     let actionBtn = '';
     if (equipped) {
-      actionBtn = `<button class="cape-equip on">✅ Equipped</button>`;
+      actionBtn = `<button class="cape-equip on">Equipped</button>`;
     } else if (owned) {
       actionBtn = `<button class="cape-equip off">Equip</button>`;
     } else {
@@ -1915,7 +1914,7 @@ function renderCapeGrid() {
     btn.addEventListener('click', async () => {
       const capeKey = mcUuid || myUid;
       if (!capeKey) {
-        if (cosmeticsStatus) cosmeticsStatus.textContent = '⚠ Sign in to your launcher account first';
+        if (cosmeticsStatus) cosmeticsStatus.textContent = 'Sign in to your launcher account first';
         return;
       }
       if (!owned) {
@@ -1936,10 +1935,10 @@ function renderCapeGrid() {
         if (preview) preview.style.background = `linear-gradient(to bottom, ${cape.top}, ${cape.bot})`;
         if (removeBtn) removeBtn.style.display = 'inline-block';
         if (cosmeticsStatus) cosmeticsStatus.textContent = mcUuid
-          ? '✅ Cape saved — visible in-game after next launch'
-          : '✅ Cape saved — sign in with Microsoft to see it in-game';
+          ? 'Cape saved — visible in-game after next launch'
+          : 'Cape saved — sign in with Microsoft to see it in-game';
         renderCapeGrid();
-      } catch { if (cosmeticsStatus) cosmeticsStatus.textContent = '❌ Failed to save — check connection'; }
+      } catch { if (cosmeticsStatus) cosmeticsStatus.textContent = 'Failed to save — check connection'; }
     });
     grid.appendChild(card);
   }
@@ -1996,17 +1995,17 @@ async function initCosmetics() {
   installBtn?.addEventListener('click', async () => {
     if (!cosm) return;
     installBtn.disabled = true;
-    installBtn.textContent = '⏳ Installing…';
+    installBtn.textContent = 'Installing…';
     const res = await cosm.installMod();
     if (res.ok) {
-      installStatus.textContent = '✅ Installed! Launch with Fabric Loader to see capes.';
+      installStatus.textContent = 'Installed! Launch with Fabric Loader to see capes.';
       installStatus.style.color = '#3fb950';
     } else {
-      installStatus.textContent = `❌ ${res.error}`;
+      installStatus.textContent = res.error;
       installStatus.style.color = '#f85149';
     }
     installBtn.disabled = false;
-    installBtn.textContent = '⬇ Install Cosmetics Mod';
+    installBtn.textContent = 'Install Cosmetics Mod';
   });
 }
 
@@ -2069,12 +2068,12 @@ function renderSavedServers() {
     card.className = 'mod-card saved-srv-card';
     card.style.cursor = 'default';
     card.innerHTML = `
-      <div class="mod-icon" style="font-size:20px;">🖥️</div>
+      <div class="mod-icon" style="font-size:20px;"></div>
       <div class="mod-info">
         <div class="mod-name">${srv.name}</div>
         <div class="mod-desc" style="font-family:monospace">${srv.ip || '(no IP)'} &nbsp;·&nbsp; ${srv.version}</div>
         <div class="mod-tags" style="margin-top:6px;">
-          <span class="mod-tag ${srv.publish ? 'perf' : ''}">${srv.publish ? '🌐 24/7 Listed' : 'Local only'}</span>
+          <span class="mod-tag ${srv.publish ? 'perf' : ''}">${srv.publish ? '24/7 Listed' : 'Local only'}</span>
         </div>
       </div>
       <div class="mod-right" style="gap:6px;">
@@ -2111,7 +2110,7 @@ srvSaveBtn?.addEventListener('click', async () => {
   const publish = srv247Toggle.checked;
 
   if (publish && !isValidServerDomain(ip)) {
-    srvSaveStatus.textContent = '⚠ Enter a domain address to list publicly (e.g. play.yourserver.net)';
+    srvSaveStatus.textContent = 'Enter a domain address to list publicly (e.g. play.yourserver.net)';
     srvSaveStatus.style.color = '#f85149';
     setTimeout(() => { srvSaveStatus.textContent = ''; }, 4000);
     return;
@@ -2124,7 +2123,7 @@ srvSaveBtn?.addEventListener('click', async () => {
   persistSavedServers(list);
   if (publish) await publish247(srv);
   renderSavedServers();
-  srvSaveStatus.textContent = publish ? '✅ Saved & listed 24/7' : '✅ Saved locally';
+  srvSaveStatus.textContent = publish ? 'Saved & listed 24/7' : 'Saved locally';
   srvSaveStatus.style.color = '#3fb950';
   setTimeout(() => { srvSaveStatus.textContent = ''; }, 2500);
 });
@@ -2323,12 +2322,12 @@ function loadCommunityServers() {
         card.className = 'mod-card';
         card.style.cursor = 'default';
         card.innerHTML = `
-          <div class="mod-icon" style="font-size:20px;">🖥️</div>
+          <div class="mod-icon" style="font-size:20px;"></div>
           <div class="mod-info">
             <div class="mod-name">${s.name || 'Unnamed Server'}</div>
             <div class="mod-desc">${s.owner || 'Unknown'} · ${s.version || '?'}</div>
             <div class="mod-tags" style="margin-top:6px;">
-              <span class="mod-tag ${isOnline ? 'util' : ''}">${isOnline ? '🟢 Online' : '⚫ Offline'}</span>
+              <span class="mod-tag ${isOnline ? 'util' : ''}">${isOnline ? 'Online' : 'Offline'}</span>
               ${s.publish ? '<span class="mod-tag perf">24/7</span>' : ''}
             </div>
           </div>
@@ -2355,7 +2354,7 @@ srvStartBtn?.addEventListener('click', async () => {
   srvStartBtn.style.display = 'none';
   srvStartBtn.style.background = 'linear-gradient(135deg,#8b1a1a,#da3633)';
   srvStartBtn.style.borderColor = '#f85149';
-  srvStartBtn.textContent = '⏳ Starting…';
+  srvStartBtn.textContent = 'Starting…';
   srvLog.innerHTML = '';
   srvLogLines = [];
 
@@ -2377,14 +2376,14 @@ srvStartBtn?.addEventListener('click', async () => {
 
   srvInfo.style.display = 'flex';
   srvVerDisplay.textContent = version;
-  srvAddress.textContent = '⏳ Starting… use localhost:25565 once ready';
+  srvAddress.textContent = 'Starting… use localhost:25565 once ready';
   // IP + publish happen in srvAddLog when MC logs "Done"
 });
 
 srvStopBtn?.addEventListener('click', async () => {
   if (!server || !srvRunning) return;
   srvStopBtn.disabled = true;
-  srvStopBtn.textContent = '⏳ Stopping…';
+  srvStopBtn.textContent = 'Stopping…';
   await server.stop();
 });
 
@@ -2444,22 +2443,22 @@ if (updater) {
   });
   updater.onAvailable((ver: string) => {
     banner.style.display = 'flex';
-    updateText.textContent = `⬇ Update v${ver} downloading…`;
+    updateText.textContent = `Update v${ver} downloading…`;
     progressWrap2.style.display = 'block';
     if (checkBtn) { checkBtn.textContent = 'Downloading…'; checkBtn.disabled = true; }
     if (updateSub) updateSub.textContent = `Downloading v${ver}…`;
   });
   updater.onProgress((pct: number) => {
     progressBar2.style.width = `${pct}%`;
-    updateText.textContent = `⬇ Downloading update… ${pct}%`;
+    updateText.textContent = `Downloading update… ${pct}%`;
     if (updateSub) updateSub.textContent = `Downloading update… ${pct}%`;
   });
   updater.onDownloaded(() => {
     progressWrap2.style.display = 'none';
-    updateText.textContent = '✅ Update ready — restart to apply';
+    updateText.textContent = 'Update ready — restart to apply';
     installBtn.style.display = 'inline-block';
     if (checkBtn) { checkBtn.textContent = 'Check for Updates'; checkBtn.disabled = false; }
-    if (updateSub) updateSub.textContent = '✅ Update downloaded — click Restart & Update to apply';
+    if (updateSub) updateSub.textContent = 'Update downloaded — click Restart & Update to apply';
     enableRestartButtons();
   });
 
@@ -2498,7 +2497,7 @@ function makeDropZone(zoneId: string, accept: string[], onDrop: (paths: string[]
   });
 }
 
-function renderFileList(listId: string, items: string[], icon: string, onOpen?: (name: string) => void) {
+function renderFileList(listId: string, items: string[]) {
   const list = document.getElementById(listId)!;
   list.innerHTML = '';
   if (!items.length) {
@@ -2508,7 +2507,7 @@ function renderFileList(listId: string, items: string[], icon: string, onOpen?: 
   for (const name of items) {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(13,17,23,0.6);border:1px solid #21262d;border-radius:8px;';
-    row.innerHTML = `<span style="font-size:16px;">${icon}</span><span style="flex:1;font-size:12px;color:#e6edf3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>`;
+    row.innerHTML = `<span style="flex:1;font-size:12px;color:#e6edf3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>`;
     list.appendChild(row);
   }
 }
@@ -2517,8 +2516,8 @@ async function refreshFileLists() {
   const filesApi = (window as any).files;
   if (!filesApi) return;
   const [worlds, schematics] = await Promise.all([filesApi.listWorlds(), filesApi.listSchematics()]);
-  renderFileList('worlds-list',     worlds,     '🌍');
-  renderFileList('schematics-list', schematics, '📐');
+  renderFileList('worlds-list',     worlds);
+  renderFileList('schematics-list', schematics);
 }
 
 function initFiles() {

@@ -356,35 +356,35 @@
     <!-- Sidebar -->
     <div id="sidebar">
       <div id="sidebar-logo">
-        <h1>⛏ VOXEL</h1>
+        <h1>VOXEL</h1>
         <p>Minecraft Launcher</p>
       </div>
       <div id="sidebar-nav" style="flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2a3060 transparent;">
       <div class="nav-section-label">Play</div>
-      <div class="nav-item active" id="nav-play">🎮 &nbsp;Java Edition</div>
-      <div class="nav-item" id="nav-bedrock">🪨 &nbsp;Bedrock Edition</div>
+      <div class="nav-item active" id="nav-play">Java Edition</div>
+      <div class="nav-item" id="nav-bedrock">Bedrock Edition</div>
       <div class="nav-section-label">Mods</div>
-      <div class="nav-item" id="nav-mods">🧩 &nbsp;Java Mods</div>
-      <div class="nav-item" id="nav-pvp">⚔️ &nbsp;PvP Mods</div>
-      <div class="nav-item" id="nav-bedrock-mods">📦 &nbsp;Bedrock Mods</div>
-      <div class="nav-item" id="nav-resourcepacks">🎨 &nbsp;Resource Packs</div>
+      <div class="nav-item" id="nav-mods">Java Mods</div>
+      <div class="nav-item" id="nav-pvp">PvP Mods</div>
+      <div class="nav-item" id="nav-bedrock-mods">Bedrock Mods</div>
+      <div class="nav-item" id="nav-resourcepacks">Resource Packs</div>
       <div class="nav-section-label">Social</div>
-      <div class="nav-item" id="nav-skins">🧢 &nbsp;Skins</div>
-      <div class="nav-item" id="nav-server">🖥️ &nbsp;Host Server</div>
-      <div class="nav-item" id="nav-cosmetics">🧣 &nbsp;Cosmetics</div>
-      <div class="nav-item" id="nav-friends">👥 &nbsp;Friends</div>
-      <div class="nav-item" id="nav-files">📁 &nbsp;Files</div>
+      <div class="nav-item" id="nav-skins">Skins</div>
+      <div class="nav-item" id="nav-server">Host Server</div>
+      <div class="nav-item" id="nav-cosmetics">Cosmetics</div>
+      <div class="nav-item" id="nav-friends">Friends</div>
+      <div class="nav-item" id="nav-files">Files</div>
       <div class="nav-section-label">Config</div>
-      <div class="nav-item" id="nav-screenshots">📸 &nbsp;Screenshots</div>
-      <div class="nav-item" id="nav-accounts">👤 &nbsp;Accounts</div>
-      <div class="nav-item" id="nav-customize">🎨 &nbsp;Customize</div>
-      <div class="nav-item" id="nav-settings">⚙️ &nbsp;Settings</div>
+      <div class="nav-item" id="nav-screenshots">Screenshots</div>
+      <div class="nav-item" id="nav-accounts">Accounts</div>
+      <div class="nav-item" id="nav-customize">Customize</div>
+      <div class="nav-item" id="nav-settings">Settings</div>
       </div>
       <div id="sidebar-bottom">
         <div id="app-version" style="font-size:11px;color:#4a5568;text-align:center;margin-bottom:6px;letter-spacing:0.5px;font-family:monospace;"></div>
-        <div id="token-badge">🪙 <span id="token-count">0</span> Tokens</div>
+        <div id="token-badge"><span id="token-count">0</span> Tokens</div>
         <div id="user-chip">
-          <div id="user-avatar">👤</div>
+          <div id="user-avatar"></div>
           <div>
             <div id="user-name">Loading…</div>
             <div id="user-sub">App account</div>
@@ -401,7 +401,7 @@
         <div id="hero-content">
           <h2>Ready to Play</h2>
           <p>Join any Minecraft Java Edition server</p>
-          <div id="mc-username-badge" style="display:none">🎮 Logged in as <span id="mc-ign"></span></div>
+          <div id="mc-username-badge" style="display:none">Logged in as <span id="mc-ign"></span></div>
         </div>
       </div>
 
@@ -442,7 +442,7 @@
         </div>
         <div class="control-card" style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;">
           <div>
-            <div style="font-size:13px;font-weight:600;color:#a371f7;">🧵 Fabric Loader</div>
+            <div style="font-size:13px;font-weight:600;color:#a371f7;">Fabric Loader</div>
             <div style="font-size:11px;color:#484f58;margin-top:2px;">Auto-installs Fabric for the selected version — required for mods</div>
             <div id="fabric-status" style="font-size:11px;color:#484f58;margin-top:2px;"></div>
             <div id="mods-badge" style="display:none;font-size:10px;margin-top:5px;padding:2px 8px;border-radius:10px;border:1px solid rgba(63,185,80,0.3);background:rgba(63,185,80,0.1);color:#3fb950;font-weight:600;letter-spacing:0.3px;width:fit-content;"></div>
@@ -459,14 +459,13 @@
         </div>
         <div class="section-label" style="grid-column:1/-1">Microsoft Account</div>
         <div style="grid-column:1/-1">
-          <button id="mc-auth-btn">🔐 &nbsp;Login with Microsoft to Play</button>
+          <button id="mc-auth-btn">Login with Microsoft to Play</button>
         </div>
       </div>
 
       <!-- Offline banner — shown when offline mode is active -->
       <div id="offline-banner" style="display:none;padding:0 32px 10px;">
         <div style="background:rgba(210,153,34,0.12);border:1px solid rgba(210,153,34,0.4);border-radius:7px;padding:8px 14px;font-size:12px;color:#d29922;display:flex;align-items:center;gap:8px;">
-          <span style="font-size:14px;">⚠️</span>
           <span><strong>Offline Mode is active</strong> — you won't be able to join online servers</span>
           <button onclick="document.getElementById('offline-toggle').click()" style="margin-left:auto;background:none;border:1px solid rgba(210,153,34,0.5);border-radius:5px;color:#d29922;font-size:11px;padding:2px 8px;cursor:pointer;">Disable</button>
         </div>
@@ -490,14 +489,14 @@
     <!-- Bedrock panel -->
     <div id="bedrock-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
       <div style="padding:24px 32px 20px;border-bottom:1px solid #21262d;background:linear-gradient(135deg,#1a1228,#0d1117);">
-        <h2 style="font-size:20px;font-weight:700;">🪨 Minecraft Bedrock Edition</h2>
+        <h2 style="font-size:20px;font-weight:700;">Minecraft Bedrock Edition</h2>
         <p style="font-size:12px;color:#8b949e;margin-top:4px;">Windows 10/11 Edition — cross-play with console, mobile &amp; more</p>
       </div>
       <div style="flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:20px;">
 
         <!-- Status card -->
         <div class="control-card" style="display:flex;align-items:center;gap:16px;">
-          <div style="font-size:32px;" id="bedrock-icon">🔍</div>
+          <div style="font-size:32px;" id="bedrock-icon"></div>
           <div style="flex:1;">
             <div style="font-size:14px;font-weight:600;" id="bedrock-status-text">Checking installation…</div>
             <div style="font-size:12px;color:#8b949e;margin-top:3px;" id="bedrock-status-sub">Looking for Minecraft for Windows in your system</div>
@@ -506,7 +505,7 @@
 
         <!-- Launch / Get button -->
         <button id="bedrock-launch-btn" style="width:100%;padding:16px;font-size:17px;font-weight:700;letter-spacing:1px;background:linear-gradient(135deg,#6e40c9,#8957e5);border:1px solid #a371f7;border-radius:10px;color:#fff;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:10px;">
-          🪨 &nbsp;Launch Bedrock Edition
+          Launch Bedrock Edition
         </button>
 
         <!-- Info cards -->
@@ -535,7 +534,6 @@
 
         <!-- Chromebook -->
         <div class="control-card" style="display:flex;align-items:center;gap:16px;border-color:rgba(121,192,255,0.35);background:rgba(121,192,255,0.04);">
-          <div style="font-size:32px;">💻</div>
           <div style="flex:1;">
             <div style="font-size:14px;font-weight:600;color:#79c0ff;">Play on Chromebook</div>
             <div style="font-size:12px;color:#8b949e;margin-top:3px;">Enable Linux on your Chromebook (Settings → Developers → Linux), download the Linux build of Voxel Client, or play Bedrock for free via the Google Play Store.</div>
@@ -555,7 +553,6 @@
           <!-- External site buttons -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <a href="https://mcpedl.com" target="_blank" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:#161b22;border:1px solid #21262d;border-radius:10px;text-decoration:none;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#30363d'" onmouseout="this.style.borderColor='#21262d'">
-              <span style="font-size:24px;">🌐</span>
               <div>
                 <div style="font-size:13px;font-weight:600;color:#e6edf3;">MCPEDL</div>
                 <div style="font-size:11px;color:#8b949e;margin-top:2px;">Largest Bedrock addon library</div>
@@ -563,7 +560,6 @@
               <span style="margin-left:auto;font-size:11px;color:#484f58;">↗</span>
             </a>
             <a href="https://www.curseforge.com/minecraft-bedrock" target="_blank" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:#161b22;border:1px solid #21262d;border-radius:10px;text-decoration:none;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#30363d'" onmouseout="this.style.borderColor='#21262d'">
-              <span style="font-size:24px;">🔥</span>
               <div>
                 <div style="font-size:13px;font-weight:600;color:#e6edf3;">CurseForge</div>
                 <div style="font-size:11px;color:#8b949e;margin-top:2px;">Addons, maps &amp; texture packs</div>
@@ -573,7 +569,7 @@
           </div>
 
           <!-- Live Modrinth search -->
-          <input id="bedrock-addon-search" type="text" placeholder="🔍  Search resource packs &amp; shaders on Modrinth…"
+          <input id="bedrock-addon-search" type="text" placeholder="Search resource packs &amp; shaders on Modrinth…"
             style="width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;"
             onfocus="this.style.borderColor='#a371f7'" onblur="this.style.borderColor='#30363d'" />
 
@@ -590,17 +586,17 @@
     <!-- Mods panel -->
     <div id="mods-panel">
       <div id="mods-hero">
-        <h2>🧩 Java Mods</h2>
+        <h2>Java Mods</h2>
         <p style="color:#8b949e;font-size:12px;margin-top:4px">Search Modrinth — mods &amp; modpacks</p>
         <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
-          <span id="mods-label-mods"  style="font-size:13px;font-weight:700;color:#3fb950;transition:color 0.15s,font-weight 0.15s;cursor:pointer;">🧩 Mods</span>
+          <span id="mods-label-mods"  style="font-size:13px;font-weight:700;color:#3fb950;transition:color 0.15s,font-weight 0.15s;cursor:pointer;">Mods</span>
           <label class="toggle" style="cursor:pointer;">
             <input type="checkbox" id="mods-type-switch"/>
             <span class="toggle-slider"></span>
           </label>
-          <span id="mods-label-packs" style="font-size:13px;font-weight:400;color:#484f58;transition:color 0.15s;cursor:pointer;">📦 Modpacks</span>
+          <span id="mods-label-packs" style="font-size:13px;font-weight:400;color:#484f58;transition:color 0.15s;cursor:pointer;">Modpacks</span>
         </div>
-        <input id="mods-search" type="text" placeholder="🔍  Search mods…"
+        <input id="mods-search" type="text" placeholder="Search mods…"
           style="margin-top:12px;width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;"
           onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
       </div>
@@ -617,18 +613,16 @@
     <div id="pvp-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
       <div style="padding:22px 28px 18px;border-bottom:1px solid rgba(33,38,45,0.5);background:rgba(8,12,20,0.6);backdrop-filter:blur(8px);flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-          <div style="font-size:28px;">⚔️</div>
           <div>
             <h2 style="font-size:18px;font-weight:700;color:#e6edf3;">PvP Mods</h2>
             <p style="color:#6e7681;font-size:12px;margin-top:2px;">Curated like Lunar Client — install Fabric API first, then pick your mods</p>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.2);border-radius:8px;padding:8px 12px;margin-bottom:10px;">
-          <span style="font-size:13px;">⚠️</span>
           <span style="font-size:11px;color:#d29922;">Enable <strong>Fabric Loader</strong> on the Play tab before launching — mods need it to run</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
-          <input id="pvp-search" type="text" placeholder="🔍  Search mods..." style="flex:1;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:8px 14px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;" />
+          <input id="pvp-search" type="text" placeholder="Search mods..." style="flex:1;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:8px 14px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;" />
           <button id="pvp-reinstall-btn" style="display:none;align-items:center;gap:6px;padding:8px 14px;background:rgba(210,153,34,0.12);border:1px solid rgba(210,153,34,0.4);border-radius:8px;color:#d29922;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;"></button>
         </div>
       </div>
@@ -641,13 +635,12 @@
     <div id="resourcepacks-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
       <div style="padding:22px 28px 18px;border-bottom:1px solid rgba(33,38,45,0.5);background:rgba(8,12,20,0.6);backdrop-filter:blur(8px);flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <div style="font-size:28px;">🎨</div>
           <div>
             <h2 style="font-size:18px;font-weight:700;color:#e6edf3;">Resource Packs</h2>
             <p style="color:#6e7681;font-size:12px;margin-top:2px;">Search Modrinth for textures &amp; themes — installed packs load automatically</p>
           </div>
         </div>
-        <input id="rp-search" type="text" placeholder="🔍  Search resource packs..." style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:8px 14px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;" />
+        <input id="rp-search" type="text" placeholder="Search resource packs..." style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:8px 14px;color:#e6edf3;font-size:13px;font-family:inherit;outline:none;" />
       </div>
       <div style="flex:1;overflow-y:auto;padding:16px 28px;display:flex;flex-direction:column;gap:12px;">
         <div id="rp-installed" style="display:flex;flex-direction:column;gap:8px;"></div>
@@ -660,7 +653,6 @@
     <div id="skins-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
       <div style="padding:22px 28px 18px;border-bottom:1px solid rgba(33,38,45,0.5);background:rgba(8,12,20,0.6);backdrop-filter:blur(8px);flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <div style="font-size:28px;">🧢</div>
           <div>
             <h2 style="font-size:18px;font-weight:700;color:#e6edf3;">Skins</h2>
             <p style="color:#6e7681;font-size:12px;margin-top:2px;">Preview your skin and upload a new one — requires Microsoft login</p>
@@ -696,13 +688,12 @@
     <div id="screenshots-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
       <div style="padding:22px 28px 18px;border-bottom:1px solid rgba(33,38,45,0.5);background:rgba(8,12,20,0.6);backdrop-filter:blur(8px);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <div style="font-size:28px;">📸</div>
           <div>
             <h2 style="font-size:18px;font-weight:700;color:#e6edf3;">Screenshots</h2>
             <p style="color:#6e7681;font-size:12px;margin-top:2px;">Click any screenshot to open it — taken with F2 in-game</p>
           </div>
         </div>
-        <button id="screenshots-open-folder" style="background:#21262d;border:1px solid #30363d;color:#8b949e;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;">📂 Open folder</button>
+        <button id="screenshots-open-folder" style="background:#21262d;border:1px solid #30363d;color:#8b949e;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;">Open folder</button>
       </div>
       <div id="screenshots-list" style="flex:1;overflow-y:auto;padding:16px 28px;display:flex;flex-direction:column;gap:8px;">
         <!-- Populated by game.ts -->
@@ -713,7 +704,6 @@
     <div id="accounts-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
       <div style="padding:22px 28px 18px;border-bottom:1px solid rgba(33,38,45,0.5);background:rgba(8,12,20,0.6);backdrop-filter:blur(8px);flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <div style="font-size:28px;">👤</div>
           <div>
             <h2 style="font-size:18px;font-weight:700;color:#e6edf3;">Accounts</h2>
             <p style="color:#6e7681;font-size:12px;margin-top:2px;">Save offline usernames — click one to switch the active account</p>
@@ -729,7 +719,7 @@
         <div id="accounts-list" style="display:flex;flex-direction:column;gap:8px;"></div>
         <div style="background:rgba(33,38,45,0.3);border:1px solid #21262d;border-radius:10px;padding:14px 18px;">
           <div style="color:#8b949e;font-size:12px;line-height:1.6;">
-            💡 <strong style="color:#e6edf3;">Online accounts</strong> use Microsoft login from the Play tab.<br>
+            <strong style="color:#e6edf3;">Online accounts</strong> use Microsoft login from the Play tab.<br>
             These saved accounts are <strong style="color:#e6edf3;">offline profiles</strong> — great for LAN servers and offline play.
           </div>
         </div>
@@ -739,19 +729,19 @@
     <!-- Bedrock Mods panel -->
     <div id="bedrock-mods-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
       <div id="bedrock-mods-hero" style="padding:24px 32px 20px;border-bottom:1px solid #21262d;background:linear-gradient(135deg,#1a1228,#0d1117);">
-        <h2 style="font-size:20px;font-weight:700;">📦 Bedrock Mods</h2>
+        <h2 style="font-size:20px;font-weight:700;">Bedrock Mods</h2>
         <p style="color:#8b949e;font-size:12px;margin-top:4px;">Resource packs &amp; shaders from Modrinth — plus browse MCPEDL &amp; CurseForge</p>
         <div style="display:flex;gap:8px;margin-top:14px;">
           <a href="https://mcpedl.com" target="_blank"
             style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(121,192,255,0.08);border:1px solid rgba(121,192,255,0.25);border-radius:7px;color:#79c0ff;font-size:12px;text-decoration:none;white-space:nowrap;">
-            🌐 MCPEDL ↗
+            MCPEDL ↗
           </a>
           <a href="https://www.curseforge.com/minecraft-bedrock" target="_blank"
             style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(255,120,50,0.08);border:1px solid rgba(255,120,50,0.25);border-radius:7px;color:#f0883e;font-size:12px;text-decoration:none;white-space:nowrap;">
-            🔥 CurseForge ↗
+            CurseForge ↗
           </a>
         </div>
-        <input id="bedrock-mods-search" type="text" placeholder="🔍  Search resource packs &amp; shaders…"
+        <input id="bedrock-mods-search" type="text" placeholder="Search resource packs &amp; shaders…"
           style="margin-top:14px;width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;"
           onfocus="this.style.borderColor='#a371f7'" onblur="this.style.borderColor='#30363d'" />
       </div>
@@ -780,7 +770,7 @@
             <input type="checkbox" id="srv-snapshots-toggle" style="accent-color:#63d2b6;" />
             <span style="font-size:12px;color:#a0aab4;">Snapshots</span>
           </label>
-          <button id="srv-preset-btn" title="Load defaults" style="padding:9px 14px;background:rgba(246,195,86,0.1);border:1px solid rgba(246,195,86,0.3);border-radius:8px;color:#f6c356;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'Roboto',sans-serif;">⚡ Defaults</button>
+          <button id="srv-preset-btn" title="Load defaults" style="padding:9px 14px;background:rgba(246,195,86,0.1);border:1px solid rgba(246,195,86,0.3);border-radius:8px;color:#f6c356;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'Roboto',sans-serif;">Defaults</button>
         </div>
 
         <!-- Row 2: RAM + start/stop -->
@@ -847,17 +837,16 @@
 
     <!-- Files panel -->
     <div id="files-panel" style="display:none;flex-direction:column;flex:1;overflow-y:auto;padding:24px 28px;gap:24px;">
-      <div style="font-size:18px;font-weight:700;color:#e6edf3;">📁 File Manager</div>
+      <div style="font-size:18px;font-weight:700;color:#e6edf3;">File Manager</div>
       <div style="font-size:12px;color:#6e7681;margin-top:-16px;">Drop files directly or browse your Minecraft folders</div>
 
       <!-- Worlds drop zone -->
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:13px;font-weight:700;color:#58a6ff;letter-spacing:0.5px;">🌍 Worlds</div>
-          <button id="files-open-saves" style="background:rgba(33,38,45,0.6);border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:11px;padding:4px 12px;cursor:pointer;">📂 Open Saves Folder</button>
+          <div style="font-size:13px;font-weight:700;color:#58a6ff;letter-spacing:0.5px;">Worlds</div>
+          <button id="files-open-saves" style="background:rgba(33,38,45,0.6);border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:11px;padding:4px 12px;cursor:pointer;">Open Saves Folder</button>
         </div>
         <div id="worlds-dropzone" style="border:2px dashed #30363d;border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:all 0.2s;background:rgba(13,17,23,0.5);">
-          <div style="font-size:28px;margin-bottom:6px;">🗺️</div>
           <div style="font-size:13px;color:#8b949e;margin-bottom:4px;">Drop a world folder or <strong>.zip</strong> here</div>
           <div style="font-size:11px;color:#484f58;">Copied to .minecraft/saves automatically</div>
         </div>
@@ -867,11 +856,10 @@
       <!-- Schematics drop zone -->
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:13px;font-weight:700;color:#a371f7;letter-spacing:0.5px;">📐 Schematics</div>
-          <button id="files-open-schematics" style="background:rgba(33,38,45,0.6);border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:11px;padding:4px 12px;cursor:pointer;">📂 Open Schematics Folder</button>
+          <div style="font-size:13px;font-weight:700;color:#a371f7;letter-spacing:0.5px;">Schematics</div>
+          <button id="files-open-schematics" style="background:rgba(33,38,45,0.6);border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:11px;padding:4px 12px;cursor:pointer;">Open Schematics Folder</button>
         </div>
         <div id="schematics-dropzone" style="border:2px dashed #30363d;border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:all 0.2s;background:rgba(13,17,23,0.5);">
-          <div style="font-size:28px;margin-bottom:6px;">📐</div>
           <div style="font-size:13px;color:#8b949e;margin-bottom:4px;">Drop <strong>.schematic</strong>, <strong>.litematic</strong>, or <strong>.schem</strong> files here</div>
           <div style="font-size:11px;color:#484f58;">Copied to .minecraft/schematics automatically</div>
         </div>
@@ -880,12 +868,12 @@
 
       <!-- Quick folder links -->
       <div>
-        <div style="font-size:13px;font-weight:700;color:#3fb950;letter-spacing:0.5px;margin-bottom:10px;">⚡ Quick Open</div>
+        <div style="font-size:13px;font-weight:700;color:#3fb950;letter-spacing:0.5px;margin-bottom:10px;">Quick Open</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;">
-          <button class="files-folder-btn" data-folder="root">🗂️ .minecraft</button>
-          <button class="files-folder-btn" data-folder="mods">🧩 Mods</button>
-          <button class="files-folder-btn" data-folder="resourcepacks">🎨 Resource Packs</button>
-          <button class="files-folder-btn" data-folder="screenshots">📸 Screenshots</button>
+          <button class="files-folder-btn" data-folder="root">.minecraft</button>
+          <button class="files-folder-btn" data-folder="mods">Mods</button>
+          <button class="files-folder-btn" data-folder="resourcepacks">Resource Packs</button>
+          <button class="files-folder-btn" data-folder="screenshots">Screenshots</button>
         </div>
       </div>
     </div>
@@ -893,7 +881,7 @@
     <!-- Cosmetics panel -->
     <div id="cosmetics-panel">
       <div id="cosmetics-hero">
-        <h2>🧣 Cosmetics</h2>
+        <h2>Cosmetics</h2>
         <p>Custom capes visible to all other Voxel Client players in-game</p>
       </div>
       <div id="cosmetics-body">
@@ -910,7 +898,6 @@
 
         <!-- Token balance + daily claim -->
         <div class="control-card" style="display:flex;align-items:center;gap:16px;">
-          <div style="font-size:24px;">🪙</div>
           <div style="flex:1;">
             <div style="font-size:14px;font-weight:600;color:#d29922;">Balance: <span id="token-balance-display">0</span> Tokens</div>
             <div style="font-size:11px;color:#484f58;margin-top:2px;">Earn 50 tokens daily — redeem for exclusive capes</div>
@@ -928,12 +915,12 @@
 
         <!-- Fabric mod install card (optional) -->
         <div id="mod-install-card">
-          <div style="font-size:13px;font-weight:600;color:#a371f7;margin-bottom:6px;">🔌 Optional: In-Game Cape Rendering</div>
+          <div style="font-size:13px;font-weight:600;color:#a371f7;margin-bottom:6px;">Optional: In-Game Cape Rendering</div>
           <div style="font-size:12px;color:#8b949e;line-height:1.6;margin-bottom:10px;">
             Your cape is already saved above — no mod needed. Install this only if you want to see capes <em>inside Minecraft</em> on Fabric. Requires <a href="https://fabricmc.net/use/installer/" target="_blank" style="color:#a371f7;">Fabric Loader</a>.
           </div>
           <button id="mod-install-btn" style="padding:8px 18px;background:rgba(163,113,247,0.15);border:1px solid rgba(163,113,247,0.4);border-radius:7px;color:#a371f7;font-size:12px;font-weight:600;cursor:pointer;">
-            ⬇ Install Cosmetics Mod (optional)
+            Install Cosmetics Mod (optional)
           </button>
           <span id="mod-install-status" style="margin-left:10px;font-size:12px;color:#8b949e;"></span>
         </div>
@@ -944,7 +931,7 @@
     <!-- Friends panel -->
     <div id="friends-panel">
       <div style="padding:24px 32px 20px;border-bottom:1px solid rgba(33,38,45,0.5);background:rgba(8,12,20,0.45);backdrop-filter:blur(4px);">
-        <h2 style="font-size:20px;font-weight:700;">👥 Friends</h2>
+        <h2 style="font-size:20px;font-weight:700;">Friends</h2>
         <p style="font-size:12px;color:#8b949e;margin-top:4px;">Add friends by Minecraft username — see when they're online and copy their server IP</p>
         <div style="display:flex;gap:8px;margin-top:14px;">
           <input id="friend-add-input" type="text" placeholder="Minecraft username…" maxlength="16"
@@ -976,7 +963,7 @@
     <!-- Customize panel -->
     <div id="customize-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
       <div style="padding:24px 32px 20px;border-bottom:1px solid #21262d;background:linear-gradient(135deg,#0d1b12,#0a1628);">
-        <h2 style="font-size:20px;font-weight:700;">🎨 Customize</h2>
+        <h2 style="font-size:20px;font-weight:700;">Customize</h2>
         <p style="font-size:12px;color:#8b949e;margin-top:4px;">Change your skin, cape and texture packs</p>
       </div>
       <div style="flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:24px;">
@@ -985,7 +972,6 @@
         <div>
           <div class="section-label" style="margin-top:0">In-Game Background</div>
           <div class="control-card" style="display:flex;align-items:center;gap:16px;">
-            <div style="font-size:28px;">🖼️</div>
             <div style="flex:1;">
               <div style="font-size:14px;font-weight:600;color:#e6edf3;">Voxel Client Panorama</div>
               <div style="font-size:12px;color:#8b949e;margin-top:3px;">Replaces the Minecraft main menu background — then enable "VoxelClient" in Options › Resource Packs</div>
@@ -1009,7 +995,7 @@
               <div class="control-card">
                 <label>Upload Skin (PNG)</label>
                 <div style="display:flex;gap:8px;margin-top:8px;">
-                  <button id="skin-pick-btn" style="flex:1;padding:9px;background:#21262d;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-size:13px;cursor:pointer;">📁 Choose File</button>
+                  <button id="skin-pick-btn" style="flex:1;padding:9px;background:#21262d;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-size:13px;cursor:pointer;">Choose File</button>
                   <button id="skin-apply-btn" disabled style="flex:1;padding:9px;background:linear-gradient(135deg,#238636,#2ea043);border:1px solid #3fb950;border-radius:7px;color:#fff;font-size:13px;cursor:pointer;opacity:0.4;">✓ Apply Skin</button>
                 </div>
                 <div id="skin-status" style="font-size:11px;color:#484f58;margin-top:6px;"></div>
@@ -1029,7 +1015,7 @@
         <div>
           <div class="section-label">Cape</div>
           <div class="control-card" style="display:flex;align-items:center;gap:16px;">
-            <div id="cape-preview" style="width:32px;height:48px;background:#21262d;border-radius:4px;border:1px solid #30363d;display:flex;align-items:center;justify-content:center;font-size:20px;">🦸</div>
+            <div id="cape-preview" style="width:32px;height:48px;background:#21262d;border-radius:4px;border:1px solid #30363d;"></div>
             <div style="flex:1;">
               <div style="font-size:14px;font-weight:600;" id="cape-name">No cape equipped</div>
               <div style="font-size:12px;color:#8b949e;margin-top:3px;">Capes are earned in-game or via Minecraft Java Edition purchases</div>
@@ -1040,7 +1026,7 @@
         <!-- Texture packs -->
         <div style="flex:1;display:flex;flex-direction:column;">
           <div class="section-label">Texture Packs</div>
-          <input id="tp-search" type="text" placeholder="🔍  Search texture packs on Modrinth…"
+          <input id="tp-search" type="text" placeholder="Search texture packs on Modrinth…"
             style="width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;margin-bottom:12px;"
             onfocus="this.style.borderColor='#3fb950'" onblur="this.style.borderColor='#30363d'" />
           <div id="tp-loading" style="display:none;align-items:center;gap:10px;padding:16px;color:#484f58;font-size:13px;">
@@ -1056,7 +1042,7 @@
     <!-- Settings panel -->
     <div id="settings-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
       <div style="padding:24px 32px 20px;border-bottom:1px solid #21262d;background:linear-gradient(135deg,#0d1b12,#0a1628)">
-        <h2 style="font-size:20px;font-weight:700;">⚙️ Settings</h2>
+        <h2 style="font-size:20px;font-weight:700;">Settings</h2>
         <p style="font-size:12px;color:#8b949e;margin-top:4px;">Launcher settings and updates</p>
       </div>
       <div style="padding:24px 32px;flex:1;overflow-y:auto;">
@@ -1099,7 +1085,7 @@
     <div id="log-header">
       <span>Console Output</span>
       <div style="display:flex;align-items:center;gap:10px;">
-        <button id="log-copy" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;font-size:10px;cursor:pointer;padding:2px 8px;border-radius:4px;">📋 Copy</button>
+        <button id="log-copy" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;font-size:10px;cursor:pointer;padding:2px 8px;border-radius:4px;">Copy</button>
         <button id="log-close" title="Close (Esc)">✕</button>
       </div>
     </div>
