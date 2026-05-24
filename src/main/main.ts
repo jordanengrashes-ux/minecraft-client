@@ -1069,7 +1069,10 @@ function setupAutoUpdater() {
   autoUpdater.on('update-available',   info => gameWin?.webContents.send('update-available',  info.version));
   autoUpdater.on('download-progress',     p => gameWin?.webContents.send('update-progress',   Math.round(p.percent)));
   autoUpdater.on('update-downloaded',     () => gameWin?.webContents.send('update-downloaded'));
-  autoUpdater.on('error',               () => {});
+  autoUpdater.on('error', err => {
+    console.error('[updater] error:', err?.message);
+    gameWin?.webContents.send('update-error', err?.message ?? 'Unknown error');
+  });
 
   autoUpdater.checkForUpdates().catch(() => {});
 }

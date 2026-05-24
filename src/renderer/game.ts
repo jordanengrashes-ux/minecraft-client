@@ -2479,6 +2479,13 @@ if (updater) {
     enableRestartButtons();
   });
 
+  updater.onError?.((msg: string) => {
+    progressWrap2.style.display = 'none';
+    updateText.textContent = `Update error: ${msg}`;
+    if (checkBtn) { checkBtn.textContent = 'Retry'; checkBtn.disabled = false; }
+    if (updateSub) updateSub.textContent = `Update failed: ${msg}`;
+  });
+
   installBtn.addEventListener('click', () => updater.install());
   checkBtn?.addEventListener('click', () => updater.check());
 }
