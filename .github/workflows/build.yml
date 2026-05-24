@@ -55,6 +55,7 @@ jobs:
             ~/.cache/electron
             ~/.cache/electron-builder
           key: ${{ runner.os }}-electron-30
+      - run: sudo apt-get install -y fakeroot dpkg rpm build-essential
       - run: mkdir -p resources/java21 resources/mods
       - run: npm ci
       - run: npm run build && npx electron-builder --linux --publish never
