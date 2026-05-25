@@ -21,9 +21,10 @@ contextBridge.exposeInMainWorld('updater', {
 });
 
 contextBridge.exposeInMainWorld('server', {
-  start:    (opts: any)    => ipcRenderer.invoke('server-start',   opts),
-  stop:     ()             => ipcRenderer.invoke('server-stop'),
-  command:  (cmd: string)  => ipcRenderer.invoke('server-command', cmd),
+  start:      (opts: any)    => ipcRenderer.invoke('server-start',       opts),
+  stop:       ()             => ipcRenderer.invoke('server-stop'),
+  command:    (cmd: string)  => ipcRenderer.invoke('server-command',     cmd),
+  openFolder: (ver: string)  => ipcRenderer.invoke('server-open-folder', ver),
   onLog:    (cb: (l: string) => void)  => ipcRenderer.on('server-log',    (_e, l) => cb(l)),
   onClosed: (cb: (c: number) => void)  => ipcRenderer.on('server-closed', (_e, c) => cb(c)),
 });

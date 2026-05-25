@@ -797,6 +797,13 @@ ipcMain.handle('server-command', async (_e, cmd: string) => {
   return { ok: true };
 });
 
+ipcMain.handle('server-open-folder', async (_e, version: string) => {
+  const dir = path.join(app.getPath('userData'), 'mc-server', version || 'default');
+  fs.mkdirSync(dir, { recursive: true });
+  shell.openPath(dir);
+  return { ok: true };
+});
+
 // ── IPC: mod install / remove ─────────────────────────────────────────────────
 ipcMain.handle('mc-install-mod', async (_e, opts: { url: string; filename: string }) => {
   try {

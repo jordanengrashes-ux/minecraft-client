@@ -13,16 +13,16 @@ import { rtdb } from './firebase';
 
   // Slowly drifting color blobs: [cx, cy, vx, vy, radius-fraction, r, g, b]
   const blobs: [number, number, number, number, number, number, number, number][] = [
-    [0.15, 0.20, 0.00022, 0.00014, 0.72,  68, 10, 130],  // deep purple
-    [0.82, 0.65, -0.00017, -0.00021, 0.60, 10, 40, 100],  // deep blue
-    [0.45, 0.88, 0.00019, -0.00013, 0.55,  10, 50, 32],   // deep green
-    [0.25, 0.70, -0.00013, 0.00017, 0.45,  40, 10, 90],   // violet
-    [0.70, 0.20, 0.00015, 0.00020, 0.50,   8, 55, 80],    // teal
+    [0.15, 0.20, 0.00022, 0.00014, 0.72, 120, 60,  0],  // deep orange
+    [0.82, 0.65, -0.00017, -0.00021, 0.60, 90, 40, 0],  // burnt orange
+    [0.45, 0.88, 0.00019, -0.00013, 0.55,  60, 25, 0],  // dark amber
+    [0.25, 0.70, -0.00013, 0.00017, 0.45, 100, 50,  0],  // orange
+    [0.70, 0.20, 0.00015, 0.00020, 0.50,   80, 35, 0],  // amber
   ];
 
   function bgAnimate() {
     const w = bgCanvas.width, h = bgCanvas.height;
-    bgCtx.fillStyle = '#080c14';
+    bgCtx.fillStyle = '#0a0a0a';
     bgCtx.fillRect(0, 0, w, h);
     for (const b of blobs) {
       b[0] += b[2]; b[1] += b[3];
@@ -2103,6 +2103,8 @@ function renderSavedServers() {
       srv247Toggle.checked = srv.publish;
       const sel = document.getElementById('srv-version') as HTMLSelectElement;
       if (Array.from(sel.options).find(o => o.value === srv.version)) sel.value = srv.version;
+      // Auto-start unless already running
+      if (!srvRunning) srvStartBtn.click();
     });
     card.querySelector('.srv-del-btn')!.addEventListener('click', async () => {
       const updated = loadSavedServers().filter(s => s.id !== srv.id);
@@ -2187,10 +2189,25 @@ function srvAddLog(text: string) {
   // Remove placeholder
   const placeholder = srvLog.querySelector('div[style*="30363d"]');
   if (placeholder) placeholder.remove();
+  document.getElementById('srv-log-placeholder')?.remove();
   srvLog.scrollTop = srvLog.scrollHeight;
 }
 
 srvLogCopy?.addEventListener('click', () => copyToClipboard(srvLogLines.join('\n'), srvLogCopy));
+
+// Copy address button
+document.getElementById('srv-copy-addr-btn')?.addEventListener('click', () => {
+  const addr = srvAddress.textContent || 'localhost:25565';
+  (window as any).electron?.copyText(addr);
+  const btn = document.getElementById('srv-copy-addr-btn') as HTMLButtonElement;
+  if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); }
+});
+
+// Open server files folder
+document.getElementById('srv-open-folder-btn')?.addEventListener('click', () => {
+  const ver = (document.getElementById('srv-version') as HTMLSelectElement)?.value || 'default';
+  (server as any)?.openFolder?.(ver);
+});
 
 // Send command to server
 srvCmdBtn?.addEventListener('click', () => {
@@ -2369,8 +2386,6 @@ srvStartBtn?.addEventListener('click', async () => {
   srvStopBtn.style.display = 'inline-flex';
   srvStopBtn.disabled = false;
   srvStartBtn.style.display = 'none';
-  srvStartBtn.style.background = 'linear-gradient(135deg,#8b1a1a,#da3633)';
-  srvStartBtn.style.borderColor = '#f85149';
   srvStartBtn.textContent = 'Starting…';
   srvLog.innerHTML = '';
   srvLogLines = [];
@@ -2384,8 +2399,8 @@ srvStartBtn?.addEventListener('click', async () => {
     srvRunning = false;
     srvStopBtn.style.display = 'none';
     srvStartBtn.style.display = 'inline-flex';
-    srvStartBtn.style.background = 'linear-gradient(135deg,#3ab89a,#63d2b6)';
-    srvStartBtn.style.color = '#0f1318';
+    srvStartBtn.style.background = '#f5a623';
+    srvStartBtn.style.color = '#0d1117';
     srvStartBtn.textContent = '▶ Start Server';
     srvStartBtn.disabled = false;
     return;
@@ -2407,17 +2422,22 @@ srvStopBtn?.addEventListener('click', async () => {
 // Handle server log events
 if (server) {
   server.onLog((line: string) => srvAddLog(line));
-  server.onClosed((_code: number) => {
+  server.onClosed((code: number) => {
     srvRunning = false;
     srvInfo.style.display = 'none';
     srvStopBtn.style.display = 'none';
     srvStopBtn.textContent = '⏹ Stop Server';
     srvStartBtn.style.display = 'inline-flex';
-    srvStartBtn.style.background = 'linear-gradient(135deg,#3ab89a,#63d2b6)';
-    srvStartBtn.style.color = '#0f1318';
+    srvStartBtn.style.background = '#f5a623';
+    srvStartBtn.style.color = '#0d1117';
     srvStartBtn.textContent = '▶ Start Server';
     srvStartBtn.disabled = false;
-    srvAddLog('[Host] Server stopped.');
+    if (code !== 0 && code != null) {
+      srvAddLog(`[Host] Server crashed (exit code ${code}) — scroll up for errors`);
+      if (code === 1) srvAddLog('[Host] Tip: may be OOM — increase RAM allocation above');
+    } else {
+      srvAddLog('[Host] Server stopped.');
+    }
     unpublishServer();
   });
 }
@@ -2584,3 +2604,4 @@ function initFiles() {
 
   refreshFileLists();
 }
+
