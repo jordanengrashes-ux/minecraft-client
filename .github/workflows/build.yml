@@ -103,8 +103,8 @@ jobs:
           if-no-files-found: warn
 
   publish:
-    needs: [build-windows, build-linux]
-    if: needs.build-windows.result == 'success' && needs.build-linux.result == 'success'
+    needs: [build-windows, build-linux, build-mac]
+    if: always() && needs.build-windows.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +112,7 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+        continue-on-error: true
       - name: Publish GitHub release
         run: |
           version=$(node -p "require('./package.json').version")
