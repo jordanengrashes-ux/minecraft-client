@@ -7,7 +7,6 @@
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0d0d0d; color:#ffffff; font-family: 'Roboto', sans-serif; width: 100vw; height: 100vh; overflow: hidden; }
-    #bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
     #sidebar, #titlebar, #hero, #play-row, #status-bar,
     #mods-hero, #bedrock-mods-hero, .nav-item, .tbtn,
     button, select, label { user-select: none; -webkit-user-select: none; }
@@ -29,7 +28,7 @@
     #launcher { display: flex; height: 100vh; padding-top: 30px; position: relative; z-index: 1; }
 
     /* Sidebar */
-    #sidebar { width: 195px; min-width: 195px; background: rgba(8,8,8,0.88); border-right: 1px solid #1e1e1e; display: flex; flex-direction: column; }
+    #sidebar { width: 195px; min-width: 195px; background: #080808; border-right: 1px solid #1e1e1e; display: flex; flex-direction: column; }
     #sidebar-logo { padding: 16px 14px 13px; border-bottom: 1px solid #1e1e1e; }
     #sidebar-logo h1 { font-size: 20px; font-weight: 800; color:#ffffff; letter-spacing: 0; line-height: 1; }
     #sidebar-logo p { font-size: 9px; color: #444444; margin-top: 3px; text-transform: uppercase; letter-spacing: 1px; }
@@ -51,7 +50,7 @@
     #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
     /* Hero */
-    #hero { height: 130px; position: relative; overflow: hidden; border-bottom: 1px solid #1e1e1e; background: rgba(17,17,17,0.72); }
+    #hero { height: 130px; position: relative; overflow: hidden; border-bottom: 1px solid #1e1e1e; background: #111111; }
     #hero-bg { position: absolute; inset: 0;  }
     #hero-content { position: relative; padding: 22px 26px; }
     #hero-content h2 { font-size: 21px; font-weight: 800; color:#ffffff; letter-spacing: -0.3px; }
@@ -223,7 +222,6 @@
   </style>
 </head>
 <body>
-  <canvas id="bg-canvas"></canvas>
   <!-- Update banner -->
   <div id="update-banner" style="display:none;position:fixed;top:32px;left:0;right:0;z-index:200;background:#1a1a1a;border-bottom:1px solid #f5a623;padding:7px 16px;font-size:12px;display:none;align-items:center;gap:10px;">
     <span id="update-text" style="flex:1;color:#ffffff;"></span>

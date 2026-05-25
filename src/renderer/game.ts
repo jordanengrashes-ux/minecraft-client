@@ -3,42 +3,6 @@
 import { ref, set, onValue, serverTimestamp, onDisconnect, update, get, increment } from 'firebase/database';
 import { rtdb } from './firebase';
 
-// ── Animated gradient background ──────────────────────────────────────────────
-{
-  const bgCanvas = document.getElementById('bg-canvas') as HTMLCanvasElement;
-  const bgCtx = bgCanvas.getContext('2d')!;
-  const resize = () => { bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; };
-  resize();
-  window.addEventListener('resize', resize);
-
-  // Slowly drifting color blobs: [cx, cy, vx, vy, radius-fraction, r, g, b]
-  const blobs: [number, number, number, number, number, number, number, number][] = [
-    [0.15, 0.20, 0.00022, 0.00014, 0.72, 120, 60,  0],  // deep orange
-    [0.82, 0.65, -0.00017, -0.00021, 0.60, 90, 40, 0],  // burnt orange
-    [0.45, 0.88, 0.00019, -0.00013, 0.55,  60, 25, 0],  // dark amber
-    [0.25, 0.70, -0.00013, 0.00017, 0.45, 100, 50,  0],  // orange
-    [0.70, 0.20, 0.00015, 0.00020, 0.50,   80, 35, 0],  // amber
-  ];
-
-  function bgAnimate() {
-    const w = bgCanvas.width, h = bgCanvas.height;
-    bgCtx.fillStyle = '#0a0a0a';
-    bgCtx.fillRect(0, 0, w, h);
-    for (const b of blobs) {
-      b[0] += b[2]; b[1] += b[3];
-      if (b[0] < 0 || b[0] > 1) b[2] *= -1;
-      if (b[1] < 0 || b[1] > 1) b[3] *= -1;
-      const cx = b[0] * w, cy = b[1] * h, r = b[4] * Math.min(w, h);
-      const g = bgCtx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      g.addColorStop(0, `rgba(${b[5]},${b[6]},${b[7]},0.80)`);
-      g.addColorStop(1, `rgba(${b[5]},${b[6]},${b[7]},0)`);
-      bgCtx.fillStyle = g;
-      bgCtx.fillRect(0, 0, w, h);
-    }
-    requestAnimationFrame(bgAnimate);
-  }
-  bgAnimate();
-}
 
 const mc     = (window as any).mc;
 const server = (window as any).server;

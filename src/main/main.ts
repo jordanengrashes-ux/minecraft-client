@@ -495,9 +495,10 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
     }
     gameWin?.webContents.send('mc-log', `[Launcher] version: ${opts.version || '1.21.4'}, mem: ${opts.maxMem || 4}G, Java ${detectedVer}, user: ${auth.name}`);
 
-    // Re-apply resource pack enable so it survives Minecraft resetting options.txt
+    // Re-apply resource pack enable and disable background blur
     const packDir = path.join(mcRoot, 'resourcepacks', 'VoxelClient');
     if (fs.existsSync(packDir)) enableVoxelResourcePack(mcRoot);
+    setOptionsKey(mcRoot, 'backgroundBlur', '0');
 
     // Auto-install cosmetics mod if bundled
     try {
@@ -555,6 +556,7 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
     const uuid = `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20,32)}`;
 
     gameWin?.webContents.send('mc-log', `[Launcher] Offline mode — user: ${opts.username}, uuid: ${uuid}`);
+    setOptionsKey(mcRoot, 'backgroundBlur', '0');
     const isFabricOff = (opts.version || '').startsWith('fabric-loader-');
     const mcVerOff    = isFabricOff ? opts.version.replace(/^fabric-loader-[\d.]+-/, '') : (opts.version || '1.21.4');
 
@@ -879,7 +881,19 @@ ipcMain.handle('mc-toggle-mod', async (_e, opts: { filename: string; enable: boo
   }
 });
 
-// ── Resource pack enable helper ───────────────────────────────────────────────
+// ── options.txt helpers ───────────────────────────────────────────────────────
+function setOptionsKey(mcRoot: string, key: string, value: string) {
+  const optPath = path.join(mcRoot, 'options.txt');
+  let txt = fs.existsSync(optPath) ? fs.readFileSync(optPath, 'utf-8') : '';
+  const re = new RegExp(`^${key}:.*`, 'm');
+  if (re.test(txt)) {
+    txt = txt.replace(re, `${key}:${value}`);
+  } else {
+    txt += (txt.endsWith('\n') || txt === '' ? '' : '\n') + `${key}:${value}\n`;
+  }
+  try { fs.writeFileSync(optPath, txt, 'utf-8'); } catch {}
+}
+
 function enableVoxelResourcePack(mcRoot: string) {
   const optPath = path.join(mcRoot, 'options.txt');
   let txt = fs.existsSync(optPath) ? fs.readFileSync(optPath, 'utf-8') : '';
