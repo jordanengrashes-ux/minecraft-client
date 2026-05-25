@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { execSync, spawnSync, spawn, ChildProcess } from 'child_process';
 import https from 'https';
@@ -13,6 +13,8 @@ let gameWin:    BrowserWindow | null = null;
 let overlayWin: BrowserWindow | null = null;
 let mcAuthToken: any = null;
 let serverProcess: ChildProcess | null = null;
+let keepAwakeId: number | null = null;
+let srvUserStopped = false;
 let mcProcess: ChildProcess | null = null;
 let javaReadyPromise: Promise<string> | null = null;
 
@@ -738,7 +740,7 @@ function downloadFileTo(url: string, dest: string, onPct?: (p: number) => void):
 }
 
 // ── IPC: server hosting ───────────────────────────────────────────────────────
-ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: number; name: string }) => {
+ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: number; minMem?: number; name: string; port?: number; maxPlayers?: number; motd?: string; }) => {
   if (serverProcess) return { ok: false, error: 'Server is already running' };
   try {
     const serverDir = path.join(app.getPath('userData'), 'mc-server', opts.version);
@@ -770,41 +772,59 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
 
     // Write server.properties — online-mode=false avoids Mojang auth socket errors
     const propsPath = path.join(serverDir, 'server.properties');
-    if (!fs.existsSync(propsPath)) {
-      fs.writeFileSync(propsPath, [
-        'online-mode=false',
-        'server-port=25565',
-        'server-ip=',
-        'max-players=20',
-        'view-distance=10',
-        'motd=Voxel Client Server',
-      ].join('\n') + '\n');
-    } else {
-      // Patch online-mode in existing properties without clobbering other settings
-      let props = fs.readFileSync(propsPath, 'utf-8');
-      if (/^online-mode=/m.test(props)) {
-        props = props.replace(/^online-mode=.*/m, 'online-mode=false');
-      } else {
-        props = 'online-mode=false\n' + props;
-      }
-      fs.writeFileSync(propsPath, props);
+    // Patch server.properties — write defaults on first run, then patch specific keys each start
+    const patchProps: Record<string, string> = {
+      'online-mode':  'false',
+      'server-port':  String(opts.port        ?? 25565),
+      'server-ip':    '',
+      'max-players':  String(opts.maxPlayers  ?? 20),
+      'view-distance':'10',
+      'motd':         opts.motd               || 'Voxel Client Server',
+    };
+    let propsContent = fs.existsSync(propsPath) ? fs.readFileSync(propsPath, 'utf-8') : '';
+    for (const [k, v] of Object.entries(patchProps)) {
+      const re = new RegExp(`^${k}=.*`, 'm');
+      propsContent = re.test(propsContent) ? propsContent.replace(re, `${k}=${v}`) : `${k}=${v}\n` + propsContent;
     }
+    fs.writeFileSync(propsPath, propsContent || Object.entries(patchProps).map(([k, v]) => `${k}=${v}`).join('\n') + '\n');
 
     // Resolve Java the same way as game launch (bundled → cache → system → download)
     // Use java.exe not javaw.exe — server needs stdout
     const javawPath = await ensureJava21((msg) => gameWin?.webContents.send('server-log', msg));
     const javaExe   = javawPath.replace(/javaw(\.exe)?$/i, 'java$1');
 
-    gameWin?.webContents.send('server-log', `[Host] Starting Minecraft ${opts.version}…`);
+    const port    = opts.port ?? 25565;
+    const minMemM = (opts.minMem ?? 512);
+    gameWin?.webContents.send('server-log', `[Host] Starting Minecraft ${opts.version} on port ${port}…`);
     serverProcess = spawn(javaExe, [
-      `-Xmx${opts.maxMem}G`, '-Xms512M', '-jar', 'server.jar', '--nogui',
+      `-Xmx${opts.maxMem}G`, `-Xms${minMemM}M`, '-jar', 'server.jar', '--nogui',
     ], { cwd: serverDir, stdio: ['pipe', 'pipe', 'pipe'] });
 
-    serverProcess.stdout?.on('data', (d: Buffer) => gameWin?.webContents.send('server-log', d.toString()));
+    // Keep system awake while server runs
+    srvUserStopped = false;
+    if (keepAwakeId === null) keepAwakeId = powerSaveBlocker.start('prevent-display-sleep');
+
+    const handleOut = (d: Buffer) => {
+      const text = d.toString();
+      gameWin?.webContents.send('server-log', text);
+      // Player join → restore window + notify renderer
+      const joinM = text.match(/(\w+) joined the game/);
+      if (joinM) {
+        if (gameWin?.isMinimized()) gameWin.restore();
+        gameWin?.show();
+        gameWin?.webContents.send('server-player-join', joinM[1]);
+      }
+      // Player count from /list response
+      const cntM = text.match(/There are (\d+) of a max(?: of)? (\d+) players/);
+      if (cntM) gameWin?.webContents.send('server-player-count', parseInt(cntM[1]), parseInt(cntM[2]));
+    };
+    serverProcess.stdout?.on('data', handleOut);
     serverProcess.stderr?.on('data', (d: Buffer) => gameWin?.webContents.send('server-log', d.toString()));
     serverProcess.on('close', (code: number) => {
+      if (keepAwakeId !== null) { powerSaveBlocker.stop(keepAwakeId); keepAwakeId = null; }
       serverProcess = null;
-      gameWin?.webContents.send('server-closed', code ?? 0);
+      gameWin?.webContents.send('server-closed', { code: code ?? 0, userStopped: srvUserStopped });
+      srvUserStopped = false;
     });
 
     return { ok: true };
@@ -816,8 +836,8 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
 
 ipcMain.handle('server-stop', async () => {
   if (!serverProcess) return { ok: false, error: 'Not running' };
+  srvUserStopped = true;
   serverProcess.stdin?.write('stop\n');
-  // Force-kill after 15s if it hasn't exited
   setTimeout(() => { try { serverProcess?.kill(); } catch {} }, 15000);
   return { ok: true };
 });

@@ -25,8 +25,10 @@ contextBridge.exposeInMainWorld('server', {
   stop:       ()             => ipcRenderer.invoke('server-stop'),
   command:    (cmd: string)  => ipcRenderer.invoke('server-command',     cmd),
   openFolder: (ver: string)  => ipcRenderer.invoke('server-open-folder', ver),
-  onLog:    (cb: (l: string) => void)  => ipcRenderer.on('server-log',    (_e, l) => cb(l)),
-  onClosed: (cb: (c: number) => void)  => ipcRenderer.on('server-closed', (_e, c) => cb(c)),
+  onLog:         (cb: (l: string) => void)             => ipcRenderer.on('server-log',          (_e, l)    => cb(l)),
+  onClosed:      (cb: (info: any) => void)             => ipcRenderer.on('server-closed',       (_e, info) => cb(info)),
+  onPlayerJoin:  (cb: (name: string) => void)          => ipcRenderer.on('server-player-join',  (_e, n)    => cb(n)),
+  onPlayerCount: (cb: (cur: number, max: number) => void) => ipcRenderer.on('server-player-count', (_e, c, m) => cb(c, m)),
 });
 
 contextBridge.exposeInMainWorld('overlay', {

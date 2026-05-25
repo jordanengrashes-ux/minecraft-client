@@ -2023,8 +2023,10 @@ const srvLog       = document.getElementById('srv-log')!;
 const srvLogCopy   = document.getElementById('srv-log-copy') as HTMLButtonElement;
 const srvCmdInput  = document.getElementById('srv-cmd-input') as HTMLInputElement;
 const srvCmdBtn    = document.getElementById('srv-cmd-btn') as HTMLButtonElement;
-const srvMemSlider = document.getElementById('srv-mem') as HTMLInputElement;
-const srvMemVal    = document.getElementById('srv-mem-val')!;
+const srvMemSlider    = document.getElementById('srv-mem')    as HTMLInputElement;
+const srvMemVal       = document.getElementById('srv-mem-val')!;
+const srvMinMemSlider = document.getElementById('srv-minmem') as HTMLInputElement;
+const srvMinMemVal    = document.getElementById('srv-minmem-val')!;
 const communityEl  = document.getElementById('community-servers')!;
 const savedSrvEl   = document.getElementById('saved-servers')!;
 const savedSrvEmpty= document.getElementById('saved-servers-empty')!;
@@ -2159,7 +2161,7 @@ if ((window as any).electron) {
   });
 }
 
-srvMemSlider?.addEventListener('input', () => { srvMemVal.textContent = srvMemSlider.value; });
+
 
 async function onServerReady(name: string, version: string) {
   const manualIp = srvIpInput.value.trim();
@@ -2304,33 +2306,59 @@ const SRV_SETTINGS_KEY = 'voxel_srv_settings';
 function loadSrvSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(SRV_SETTINGS_KEY) || '{}');
-    const nameEl = document.getElementById('srv-name') as HTMLInputElement;
-    const verSel = document.getElementById('srv-version') as HTMLSelectElement;
-    if (s.name) nameEl.value = s.name;
+    const nameEl   = document.getElementById('srv-name')       as HTMLInputElement;
+    const verSel   = document.getElementById('srv-version')    as HTMLSelectElement;
+    const portEl   = document.getElementById('srv-port')       as HTMLInputElement;
+    const maxPEl   = document.getElementById('srv-maxplayers') as HTMLInputElement;
+    const motdEl   = document.getElementById('srv-motd')       as HTMLInputElement;
+    const arEl     = document.getElementById('srv-autorestart')as HTMLInputElement;
+    if (s.name)    nameEl.value = s.name;
     if (s.version && Array.from(verSel.options).find(o => o.value === s.version)) verSel.value = s.version;
-    if (s.mem) { srvMemSlider.value = s.mem; srvMemVal.textContent = s.mem; }
+    if (s.mem)     { srvMemSlider.value = s.mem;       srvMemVal.textContent    = s.mem; }
+    if (s.minMem)  { srvMinMemSlider.value = s.minMem; srvMinMemVal.textContent = s.minMem; }
+    if (s.port)    portEl.value   = s.port;
+    if (s.maxP)    maxPEl.value   = s.maxP;
+    if (s.motd)    motdEl.value   = s.motd;
+    if (arEl)      arEl.checked   = !!s.autoRestart;
   } catch {}
 }
 function saveSrvSettings() {
-  const nameEl = document.getElementById('srv-name') as HTMLInputElement;
-  const verSel = document.getElementById('srv-version') as HTMLSelectElement;
+  const nameEl = document.getElementById('srv-name')       as HTMLInputElement;
+  const verSel = document.getElementById('srv-version')    as HTMLSelectElement;
+  const portEl = document.getElementById('srv-port')       as HTMLInputElement;
+  const maxPEl = document.getElementById('srv-maxplayers') as HTMLInputElement;
+  const motdEl = document.getElementById('srv-motd')       as HTMLInputElement;
+  const arEl   = document.getElementById('srv-autorestart')as HTMLInputElement;
   localStorage.setItem(SRV_SETTINGS_KEY, JSON.stringify({
-    name: nameEl.value,
-    version: verSel.value,
-    mem: srvMemSlider.value,
+    name: nameEl?.value,
+    version: verSel?.value,
+    mem:    srvMemSlider?.value,
+    minMem: srvMinMemSlider?.value,
+    port:   portEl?.value,
+    maxP:   maxPEl?.value,
+    motd:   motdEl?.value,
+    autoRestart: arEl?.checked,
   }));
 }
+srvMemSlider?.addEventListener('input', () => { srvMemVal.textContent = srvMemSlider.value; saveSrvSettings(); });
+srvMinMemSlider?.addEventListener('input', () => { srvMinMemVal.textContent = srvMinMemSlider.value; saveSrvSettings(); });
 document.getElementById('srv-name')?.addEventListener('input', saveSrvSettings);
 document.getElementById('srv-version')?.addEventListener('change', saveSrvSettings);
-srvMemSlider?.addEventListener('input', saveSrvSettings);
+document.getElementById('srv-port')?.addEventListener('input', saveSrvSettings);
+document.getElementById('srv-maxplayers')?.addEventListener('input', saveSrvSettings);
+document.getElementById('srv-motd')?.addEventListener('input', saveSrvSettings);
+document.getElementById('srv-autorestart')?.addEventListener('change', saveSrvSettings);
 
 document.getElementById('srv-preset-btn')?.addEventListener('click', () => {
-  (document.getElementById('srv-name') as HTMLInputElement).value = 'Voxels Default';
+  (document.getElementById('srv-name')       as HTMLInputElement).value = 'Voxels Default';
+  (document.getElementById('srv-port')       as HTMLInputElement).value = '25565';
+  (document.getElementById('srv-maxplayers') as HTMLInputElement).value = '20';
+  (document.getElementById('srv-motd')       as HTMLInputElement).value = 'Voxel Client Server';
   const sel = document.getElementById('srv-version') as HTMLSelectElement;
   const latest = Array.from(sel.options).find(o => o.value && !o.disabled);
   if (latest) sel.value = latest.value;
-  srvMemSlider.value = '4';
-  srvMemVal.textContent = '4';
+  srvMemSlider.value = '4'; srvMemVal.textContent = '4';
+  srvMinMemSlider.value = '512'; srvMinMemVal.textContent = '512';
   saveSrvSettings();
 });
 
@@ -2378,9 +2406,13 @@ function loadCommunityServers() {
 srvStartBtn?.addEventListener('click', async () => {
   if (!server) return;
 
-  const name    = (document.getElementById('srv-name') as HTMLInputElement).value.trim() || 'My Server';
-  const version = (document.getElementById('srv-version') as HTMLSelectElement).value;
-  const maxMem  = parseInt(srvMemSlider.value, 10);
+  const name       = (document.getElementById('srv-name')       as HTMLInputElement).value.trim() || 'My Server';
+  const version    = (document.getElementById('srv-version')    as HTMLSelectElement).value;
+  const maxMem     = parseInt(srvMemSlider.value, 10);
+  const minMem     = parseInt((document.getElementById('srv-minmem') as HTMLInputElement)?.value || '512', 10);
+  const port       = parseInt((document.getElementById('srv-port') as HTMLInputElement)?.value || '25565', 10);
+  const maxPlayers = parseInt((document.getElementById('srv-maxplayers') as HTMLInputElement)?.value || '20', 10);
+  const motd       = (document.getElementById('srv-motd') as HTMLInputElement)?.value.trim() || 'Voxel Client Server';
 
   srvRunning = true;
   srvStopBtn.style.display = 'inline-flex';
@@ -2393,7 +2425,7 @@ srvStartBtn?.addEventListener('click', async () => {
   pendingSrvName    = name;
   pendingSrvVersion = version;
 
-  const res = await server.start({ version, maxMem, name });
+  const res = await server.start({ version, maxMem, minMem, name, port, maxPlayers, motd });
   if (!res.ok) {
     srvAddLog(`[Error] ${res.error}`);
     srvRunning = false;
@@ -2408,7 +2440,13 @@ srvStartBtn?.addEventListener('click', async () => {
 
   srvInfo.style.display = 'flex';
   srvVerDisplay.textContent = version;
-  srvAddress.textContent = 'Starting… use localhost:25565 once ready';
+  const portDisplay = document.getElementById('srv-port-display');
+  const maxPDisplay = document.getElementById('srv-maxplayers-display');
+  const playersBadge = document.getElementById('srv-players-badge');
+  if (portDisplay) portDisplay.textContent = String(port);
+  if (maxPDisplay) maxPDisplay.textContent = String(maxPlayers);
+  if (playersBadge) playersBadge.textContent = `0/${maxPlayers} players`;
+  srvAddress.textContent = `Starting… connect via localhost:${port} once ready`;
   // IP + publish happen in srvAddLog when MC logs "Done"
 });
 
@@ -2422,19 +2460,46 @@ srvStopBtn?.addEventListener('click', async () => {
 // Handle server log events
 if (server) {
   server.onLog((line: string) => srvAddLog(line));
-  server.onClosed((code: number) => {
+
+  (server as any).onPlayerJoin?.((name: string) => {
+    srvAddLog(`[Host] >> ${name} joined the server`);
+    // Flash a toast notification
+    const toast = document.createElement('div');
+    toast.textContent = `${name} joined the server`;
+    toast.style.cssText = 'position:fixed;bottom:80px;right:24px;background:#1e1e1e;border:1px solid #f5a623;border-radius:8px;color:#ffffff;font-size:13px;padding:10px 18px;z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.3s;font-family:Roboto,sans-serif;';
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => { toast.style.opacity = '1'; });
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 350); }, 3500);
+  });
+
+  (server as any).onPlayerCount?.((cur: number, max: number) => {
+    const badge = document.getElementById('srv-players-badge');
+    const maxD  = document.getElementById('srv-maxplayers-display');
+    if (badge) badge.textContent = `${cur}/${max} players`;
+    if (maxD)  maxD.textContent  = String(max);
+  });
+
+  server.onClosed((info: any) => {
+    const code = typeof info === 'object' ? info?.code : info;
+    const userStopped = typeof info === 'object' ? info?.userStopped : false;
     srvRunning = false;
     srvInfo.style.display = 'none';
     srvStopBtn.style.display = 'none';
+    srvStopBtn.disabled = false;
     srvStopBtn.textContent = '⏹ Stop Server';
     srvStartBtn.style.display = 'inline-flex';
     srvStartBtn.style.background = '#f5a623';
     srvStartBtn.style.color = '#0d1117';
     srvStartBtn.textContent = '▶ Start Server';
     srvStartBtn.disabled = false;
-    if (code !== 0 && code != null) {
+    if (!userStopped && code !== 0 && code != null) {
       srvAddLog(`[Host] Server crashed (exit code ${code}) — scroll up for errors`);
       if (code === 1) srvAddLog('[Host] Tip: may be OOM — increase RAM allocation above');
+      const autoRestart = (document.getElementById('srv-autorestart') as HTMLInputElement)?.checked;
+      if (autoRestart) {
+        srvAddLog('[Host] Auto-restart enabled — restarting in 5s…');
+        setTimeout(() => { if (!srvRunning) srvStartBtn.click(); }, 5000);
+      }
     } else {
       srvAddLog('[Host] Server stopped.');
     }
