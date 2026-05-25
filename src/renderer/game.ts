@@ -50,6 +50,7 @@ const mcIgnSpan     = document.getElementById('mc-ign')!;
 const mcAuthBtn     = document.getElementById('mc-auth-btn') as HTMLButtonElement;
 const mcPlayBtn     = document.getElementById('mc-play-btn') as HTMLButtonElement;
 const mcVersion     = document.getElementById('mc-version') as HTMLSelectElement;
+const javaVersionSel = document.getElementById('java-version') as HTMLSelectElement;
 const mcMemory      = document.getElementById('mc-memory') as HTMLInputElement;
 const mcMemoryVal   = document.getElementById('mc-memory-val')!;
 const statusDot     = document.getElementById('status-dot')!;
@@ -117,9 +118,14 @@ function isJava21Compatible(id: string): boolean {
 
 function populateVersions() {
   const showSnapshots = snapshotsToggle.checked;
+  const jSel = javaVersionSel?.value ?? 'auto';
+  // Java 8 or Auto can run any MC version; 17/21/25 require 1.17+
+  const noFilter = jSel === '8' || jSel === 'auto';
   const filtered = allVersions.filter(v =>
-    (v.type === 'release' && isJava21Compatible(v.id)) ||
-    (showSnapshots && v.type === 'snapshot' && isJava21Compatible(v.id))
+    noFilter
+      ? (v.type === 'release' || (showSnapshots && v.type === 'snapshot'))
+      : ((v.type === 'release' && isJava21Compatible(v.id)) ||
+         (showSnapshots && v.type === 'snapshot' && isJava21Compatible(v.id)))
   );
   const prev = mcVersion.value;
   mcVersion.innerHTML = '';
@@ -156,6 +162,7 @@ fetch('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json')
   });
 
 snapshotsToggle.addEventListener('change', populateVersions);
+javaVersionSel.addEventListener('change', populateVersions);
 
 // ── Memory slider ──────────────────────────────────────────────────────────────
 mcMemory.addEventListener('input', () => {
@@ -315,6 +322,21 @@ mcAuthBtn.addEventListener('click', async () => {
   }
 });
 
+function getEffectiveJavaVersion(): number {
+  const sel = javaVersionSel?.value ?? 'auto';
+  if (sel !== 'auto') return parseInt(sel, 10);
+  // Auto: pick based on MC version
+  const id = mcVersion.value;
+  const m = id.match(/^(\d+)\.(\d+)/);
+  if (!m) return 21;
+  const maj = parseInt(m[1]);
+  if (maj !== 1) return 21;       // year-based versions (26.x.x …)
+  const min = parseInt(m[2]);
+  if (min < 17) return 8;
+  if (min < 21) return 17;
+  return 21;
+}
+
 // ── Launch ─────────────────────────────────────────────────────────────────────
 mcPlayBtn.addEventListener('click', async () => {
   if (!mc) return;
@@ -322,6 +344,7 @@ mcPlayBtn.addEventListener('click', async () => {
 
   let version = mcVersion.value;
   const maxMem = parseInt(mcMemory.value, 10);
+  const javaVersion = getEffectiveJavaVersion();
 
   running = true;
   mcPlayBtn.disabled = true;
@@ -348,11 +371,11 @@ mcPlayBtn.addEventListener('click', async () => {
     }
   }
 
-  addLog(`Launching Minecraft ${version} with ${maxMem}GB RAM…`);
+  addLog(`Launching Minecraft ${version} with ${maxMem}GB RAM, Java ${javaVersion}…`);
 
   const res = offlineToggle.checked
-    ? await mc.launchOffline({ version, maxMem, username: offlineUsername.value.trim() || 'Player' })
-    : await mc.launch({ version, maxMem });
+    ? await mc.launchOffline({ version, maxMem, username: offlineUsername.value.trim() || 'Player', javaVersion })
+    : await mc.launch({ version, maxMem, javaVersion });
   if (!res.ok) {
     setStatus(`Launch failed: ${res.error}`, 'red');
     addLog(`Error: ${res.error}`, 'error');

@@ -17,18 +17,28 @@ let mcProcess: ChildProcess | null = null;
 let javaReadyPromise: Promise<string> | null = null;
 
 const DEV = !app.isPackaged;
-const AUTH_CACHE      = path.join(app.getPath('userData'), 'mc-auth.json');
-const JAVA_PATH_CACHE = path.join(app.getPath('userData'), 'java-path.json');
+const AUTH_CACHE       = path.join(app.getPath('userData'), 'mc-auth.json');
+const JAVA_PATH_CACHE  = path.join(app.getPath('userData'), 'java-path.json');  // legacy Java 21 cache
+const JAVA_PATHS_CACHE = path.join(app.getPath('userData'), 'java-paths.json'); // multi-version cache
 
-function loadCachedJavaPath(): string | null {
-  try {
-    const data = JSON.parse(fs.readFileSync(JAVA_PATH_CACHE, 'utf-8'));
-    if (data?.path && fs.existsSync(data.path)) return data.path as string;
-  } catch {}
+function loadJavaPathsDict(): Record<string, string> {
+  try { return JSON.parse(fs.readFileSync(JAVA_PATHS_CACHE, 'utf-8')); } catch { return {}; }
+}
+function loadCachedJavaPath(major: number): string | null {
+  const dict = loadJavaPathsDict();
+  if (dict[String(major)] && fs.existsSync(dict[String(major)])) return dict[String(major)];
+  if (major === 21) {
+    try {
+      const data = JSON.parse(fs.readFileSync(JAVA_PATH_CACHE, 'utf-8'));
+      if (data?.path && fs.existsSync(data.path)) return data.path as string;
+    } catch {}
+  }
   return null;
 }
-function saveCachedJavaPath(javaPath: string) {
-  try { fs.writeFileSync(JAVA_PATH_CACHE, JSON.stringify({ path: javaPath })); } catch {}
+function saveCachedJavaPath(major: number, javaPath: string) {
+  const dict = loadJavaPathsDict();
+  dict[String(major)] = javaPath;
+  try { fs.writeFileSync(JAVA_PATHS_CACHE, JSON.stringify(dict)); } catch {}
 }
 
 // ── Java helpers ──────────────────────────────────────────────────────────────
@@ -75,44 +85,58 @@ function findJavawInDir(dir: string): string | null {
   return null;
 }
 
-async function ensureJava21(log: (msg: string) => void): Promise<string> {
+// MC launcher ships its own JREs — check them before downloading
+const MC_RUNTIME_MAP: Record<number, string[]> = {
+  8:  ['java-runtime-legacy'],
+  17: ['java-runtime-gamma', 'java-runtime-gamma-snapshot'],
+  21: ['java-runtime-delta'],
+};
+
+async function ensureJava(major: number, log: (msg: string) => void): Promise<string> {
   // Fast path: previously resolved path saved to disk
-  const diskCached = loadCachedJavaPath();
+  const diskCached = loadCachedJavaPath(major);
   if (diskCached) {
     const v = getJavaMajorVersion(diskCached);
-    if (v >= 21) { log(`[Launcher] Java ${v} ready`); return diskCached; }
+    if (v === major || (major === 21 && v >= 21)) { log(`[Launcher] Java ${v} ready`); return diskCached; }
   }
 
-  // 0. Bundled Java 21 — shipped inside the installer, trust it unconditionally
-  const bundledDir = path.join(process.resourcesPath, 'java21');
-  const bundled = findJavawInDir(bundledDir);
-  if (bundled) {
-    log(`[Launcher] Using bundled Java 21 at ${bundled}`);
-    saveCachedJavaPath(bundled);
-    return bundled;
+  // 0. Bundled Java 21 (shipped inside installer)
+  if (major === 21) {
+    const bundledDir = path.join(process.resourcesPath, 'java21');
+    const bundled = findJavawInDir(bundledDir);
+    if (bundled) {
+      log(`[Launcher] Using bundled Java 21 at ${bundled}`);
+      saveCachedJavaPath(21, bundled);
+      return bundled;
+    }
+    log(`[Launcher] Bundled Java not found at ${bundledDir} — checking fallbacks`);
   }
-  log(`[Launcher] Bundled Java not found at ${bundledDir} — checking fallbacks`);
 
-  const java21Dir = path.join(app.getPath('userData'), 'java21');
+  const javaDir = path.join(app.getPath('userData'), `java${major}`);
 
-  // 1. Our own cached download — verify it's actually 21+
-  const cached = findJavawInDir(java21Dir);
+  // 1. Our own cached download
+  const cached = findJavawInDir(javaDir);
   if (cached) {
     const v = getJavaMajorVersion(cached);
-    if (v >= 21) { log(`[Launcher] Java 21 ready (cached)`); saveCachedJavaPath(cached); return cached; }
+    if (v === major || (major === 21 && v >= 21)) { log(`[Launcher] Java ${major} ready (cached)`); saveCachedJavaPath(major, cached); return cached; }
     log(`[Launcher] Cached Java is v${v} — clearing and re-downloading…`);
-    try { fs.rmSync(java21Dir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(javaDir, { recursive: true, force: true }); } catch {}
   }
 
-  // 2. Official Minecraft launcher's Java 21 (java-runtime-delta is always Java 21) — verify version
-  const mcJava21 = path.join(app.getPath('appData'), '.minecraft', 'runtime', 'java-runtime-delta', 'windows-x64', 'java-runtime-delta', 'bin', 'javaw.exe');
-  if (fs.existsSync(mcJava21)) {
-    const v2 = getJavaMajorVersion(mcJava21);
-    if (v2 >= 21) { log(`[Launcher] Using Minecraft launcher Java ${v2}`); saveCachedJavaPath(mcJava21); return mcJava21; }
-    log(`[Launcher] java-runtime-delta is v${v2} — skipping`);
+  // 2. Minecraft launcher bundled runtimes
+  for (const rtName of (MC_RUNTIME_MAP[major] || [])) {
+    const rtPath = path.join(app.getPath('appData'), '.minecraft', 'runtime', rtName, 'windows-x64', rtName, 'bin', 'javaw.exe');
+    if (fs.existsSync(rtPath)) {
+      const v = getJavaMajorVersion(rtPath);
+      if (v === major || (major === 21 && v >= 21)) {
+        log(`[Launcher] Using Minecraft launcher Java ${v} (${rtName})`);
+        saveCachedJavaPath(major, rtPath);
+        return rtPath;
+      }
+    }
   }
 
-  // 3. System Java — use java.exe for version check (javaw.exe is silent/windowless)
+  // 3. System Java
   const programFiles = [process.env.PROGRAMFILES || 'C:\\Program Files', process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)'];
   const vendors = ['Eclipse Adoptium', 'Temurin', 'Microsoft', 'BellSoft', 'Amazon Corretto', 'Zulu', 'Java', 'OpenJDK'];
   const sysCandidates: string[] = [];
@@ -125,20 +149,18 @@ async function ensureJava21(log: (msg: string) => void): Promise<string> {
   }
   for (const c of sysCandidates) {
     const v = getJavaMajorVersion(c);
-    log(`[Launcher] Found Java ${v || '?'} at ${c}`);
-    if (v >= 21) { log(`[Launcher] Using system Java ${v}`); saveCachedJavaPath(c); return c; }
+    if (v === major || (major === 21 && v >= 21)) { log(`[Launcher] Using system Java ${v}`); saveCachedJavaPath(major, c); return c; }
   }
 
-  // 4. Download Java 21 from Adoptium (one-time ~85MB)
-  log('[Launcher] No Java 21 found — downloading from Adoptium (~85MB)…');
-
-  const info = await fetchJson('https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jre&os=windows&vendor=eclipse');
+  // 4. Download from Adoptium
+  log(`[Launcher] No Java ${major} found — downloading from Adoptium…`);
+  const info = await fetchJson(`https://api.adoptium.net/v3/assets/latest/${major}/hotspot?architecture=x64&image_type=jre&os=windows&vendor=eclipse`);
   const pkg = info[0]?.binary?.package;
-  if (!pkg?.link) throw new Error('Could not get Java 21 download URL from Adoptium');
+  if (!pkg?.link) throw new Error(`Could not get Java ${major} download URL from Adoptium`);
 
-  const zipPath = path.join(app.getPath('temp'), 'voxel-java21.zip');
+  const zipPath = path.join(app.getPath('temp'), `voxel-java${major}.zip`);
   const sizeMB = Math.round((pkg.size || 0) / 1024 / 1024);
-  log(`[Launcher] Downloading Java 21 JRE (${sizeMB}MB) — this only happens once…`);
+  log(`[Launcher] Downloading Java ${major} JRE (${sizeMB}MB) — this only happens once…`);
 
   await new Promise<void>((resolve, reject) => {
     const file = fs.createWriteStream(zipPath);
@@ -148,7 +170,7 @@ async function ensureJava21(log: (msg: string) => void): Promise<string> {
     function doGet(url: string) {
       https.get(url, { headers: { 'User-Agent': 'VoxelClient' } }, res => {
         if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) {
-          res.resume(); // drain redirect body so socket is released
+          res.resume();
           doGet(res.headers.location!);
           return;
         }
@@ -159,8 +181,8 @@ async function ensureJava21(log: (msg: string) => void): Promise<string> {
           const pct = total > 0 ? Math.round(downloaded / total * 100) : 0;
           if (pct !== lastPct && pct % 10 === 0) {
             lastPct = pct;
-            log(`[Launcher] Downloading Java 21… ${pct}%`);
-            gameWin?.webContents.send('mc-status', { msg: `Downloading Java 21… ${pct}%`, color: 'yellow' });
+            log(`[Launcher] Downloading Java ${major}… ${pct}%`);
+            gameWin?.webContents.send('mc-status', { msg: `Downloading Java ${major}… ${pct}%`, color: 'yellow' });
           }
         });
         res.pipe(file);
@@ -173,27 +195,28 @@ async function ensureJava21(log: (msg: string) => void): Promise<string> {
 
   const dlSize = fs.statSync(zipPath).size;
   log(`[Launcher] Download complete — ${Math.round(dlSize / 1024 / 1024)}MB received`);
-  if (dlSize < 10 * 1024 * 1024) throw new Error(`Java 21 download too small (${dlSize} bytes) — try again`);
+  if (dlSize < 10 * 1024 * 1024) throw new Error(`Java ${major} download too small (${dlSize} bytes) — try again`);
 
-  log('[Launcher] Extracting Java 21…');
-  gameWin?.webContents.send('mc-status', { msg: 'Extracting Java 21…', color: 'yellow' });
-  // Always wipe the target dir before extracting — removes any stale partial state
-  try { if (fs.existsSync(java21Dir)) fs.rmSync(java21Dir, { recursive: true, force: true }); } catch {}
-  fs.mkdirSync(java21Dir, { recursive: true });
+  log(`[Launcher] Extracting Java ${major}…`);
+  gameWin?.webContents.send('mc-status', { msg: `Extracting Java ${major}…`, color: 'yellow' });
+  try { if (fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true }); } catch {}
+  fs.mkdirSync(javaDir, { recursive: true });
   try {
-    execSync(`powershell -NoProfile -command "Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${java21Dir}' -Force"`, { timeout: 120000 });
+    execSync(`powershell -NoProfile -command "Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${javaDir}' -Force"`, { timeout: 120000 });
   } catch (extractErr: any) {
-    throw new Error(`Java 21 extraction failed: ${extractErr.message}`);
+    throw new Error(`Java ${major} extraction failed: ${extractErr.message}`);
   }
 
-  const javaw = findJavawInDir(java21Dir);
-  if (!javaw) throw new Error('Java 21 extracted but javaw.exe not found');
+  const javaw = findJavawInDir(javaDir);
+  if (!javaw) throw new Error(`Java ${major} extracted but javaw.exe not found`);
   const finalVer = getJavaMajorVersion(javaw);
   log(`[Launcher] Java ${finalVer} installed at ${javaw}`);
-  gameWin?.webContents.send('mc-status', { msg: 'Java 21 ready', color: 'green' });
-  saveCachedJavaPath(javaw);
+  gameWin?.webContents.send('mc-status', { msg: `Java ${major} ready`, color: 'green' });
+  saveCachedJavaPath(major, javaw);
   return javaw;
 }
+
+const ensureJava21 = (log: (msg: string) => void) => ensureJava(21, log);
 
 // ── Token validation ──────────────────────────────────────────────────────────
 async function validateToken(token: any): Promise<boolean> {
@@ -432,9 +455,11 @@ ipcMain.handle('mc-reauth', async () => {
 });
 
 // ── IPC: launch Minecraft ─────────────────────────────────────────────────────
-ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }) => {
-  // Start Java resolution immediately in parallel with any auth work
-  const javaPromise = javaReadyPromise ?? ensureJava21((msg) => gameWin?.webContents.send('mc-log', msg));
+ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; javaVersion?: number }) => {
+  const requestedJava = opts.javaVersion || 21;
+  const javaPromise = (requestedJava === 21 && javaReadyPromise)
+    ? javaReadyPromise
+    : ensureJava(requestedJava, (msg) => gameWin?.webContents.send('mc-log', msg));
 
   // If no cached token, or token is stale, run the auth flow inline
   const tokenAge = Date.now() - (mcAuthToken?.cached_at ?? 0);
@@ -465,10 +490,10 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }
     const detectedVer = getJavaMajorVersion(javaPath);
     gameWin?.webContents.send('mc-log', `[Launcher] Java path: ${javaPath}`);
     gameWin?.webContents.send('mc-log', `[Launcher] Java version detected: ${detectedVer || 'UNKNOWN'}`);
-    if (detectedVer < 21) {
-      throw new Error(`Java at ${javaPath} is version ${detectedVer || 'unknown'} — need 21. Delete %APPDATA%\\VoxelClient\\java21 and relaunch to re-download.`);
+    if (detectedVer !== requestedJava && !(requestedJava === 21 && detectedVer >= 21)) {
+      throw new Error(`Java ${detectedVer || 'unknown'} found but Java ${requestedJava} was requested. Delete %APPDATA%\\VoxelClient\\java${requestedJava} and relaunch to re-download.`);
     }
-    gameWin?.webContents.send('mc-log', `[Launcher] version: ${opts.version || '1.21.4'}, mem: ${opts.maxMem || 4}G, user: ${auth.name}`);
+    gameWin?.webContents.send('mc-log', `[Launcher] version: ${opts.version || '1.21.4'}, mem: ${opts.maxMem || 4}G, Java ${detectedVer}, user: ${auth.name}`);
 
     // Re-apply resource pack enable so it survives Minecraft resetting options.txt
     const packDir = path.join(mcRoot, 'resourcepacks', 'VoxelClient');
@@ -509,13 +534,17 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number }
 });
 
 // ── IPC: offline launch ───────────────────────────────────────────────────────
-ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: number; username: string }) => {
+ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: number; username: string; javaVersion?: number }) => {
+  const requestedJava = opts.javaVersion || 21;
   try {
     const mcRoot   = path.join(app.getPath('userData'), '.minecraft');
     const launcher = new Client();
-    const javaPath = await (javaReadyPromise ?? ensureJava21((msg) => gameWin?.webContents.send('mc-log', msg)));
+    const javaPath = await ((requestedJava === 21 && javaReadyPromise)
+      ? javaReadyPromise
+      : ensureJava(requestedJava, (msg) => gameWin?.webContents.send('mc-log', msg)));
     const detectedVer = getJavaMajorVersion(javaPath);
-    if (detectedVer < 21) throw new Error(`Java ${detectedVer} found but 21 required`);
+    if (detectedVer !== requestedJava && !(requestedJava === 21 && detectedVer >= 21))
+      throw new Error(`Java ${detectedVer} found but Java ${requestedJava} was requested`);
 
     // Offline UUID — matches vanilla OfflinePlayer UUID derivation
     const { createHash } = await import('crypto');

@@ -51,8 +51,8 @@ contextBridge.exposeInMainWorld('cosmetics', {
 contextBridge.exposeInMainWorld('mc', {
   auth:            () => ipcRenderer.invoke('mc-auth'),
   reauth:          () => ipcRenderer.invoke('mc-reauth'),
-  launch:          (opts: { version: string; maxMem: number }) => ipcRenderer.invoke('mc-launch', opts),
-  launchOffline:   (opts: { version: string; maxMem: number; username: string }) => ipcRenderer.invoke('mc-launch-offline', opts),
+  launch:          (opts: { version: string; maxMem: number; javaVersion?: number }) => ipcRenderer.invoke('mc-launch', opts),
+  launchOffline:   (opts: { version: string; maxMem: number; username: string; javaVersion?: number }) => ipcRenderer.invoke('mc-launch-offline', opts),
   uploadSkin:      (opts: { base64: string; variant: 'classic' | 'slim' }) => ipcRenderer.invoke('mc-upload-skin', opts),
   kill:            () => ipcRenderer.invoke('mc-kill'),
   repair:          () => ipcRenderer.invoke('mc-repair'),
