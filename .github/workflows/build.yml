@@ -33,7 +33,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist-artifacts
-          Get-ChildItem -Path release\* -Include *.exe,*.blockmap,*.yml |
+          Get-ChildItem -Path release -Recurse -Include *.exe,*.blockmap,*.yml |
             Copy-Item -Destination dist-artifacts
       - uses: actions/upload-artifact@v4
         with:
@@ -41,78 +41,15 @@ jobs:
           path: dist-artifacts/
           if-no-files-found: error
 
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/electron
-            ~/.cache/electron-builder
-          key: ${{ runner.os }}-electron-30
-      - run: sudo apt-get install -y fakeroot dpkg rpm build-essential
-      - run: mkdir -p resources/java21 resources/mods
-      - run: npm ci
-      - run: npm run build && npx electron-builder --linux --publish never
-      - name: Collect artifacts
-        run: |
-          mkdir -p dist-artifacts
-          find release -maxdepth 1 -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.blockmap" -o -name "*.yml" \) \
-            -exec cp {} dist-artifacts/ \;
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-linux
-          path: dist-artifacts/
-          if-no-files-found: error
-
-  build-mac:
-    runs-on: macos-13
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/Library/Caches/electron
-            ~/Library/Caches/electron-builder
-          key: ${{ runner.os }}-electron-30
-      - run: mkdir -p resources/java21 resources/mods
-      - run: npm ci
-      - name: Build
-        run: npm run build && npx electron-builder --mac --publish never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-      - name: Collect artifacts
-        run: |
-          mkdir -p dist-artifacts
-          find release -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.blockmap" -o -name "*.yml" \) \
-            -exec cp {} dist-artifacts/ \;
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-mac
-          path: dist-artifacts/
-          if-no-files-found: warn
-
   publish:
-    needs: [build-windows, build-linux, build-mac]
-    if: always() && needs.build-windows.result == 'success'
+    needs: [build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
+          name: release-windows
           path: dist
-          merge-multiple: true
-        continue-on-error: true
       - name: Publish GitHub release
         run: |
           version=$(node -p "require('./package.json').version")
