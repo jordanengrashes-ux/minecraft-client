@@ -29,7 +29,7 @@
     #launcher { display: flex; height: 100vh; padding-top: 30px; position: relative; z-index: 1; }
 
     /* Sidebar */
-    #sidebar { width: 195px; min-width: 195px; background: #080808; border-right: 1px solid #1e1e1e; display: flex; flex-direction: column; }
+    #sidebar { width: 195px; min-width: 195px; background: rgba(8,8,8,0.88); border-right: 1px solid #1e1e1e; display: flex; flex-direction: column; }
     #sidebar-logo { padding: 16px 14px 13px; border-bottom: 1px solid #1e1e1e; }
     #sidebar-logo h1 { font-size: 20px; font-weight: 800; color:#ffffff; letter-spacing: 0; line-height: 1; }
     #sidebar-logo p { font-size: 9px; color: #444444; margin-top: 3px; text-transform: uppercase; letter-spacing: 1px; }
@@ -51,7 +51,7 @@
     #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
     /* Hero */
-    #hero { height: 130px; position: relative; overflow: hidden; border-bottom: 1px solid #1e1e1e; background: #111111; }
+    #hero { height: 130px; position: relative; overflow: hidden; border-bottom: 1px solid #1e1e1e; background: rgba(17,17,17,0.72); }
     #hero-bg { position: absolute; inset: 0;  }
     #hero-content { position: relative; padding: 22px 26px; }
     #hero-content h2 { font-size: 21px; font-weight: 800; color:#ffffff; letter-spacing: -0.3px; }
@@ -721,6 +721,7 @@
           <div style="display:flex;align-items:center;gap:8px;">
             <label class="toggle toggle-sm"><input type="checkbox" id="srv-247-toggle" /><span class="toggle-slider"></span></label>
             <span style="font-size:11px;color:#aaaaaa;">24/7 list</span>
+            <button id="srv-new-btn" style="padding:3px 12px;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.35);border-radius:6px;color:#f5a623;font-size:11px;font-weight:600;cursor:pointer;font-family:'Roboto',sans-serif;">+ New</button>
             <button id="srv-save-btn" style="padding:3px 12px;background:rgba(60,60,60,0.5);border:1px solid rgba(245,166,35,0.25);border-radius:6px;color:#ffffff;font-size:11px;font-weight:600;cursor:pointer;font-family:'Roboto',sans-serif;">Save</button>
             <span id="srv-save-status" style="font-size:11px;color:#444444;"></span>
           </div>

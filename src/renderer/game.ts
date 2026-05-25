@@ -2065,6 +2065,7 @@ const communityEl  = document.getElementById('community-servers')!;
 const savedSrvEl   = document.getElementById('saved-servers')!;
 const savedSrvEmpty= document.getElementById('saved-servers-empty')!;
 const srvSaveBtn   = document.getElementById('srv-save-btn') as HTMLButtonElement;
+const srvNewBtn    = document.getElementById('srv-new-btn') as HTMLButtonElement;
 const srvSaveStatus= document.getElementById('srv-save-status')!;
 const srv247Toggle = document.getElementById('srv-247-toggle') as HTMLInputElement;
 const srvIpInput   = document.getElementById('srv-ip') as HTMLInputElement;
@@ -2144,6 +2145,18 @@ function isValidServerDomain(addr: string): boolean {
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return false; // block raw IPv4
   return /\.[a-zA-Z]{2,}$/.test(host); // must end with a TLD (.net, .gg, .com …)
 }
+
+srvNewBtn?.addEventListener('click', () => {
+  (document.getElementById('srv-name') as HTMLInputElement).value = 'My Server';
+  srvIpInput.value = '';
+  srv247Toggle.checked = false;
+  const sel = document.getElementById('srv-version') as HTMLSelectElement;
+  if (sel.options.length > 0) sel.selectedIndex = 0;
+  const mem = document.getElementById('srv-mem') as HTMLInputElement;
+  mem.value = '2';
+  document.getElementById('srv-mem-val')!.textContent = '2';
+  srvSaveStatus.textContent = '';
+});
 
 srvSaveBtn?.addEventListener('click', async () => {
   const name    = (document.getElementById('srv-name') as HTMLInputElement).value.trim() || 'My Server';
