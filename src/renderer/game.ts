@@ -183,7 +183,7 @@ function copyToClipboard(text: string, btn: HTMLButtonElement) {
   (window as any).electron?.copyText(text);
   const orig = btn.textContent;
   btn.textContent = '✓ Copied!';
-  btn.style.color = '#3fb950';
+  btn.style.color = '#f5a623';
   setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
 }
 
@@ -252,9 +252,9 @@ function updateModsBadge() {
   modsBadge.textContent     = fabricOn
     ? `✓ ${count} mod${count !== 1 ? 's' : ''} ready`
     : `${count} mod${count !== 1 ? 's' : ''} installed — enable Fabric above`;
-  modsBadge.style.color      = fabricOn ? '#3fb950'                  : '#d29922';
-  modsBadge.style.background = fabricOn ? 'rgba(63,185,80,0.10)'     : 'rgba(210,153,34,0.10)';
-  modsBadge.style.borderColor= fabricOn ? 'rgba(63,185,80,0.30)'     : 'rgba(210,153,34,0.35)';
+  modsBadge.style.color      = fabricOn ? '#f5a623'                  : '#f6c356';
+  modsBadge.style.background = fabricOn ? 'rgba(245,166,35,0.10)'     : 'rgba(246,195,86,0.10)';
+  modsBadge.style.borderColor= fabricOn ? 'rgba(245,166,35,0.30)'     : 'rgba(246,195,86,0.35)';
 }
 
 fabricToggle.addEventListener('change', () => {
@@ -336,15 +336,15 @@ mcPlayBtn.addEventListener('click', async () => {
   // Install Fabric if toggled on
   if (fabricToggle.checked) {
     fabricStatus.textContent = 'Installing Fabric…';
-    fabricStatus.style.color = '#a371f7';
+    fabricStatus.style.color = '#f5a623';
     const fab = await mc.installFabric({ mcVersion: version });
     if (fab.ok) {
       version = fab.fabricVersion; // launch with fabric version id
       fabricStatus.textContent = `Fabric ${fab.loaderVersion}`;
-      fabricStatus.style.color = '#3fb950';
+      fabricStatus.style.color = '#f5a623';
     } else {
       fabricStatus.textContent = `Fabric install failed — launching vanilla`;
-      fabricStatus.style.color = '#d29922';
+      fabricStatus.style.color = '#f6c356';
     }
   }
 
@@ -602,7 +602,7 @@ async function searchBedrockAddons(query: string) {
     bedrockAddonList.appendChild(frag);
   } catch {
     bedrockAddonLoading.style.display = 'none';
-    bedrockAddonList.innerHTML = '<p style="color:#f85149;text-align:center;padding:16px">Could not reach Modrinth — check your connection</p>';
+    bedrockAddonList.innerHTML = '<p style="color:#e05500;text-align:center;padding:16px">Could not reach Modrinth — check your connection</p>';
   }
 }
 
@@ -661,7 +661,7 @@ async function searchBedrockMods(query: string) {
     bedrockModsList.appendChild(frag);
   } catch {
     bedrockModsLoading.style.display = 'none';
-    bedrockModsList.innerHTML = '<p style="color:#f85149;padding:20px;text-align:center">Could not reach Modrinth — check your connection</p>';
+    bedrockModsList.innerHTML = '<p style="color:#e05500;padding:20px;text-align:center">Could not reach Modrinth — check your connection</p>';
   }
 }
 
@@ -712,7 +712,7 @@ document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => 
 // ── In-game background (resource pack) ───────────────────────────────────────
 async function installGameBg(statusEl: HTMLElement) {
   statusEl.textContent = 'Generating panorama…';
-  statusEl.style.color = '#d29922';
+  statusEl.style.color = '#f6c356';
 
   const glowColors = [
     [68, 10, 130], [10, 40, 100], [10, 50, 32],
@@ -739,11 +739,11 @@ async function installGameBg(statusEl: HTMLElement) {
   const res = await mc.installBg({ images });
   if (res.ok) {
     statusEl.textContent = 'Installed — enable "VoxelClient" in Options › Resource Packs';
-    statusEl.style.color = '#3fb950';
+    statusEl.style.color = '#f5a623';
     localStorage.setItem('bg_installed', '1');
   } else {
     statusEl.textContent = res.error;
-    statusEl.style.color = '#f85149';
+    statusEl.style.color = '#e05500';
   }
 }
 
@@ -756,7 +756,7 @@ function initCustomize() {
   if (localStorage.getItem('bg_installed') === '1') {
     toggle.checked = true;
     status.textContent = 'Installed — enable "VoxelClient" in Options › Resource Packs';
-    status.style.color = '#3fb950';
+    status.style.color = '#f5a623';
   }
 
   toggle.addEventListener('change', async () => {
@@ -817,7 +817,7 @@ skinPickBtn.addEventListener('click', () => {
       skinApplyBtn.disabled = false;
       skinApplyBtn.style.opacity = '1';
       skinStatus.textContent = 'Skin loaded — click Apply to upload';
-      skinStatus.style.color = '#3fb950';
+      skinStatus.style.color = '#f5a623';
     };
     reader.readAsDataURL(file);
   };
@@ -828,14 +828,14 @@ skinApplyBtn.addEventListener('click', async () => {
   if (!mc || !skinBase64) return;
   skinApplyBtn.disabled = true;
   skinStatus.textContent = 'Uploading…';
-  skinStatus.style.color = '#d29922';
+  skinStatus.style.color = '#f6c356';
   const res = await mc.uploadSkin({ base64: skinBase64, variant: skinVariant });
   if (res.ok) {
     skinStatus.textContent = '✓ Skin applied!';
-    skinStatus.style.color = '#3fb950';
+    skinStatus.style.color = '#f5a623';
   } else {
     skinStatus.textContent = `Failed: ${res.error}`;
-    skinStatus.style.color = '#f85149';
+    skinStatus.style.color = '#e05500';
   }
   skinApplyBtn.disabled = false;
 });
@@ -848,8 +848,8 @@ document.querySelectorAll('.model-btn').forEach(btn => {
       (b as HTMLElement).style.color = '#8b949e';
     });
     const el = btn as HTMLElement;
-    el.style.background = '#238636';
-    el.style.borderColor = '#3fb950';
+    el.style.background = '#c07000';
+    el.style.borderColor = '#f5a623';
     el.style.color = '#fff';
     skinVariant = (el.dataset.model as 'classic' | 'slim') || 'classic';
   });
@@ -889,7 +889,7 @@ async function searchTexturePacks(query: string) {
     });
   } catch {
     tpLoading.style.display = 'none';
-    tpList.innerHTML = '<p style="color:#f85149;text-align:center;padding:16px">Could not reach Modrinth</p>';
+    tpList.innerHTML = '<p style="color:#e05500;text-align:center;padding:16px">Could not reach Modrinth</p>';
   }
 }
 
@@ -923,16 +923,16 @@ const modsLabelPacks = document.getElementById('mods-label-packs')!;
 if (localStorage.getItem('voxel_mods_tab') === 'modpack') {
   modsTypeSwitch.checked = true; modsTabType = 'modpack';
   modsLabelMods.style.color = '#484f58'; modsLabelMods.style.fontWeight = '400';
-  modsLabelPacks.style.color = '#3fb950'; modsLabelPacks.style.fontWeight = '700';
+  modsLabelPacks.style.color = '#f5a623'; modsLabelPacks.style.fontWeight = '700';
 }
 
 function setModsTab(type: 'mod' | 'modpack') {
   modsTabType = type;
   const isMod = type === 'mod';
   modsTypeSwitch.checked         = !isMod;
-  modsLabelMods.style.color      = isMod  ? '#3fb950' : '#484f58';
+  modsLabelMods.style.color      = isMod  ? '#f5a623' : '#484f58';
   modsLabelMods.style.fontWeight = isMod  ? '700'     : '400';
-  modsLabelPacks.style.color     = !isMod ? '#3fb950' : '#484f58';
+  modsLabelPacks.style.color     = !isMod ? '#f5a623' : '#484f58';
   modsLabelPacks.style.fontWeight= !isMod ? '700'     : '400';
   modsSearch.placeholder = isMod ? 'Search mods…' : 'Search modpacks…';
   localStorage.setItem('voxel_mods_tab', type);
@@ -997,7 +997,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
 
     if (checked) {
       statusEl.textContent = '…';
-      statusEl.style.color = '#d29922';
+      statusEl.style.color = '#f6c356';
       try {
         const ver = mcVersion.value || '1.21.4';
         const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '20' });
@@ -1018,12 +1018,12 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
         enabledMods.add(mod.project_id);
         card.className = 'mod-card enabled';
         statusEl.textContent = '✓';
-        statusEl.style.color = '#3fb950';
+        statusEl.style.color = '#f5a623';
       } catch (err: any) {
         input.checked = false;
         card.className = 'mod-card';
         statusEl.textContent = '✗';
-        statusEl.style.color = '#f85149';
+        statusEl.style.color = '#e05500';
         statusEl.title = err.message;
       }
     } else {
@@ -1039,7 +1039,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
     input.disabled = false;
   });
 
-  if (on) { statusEl.textContent = '✓'; statusEl.style.color = '#3fb950'; }
+  if (on) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
   return card;
 }
 
@@ -1084,7 +1084,7 @@ async function loadRecommendedMods() {
     modsList.appendChild(frag);
   } catch {
     modsLoading.style.display = 'none';
-    modsList.innerHTML = '<p style="color:#f85149;padding:20px;text-align:center">Could not reach Modrinth — check your connection</p>';
+    modsList.innerHTML = '<p style="color:#e05500;padding:20px;text-align:center">Could not reach Modrinth — check your connection</p>';
   }
 }
 
@@ -1115,7 +1115,7 @@ async function searchModrinth(query: string) {
     modsList.appendChild(frag);
   } catch {
     modsLoading.style.display = 'none';
-    modsList.innerHTML = '<p style="color:#f85149;padding:20px;text-align:center">Could not reach Modrinth — check your connection</p>';
+    modsList.innerHTML = '<p style="color:#e05500;padding:20px;text-align:center">Could not reach Modrinth — check your connection</p>';
   }
 }
 
@@ -1134,14 +1134,14 @@ interface PvpModDef {
 const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
   {
     label: 'Required',
-    color: '#d29922',
+    color: '#f6c356',
     mods: [
       { slug: 'fabric-api',            emoji: '🔧', name: 'Fabric API',           desc: 'Required dependency — all Fabric mods need this', group: 'Utility' },
     ],
   },
   {
     label: 'HUD & Info',
-    color: '#58a6ff',
+    color: '#f5a623',
     mods: [
       { slug: 'keystrokes',            emoji: '⌨️', name: 'Keystrokes',           desc: 'Live WASD + CPS overlay (Feather Keystrokes)', group: 'HUD' },
       { slug: 'appleskin',             emoji: '🍎', name: 'AppleSkin',            desc: 'Saturation & exhaustion on the hunger bar', group: 'HUD' },
@@ -1159,7 +1159,7 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
   },
   {
     label: 'Visual',
-    color: '#a371f7',
+    color: '#f5a623',
     mods: [
       { slug: 'custom-crosshair-mod',  emoji: '🎯', name: 'Custom Crosshair',    desc: 'Crosshair style, size, color & gap (Feather Crosshair)', group: 'Visual' },
       { slug: 'natural-motion-blur',   emoji: '💨', name: 'Motion Blur',         desc: 'Smooth camera motion blur (Feather Motion Blur)', group: 'Visual' },
@@ -1177,7 +1177,7 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
   },
   {
     label: 'Utility',
-    color: '#3fb950',
+    color: '#f5a623',
     mods: [
       { slug: 'sprinthop',             emoji: '🏃', name: 'Toggle Sprint',       desc: 'Toggle sprint & sneak — no need to hold Ctrl', group: 'Utility' },
       { slug: 'no-chat-reports',       emoji: '🔇', name: 'No Chat Reports',     desc: 'Removes chat signing — blocks Microsoft reports', group: 'Utility' },
@@ -1269,7 +1269,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
     : '';
 
   const verBadge = wrongVer
-    ? `<span style="font-size:10px;color:#d29922;background:rgba(210,153,34,0.12);border:1px solid rgba(210,153,34,0.3);border-radius:10px;padding:1px 6px;">v${installedInfo!.mcVersion}</span>`
+    ? `<span style="font-size:10px;color:#f6c356;background:rgba(246,195,86,0.12);border:1px solid rgba(246,195,86,0.3);border-radius:10px;padding:1px 6px;">v${installedInfo!.mcVersion}</span>`
     : on && installedInfo?.mcVersion
       ? `<span style="font-size:10px;color:#484f58;">v${installedInfo.mcVersion}</span>`
       : '';
@@ -1283,10 +1283,10 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
       </div>
       <div class="mod-desc">${mod.desc}</div>
       ${depsHtml}
-      <div class="pvp-err" style="font-size:11px;color:#f85149;margin-top:4px;display:none;"></div>
+      <div class="pvp-err" style="font-size:11px;color:#e05500;margin-top:4px;display:none;"></div>
     </div>
     <div class="mod-right">
-      <div class="mod-version" style="color:${on ? (wrongVer ? '#d29922' : '#3fb950') : 'transparent'}">${on ? (wrongVer ? '↻' : '✓') : ''}</div>
+      <div class="mod-version" style="color:${on ? (wrongVer ? '#f6c356' : '#f5a623') : 'transparent'}">${on ? (wrongVer ? '↻' : '✓') : ''}</div>
       <label class="toggle">
         <input type="checkbox" ${on ? 'checked' : ''} />
         <span class="toggle-slider"></span>
@@ -1302,7 +1302,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
     input.disabled = true;
     errEl.style.display = 'none';
     if (checked) {
-      statusEl.textContent = '…'; statusEl.style.color = '#d29922';
+      statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
       try {
         const ver = mcVersion.value || '1.21.4';
         const curInstalled = loadInstalledMods();
@@ -1315,18 +1315,18 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
             return !info || info.mcVersion !== ver;
           });
         for (const dep of depsToInstall) {
-          statusEl.textContent = dep.name; statusEl.style.color = '#58a6ff';
+          statusEl.textContent = dep.name; statusEl.style.color = '#f5a623';
           await installOneMod(dep, ver);
         }
-        statusEl.textContent = '…'; statusEl.style.color = '#58a6ff';
+        statusEl.textContent = '…'; statusEl.style.color = '#f5a623';
         await installOneMod(mod, ver);
         card.className = 'mod-card enabled';
-        statusEl.textContent = '✓'; statusEl.style.color = '#3fb950';
+        statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
         if (depsToInstall.length) renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
       } catch (err: any) {
         input.checked = false;
         card.className = 'mod-card';
-        statusEl.textContent = '✗'; statusEl.style.color = '#f85149';
+        statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
         errEl.textContent = err.message;
         errEl.style.display = 'block';
       }
@@ -1439,10 +1439,10 @@ function buildRPCard(name: string, slug: string, icon: string, desc: string, ins
     <div class="mod-info">
       <div class="mod-name">${name}</div>
       <div class="mod-desc">${desc}</div>
-      <div class="pvp-err" style="font-size:11px;color:#f85149;margin-top:4px;display:none;"></div>
+      <div class="pvp-err" style="font-size:11px;color:#e05500;margin-top:4px;display:none;"></div>
     </div>
     <div class="mod-right">
-      <div class="mod-version" style="color:${installed ? '#3fb950' : 'transparent'}">✓</div>
+      <div class="mod-version" style="color:${installed ? '#f5a623' : 'transparent'}">✓</div>
       <label class="toggle"><input type="checkbox" ${installed ? 'checked' : ''} /><span class="toggle-slider"></span></label>
     </div>`;
   const input    = card.querySelector('input') as HTMLInputElement;
@@ -1454,18 +1454,18 @@ function buildRPCard(name: string, slug: string, icon: string, desc: string, ins
     errEl.style.display = 'none';
     const rps = loadInstalledRPs();
     if (checked) {
-      statusEl.textContent = '…'; statusEl.style.color = '#58a6ff';
+      statusEl.textContent = '…'; statusEl.style.color = '#f5a623';
       try {
         const res = await mc.installResourcePack({ url, filename });
         if (!res.ok) throw new Error(res.error);
         rps[slug] = filename;
         saveInstalledRPs(rps);
         card.className = 'mod-card enabled';
-        statusEl.textContent = '✓'; statusEl.style.color = '#3fb950';
+        statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
       } catch (err: any) {
         input.checked = false;
         card.className = 'mod-card';
-        statusEl.textContent = '✗'; statusEl.style.color = '#f85149';
+        statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
         errEl.textContent = err.message; errEl.style.display = 'block';
       }
     } else {
@@ -1500,7 +1500,7 @@ async function searchResourcePacks(query: string) {
       rpList.appendChild(card);
     }
     if (!data.hits?.length) rpList.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:20px 0;">No results</div>';
-  } catch { rpLoading.style.display = 'none'; rpList.innerHTML = '<div style="color:#f85149;font-size:13px;text-align:center;padding:20px 0;">Search failed</div>'; }
+  } catch { rpLoading.style.display = 'none'; rpList.innerHTML = '<div style="color:#e05500;font-size:13px;text-align:center;padding:20px 0;">Search failed</div>'; }
 }
 
 function initResourcePacks() {
@@ -1509,7 +1509,7 @@ function initResourcePacks() {
   installedEl.innerHTML = '';
   if (Object.keys(rps).length) {
     const label = document.createElement('div');
-    label.style.cssText = 'font-size:13px;font-weight:700;color:#3fb950;margin-bottom:8px;';
+    label.style.cssText = 'font-size:13px;font-weight:700;color:#f5a623;margin-bottom:8px;';
     label.textContent = '✓ Installed';
     installedEl.appendChild(label);
     for (const [slug, filename] of Object.entries(rps)) {
@@ -1568,11 +1568,11 @@ function initSkins() {
   applyBtn.addEventListener('click', async () => {
     const variant = (document.querySelector('input[name="skin-variant"]:checked') as HTMLInputElement)?.value as 'classic' | 'slim' || 'classic';
     applyBtn.disabled = true;
-    statusEl.textContent = 'Uploading...'; statusEl.style.color = '#d29922';
+    statusEl.textContent = 'Uploading...'; statusEl.style.color = '#f6c356';
     const res = await mc.uploadSkin({ base64: selectedBase64, variant });
     applyBtn.disabled = false;
-    if (res.ok) { statusEl.textContent = '✓ Skin applied!'; statusEl.style.color = '#3fb950'; }
-    else         { statusEl.textContent = `✗ ${res.error}`; statusEl.style.color = '#f85149'; }
+    if (res.ok) { statusEl.textContent = '✓ Skin applied!'; statusEl.style.color = '#f5a623'; }
+    else         { statusEl.textContent = `✗ ${res.error}`; statusEl.style.color = '#e05500'; }
   });
 }
 
@@ -1634,7 +1634,7 @@ function renderAccountsList() {
         <div style="color:#e6edf3;font-size:13px;font-weight:600;">${acc.name}</div>
         <div style="color:#6e7681;font-size:11px;">Added ${new Date(acc.added).toLocaleDateString()}</div>
       </div>
-      ${isActive ? '<span style="color:#3fb950;font-size:12px;font-weight:600;">● Active</span>' : '<button class="switch-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;">Switch</button>'}
+      ${isActive ? '<span style="color:#f5a623;font-size:12px;font-weight:600;">● Active</span>' : '<button class="switch-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;">Switch</button>'}
       <button class="remove-btn" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:16px;padding:0 4px;" title="Remove">✕</button>`;
     row.querySelector('.switch-btn')?.addEventListener('click', () => {
       if (offlineInput) { offlineInput.value = acc.name; offlineInput.dispatchEvent(new Event('input')); }
@@ -1670,14 +1670,14 @@ function initAccounts() {
 
 // ── Cosmetics panel ───────────────────────────────────────────────────────────
 const CAPE_DEFS = [
-  { id: 'voxel_green', name: 'Voxel Green',  top: '#3fb950', bot: '#1a4a2e', cost: 0   },
-  { id: 'midnight',    name: 'Midnight Blue', top: '#58a6ff', bot: '#1a2e4a', cost: 100 },
-  { id: 'crimson',     name: 'Crimson',       top: '#da3633', bot: '#5a0a0a', cost: 100 },
-  { id: 'amethyst',    name: 'Amethyst',      top: '#a371f7', bot: '#4a1a9e', cost: 150 },
-  { id: 'golden',      name: 'Golden',        top: '#d29922', bot: '#6b4c00', cost: 150 },
+  { id: 'voxel_green', name: 'Voxel Green',  top: '#f5a623', bot: '#1a4a2e', cost: 0   },
+  { id: 'midnight',    name: 'Midnight Blue', top: '#f5a623', bot: '#1a2e4a', cost: 100 },
+  { id: 'crimson',     name: 'Crimson',       top: '#e05500', bot: '#5a0a0a', cost: 100 },
+  { id: 'amethyst',    name: 'Amethyst',      top: '#f5a623', bot: '#4a1a9e', cost: 150 },
+  { id: 'golden',      name: 'Golden',        top: '#f6c356', bot: '#6b4c00', cost: 150 },
   { id: 'nether',      name: 'Nether',        top: '#f97316', bot: '#7a1a00', cost: 200 },
   { id: 'ocean',       name: 'Ocean',         top: '#7cc4db', bot: '#1a4a5a', cost: 200 },
-  { id: 'void',        name: 'Void',          top: '#8b5cf6', bot: '#0a0a2e', cost: 300 },
+  { id: 'void',        name: 'Void',          top: '#f5a623', bot: '#0a0a2e', cost: 300 },
 ];
 
 let equippedCapeId: string | null = null;
@@ -1784,7 +1784,7 @@ function renderFriendsList(uid: string, data: Record<string, any>) {
         <div id="fstatus-${fuid}" style="font-size:11px;color:#484f58;margin-top:2px;">Offline</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;">
-        <span id="fsrv-${fuid}" style="display:none;font-family:monospace;font-size:11px;color:#3fb950;background:rgba(63,185,80,0.06);border:1px solid rgba(63,185,80,0.15);padding:4px 8px;border-radius:6px;cursor:pointer;" title="Click to copy"></span>
+        <span id="fsrv-${fuid}" style="display:none;font-family:monospace;font-size:11px;color:#f5a623;background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.15);padding:4px 8px;border-radius:6px;cursor:pointer;" title="Click to copy"></span>
         <button data-fuid="${fuid}" class="friend-remove-btn" style="padding:4px 10px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#484f58;font-size:11px;cursor:pointer;">Remove</button>
       </div>`;
     card.querySelector('.friend-remove-btn')!.addEventListener('click', async () => {
@@ -1831,7 +1831,7 @@ function renderFriendRequests(uid: string, data: Record<string, any>) {
     card.innerHTML = `
       <div class="friend-avatar" style="font-size:16px;">🧑</div>
       <div style="flex:1;font-size:13px;color:#e6edf3;font-weight:500;">${info.name || fromUid}</div>
-      <button class="req-accept" style="padding:5px 12px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:6px;color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">Accept</button>
+      <button class="req-accept" style="padding:5px 12px;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.4);border-radius:6px;color:#f5a623;font-size:12px;cursor:pointer;font-weight:600;">Accept</button>
       <button class="req-decline" style="padding:5px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#484f58;font-size:12px;cursor:pointer;margin-left:6px;">Decline</button>`;
     card.querySelector('.req-accept')!.addEventListener('click', async () => {
       // Add to each other's list
@@ -1853,7 +1853,7 @@ async function sendFriendRequest(uid: string, targetName: string) {
   const statusEl = document.getElementById('friend-add-status');
   const addBtn   = document.getElementById('friend-add-btn') as HTMLButtonElement;
   if (!statusEl || !addBtn) return;
-  if (!uid) { statusEl.style.color = '#f85149'; statusEl.textContent = 'Sign in first'; return; }
+  if (!uid) { statusEl.style.color = '#e05500'; statusEl.textContent = 'Sign in first'; return; }
   const name = targetName.trim().toLowerCase();
   if (!name) return;
   addBtn.disabled = true;
@@ -1862,20 +1862,20 @@ async function sendFriendRequest(uid: string, targetName: string) {
   const snap = await get(ref(rtdb, `voxel_user_index/${name}`));
   const target = snap.val();
   if (!target) {
-    statusEl.style.color = '#f85149';
+    statusEl.style.color = '#e05500';
     statusEl.textContent = `"${targetName}" hasn't used Voxel Client yet`;
     addBtn.disabled = false;
     return;
   }
   const targetUid = target.uid;
-  if (targetUid === uid) { statusEl.style.color = '#f85149'; statusEl.textContent = "That's you!"; addBtn.disabled = false; return; }
+  if (targetUid === uid) { statusEl.style.color = '#e05500'; statusEl.textContent = "That's you!"; addBtn.disabled = false; return; }
   // Check if already friends
   const alreadySnap = await get(ref(rtdb, `voxel_friends/${uid}/list/${targetUid}`));
-  if (alreadySnap.exists()) { statusEl.style.color = '#d29922'; statusEl.textContent = 'Already friends'; addBtn.disabled = false; return; }
+  if (alreadySnap.exists()) { statusEl.style.color = '#f6c356'; statusEl.textContent = 'Already friends'; addBtn.disabled = false; return; }
   // Send request
   await set(ref(rtdb, `voxel_friends/${targetUid}/requests/incoming/${uid}`), { name: mcIgnSpan.textContent || uid, sentAt: serverTimestamp() });
   await set(ref(rtdb, `voxel_friends/${uid}/requests/outgoing/${targetUid}`), { name: target.name, sentAt: serverTimestamp() });
-  statusEl.style.color = '#3fb950';
+  statusEl.style.color = '#f5a623';
   statusEl.textContent = `Request sent to ${target.name}`;
   (document.getElementById('friend-add-input') as HTMLInputElement).value = '';
   addBtn.disabled = false;
@@ -2016,10 +2016,10 @@ async function initCosmetics() {
     const res = await cosm.installMod();
     if (res.ok) {
       installStatus.textContent = 'Installed! Launch with Fabric Loader to see capes.';
-      installStatus.style.color = '#3fb950';
+      installStatus.style.color = '#f5a623';
     } else {
       installStatus.textContent = res.error;
-      installStatus.style.color = '#f85149';
+      installStatus.style.color = '#e05500';
     }
     installBtn.disabled = false;
     installBtn.textContent = 'Install Cosmetics Mod';
@@ -2094,7 +2094,7 @@ function renderSavedServers() {
         </div>
       </div>
       <div class="mod-right" style="gap:6px;">
-        <button data-id="${srv.id}" class="srv-load-btn" style="padding:5px 12px;background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:6px;color:#3fb950;font-size:11px;cursor:pointer;white-space:nowrap;">Load</button>
+        <button data-id="${srv.id}" class="srv-load-btn" style="padding:5px 12px;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:6px;color:#f5a623;font-size:11px;cursor:pointer;white-space:nowrap;">Load</button>
         <button data-id="${srv.id}" class="srv-del-btn" style="padding:5px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:11px;cursor:pointer;">✕</button>
       </div>`;
     card.querySelector('.srv-load-btn')!.addEventListener('click', () => {
@@ -2130,7 +2130,7 @@ srvSaveBtn?.addEventListener('click', async () => {
 
   if (publish && !isValidServerDomain(ip)) {
     srvSaveStatus.textContent = 'Enter a domain address to list publicly (e.g. play.yourserver.net)';
-    srvSaveStatus.style.color = '#f85149';
+    srvSaveStatus.style.color = '#e05500';
     setTimeout(() => { srvSaveStatus.textContent = ''; }, 4000);
     return;
   }
@@ -2143,7 +2143,7 @@ srvSaveBtn?.addEventListener('click', async () => {
   if (publish) await publish247(srv);
   renderSavedServers();
   srvSaveStatus.textContent = publish ? 'Saved & listed 24/7' : 'Saved locally';
-  srvSaveStatus.style.color = '#3fb950';
+  srvSaveStatus.style.color = '#f5a623';
   setTimeout(() => { srvSaveStatus.textContent = ''; }, 2500);
 });
 
@@ -2176,8 +2176,8 @@ function srvAddLog(text: string) {
     if (srvLogLines.length > 300) srvLogLines.shift();
     const div = document.createElement('div');
     div.style.lineHeight = '1.6';
-    div.style.color = l.includes('ERROR') || l.includes('WARN') ? '#d29922'
-                    : l.includes('[Host]') ? '#79c0ff' : '#6e7681';
+    div.style.color = l.includes('ERROR') || l.includes('WARN') ? '#f6c356'
+                    : l.includes('[Host]') ? '#f6c356' : '#6e7681';
     div.textContent = l;
     srvLog.appendChild(div);
     // Detect when MC server finishes starting — show connection address
@@ -2366,7 +2366,7 @@ function loadCommunityServers() {
             </div>
           </div>
           <div class="mod-right">
-            <span style="font-family:monospace;font-size:11px;color:${isOnline ? '#3fb950' : '#484f58'};background:rgba(${isOnline ? '63,185,80' : '255,255,255'},0.06);border:1px solid rgba(${isOnline ? '63,185,80' : '255,255,255'},0.12);padding:4px 10px;border-radius:6px;">${s.address || '—'}:${s.port || 25565}</span>
+            <span style="font-family:monospace;font-size:11px;color:${isOnline ? '#f5a623' : '#484f58'};background:rgba(${isOnline ? '63,185,80' : '255,255,255'},0.06);border:1px solid rgba(${isOnline ? '63,185,80' : '255,255,255'},0.12);padding:4px 10px;border-radius:6px;">${s.address || '—'}:${s.port || 25565}</span>
           </div>`;
         communityEl.appendChild(card);
       });
@@ -2513,7 +2513,7 @@ if (updater) {
 // ── Files panel ───────────────────────────────────────────────────────────────
 function makeDropZone(zoneId: string, accept: string[], onDrop: (paths: string[]) => void) {
   const zone = document.getElementById(zoneId)!;
-  const highlight = () => { zone.style.borderColor = '#58a6ff'; zone.style.background = 'rgba(88,166,255,0.06)'; };
+  const highlight = () => { zone.style.borderColor = '#f5a623'; zone.style.background = 'rgba(245,166,35,0.06)'; };
   const unhighlight = () => { zone.style.borderColor = '#30363d'; zone.style.background = 'rgba(13,17,23,0.5)'; };
   zone.addEventListener('dragover',  e => { e.preventDefault(); highlight(); });
   zone.addEventListener('dragleave', () => unhighlight());
@@ -2598,10 +2598,11 @@ function initFiles() {
   // Quick-open button styles
   document.querySelectorAll<HTMLElement>('.files-folder-btn').forEach(btn => {
     btn.style.cssText = 'padding:7px 14px;background:rgba(33,38,45,0.6);border:1px solid #30363d;border-radius:7px;color:#8b949e;font-size:12px;cursor:pointer;';
-    btn.onmouseenter = () => { btn.style.borderColor = '#58a6ff'; btn.style.color = '#58a6ff'; };
+    btn.onmouseenter = () => { btn.style.borderColor = '#f5a623'; btn.style.color = '#f5a623'; };
     btn.onmouseleave = () => { btn.style.borderColor = '#30363d'; btn.style.color = '#8b949e'; };
   });
 
   refreshFileLists();
 }
+
 
