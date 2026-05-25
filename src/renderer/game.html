@@ -23,7 +23,7 @@
     #titlebar-btns { -webkit-app-region: no-drag; display: flex; }
     .tbtn { background: none; border: none; color: #3a3015; font-size: 12px; cursor: pointer; padding: 2px 10px; transition: background 0.1s, color 0.1s; }
     .tbtn:hover { background: #1c1708; color: #fff; }
-    #close-btn:hover { background: #c0392b; color: #fff; }
+    #close-btn:hover { background: #c97800; color: #fff; }
 
     /* Layout */
     #launcher { display: flex; height: 100vh; padding-top: 30px; position: relative; z-index: 1; }
@@ -103,7 +103,7 @@
     }
     #mc-play-btn:hover:not(:disabled) { background: #ffb938; transform: translateY(-1px); box-shadow: 0 5px 20px rgba(245,166,35,0.28); }
     #mc-play-btn:disabled { opacity: 0.28; cursor: not-allowed; transform: none; box-shadow: none; }
-    #mc-play-btn.running { background: #1a0808; border: 1px solid #4a1010; color: #f85149; letter-spacing: 1px; }
+    #mc-play-btn.running { background: #111008; border: 1px solid #161208; color: #ffffff; letter-spacing: 1px; }
 
     /* Status bar */
     #status-bar {
@@ -114,7 +114,7 @@
     #status-dot { width: 6px; height: 6px; border-radius: 50%; background: #252010; flex-shrink: 0; }
     #status-dot.green { background: #f5a623; box-shadow: 0 0 5px rgba(245,166,35,0.5); }
     #status-dot.yellow { background: #f5a623; }
-    #status-dot.red { background: #f85149; }
+    #status-dot.red { background: #ffffff; }
     #status-text { flex: 1; }
     #progress-bar-wrap { width: 130px; height: 3px; background: #1a1408; border-radius: 2px; overflow: hidden; display: none; }
     #progress-bar { height: 100%; background: #f5a623; width: 0%; transition: width 0.3s; }
@@ -131,11 +131,11 @@
     }
     #log-header span { font-size: 10px; color: #3a3015; font-family: monospace; letter-spacing: 1px; text-transform: uppercase; }
     #log-close { background: none; border: none; color: #3a3015; font-size: 14px; cursor: pointer; padding: 0 4px; }
-    #log-close:hover { color: #f85149; }
+    #log-close:hover { color: #ffffff; }
     #log-body { overflow-y: auto; padding: 6px 26px 8px; font-family: 'Consolas', monospace; font-size: 11px; color: #5a4e2a; cursor: text; flex: 1; }
     .log-line { line-height: 1.6; }
     .log-line.warn  { color: #f5a623; }
-    .log-line.error { color: #f85149; }
+    .log-line.error { color: #ffffff; }
     #log-toggle { background: none; border: none; color: #3a3015; font-size: 11px; cursor: pointer; padding: 0; }
     #log-toggle:hover { color: #7a6a38; }
 
@@ -151,7 +151,7 @@
       border-radius: 6px; font-size: 12px; color: #7a6a38;
     }
     #mods-loader-row span { flex: 1; }
-    #fabric-badge { padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 700; background: rgba(245,166,35,0.1); color: #f5a623; border: 1px solid rgba(245,166,35,0.22); }
+    #f5a623ric-badge { padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 700; background: rgba(245,166,35,0.1); color: #f5a623; border: 1px solid rgba(245,166,35,0.22); }
     #mods-list { flex: 1; overflow-y: auto; padding: 14px 26px; display: flex; flex-direction: column; gap: 6px; }
     .mod-card {
       display: flex; align-items: center; gap: 12px;
@@ -364,7 +364,7 @@
       <!-- Play button -->
       <div id="play-row" style="display:flex;gap:10px;align-items:center;">
         <button id="mc-play-btn" style="flex:1;">▶ &nbsp;PLAY</button>
-        <button id="mc-force-quit-btn" style="display:none;padding:0 18px;height:48px;background:#3a1010;border:1px solid #8b1a1a;border-radius:8px;color:#f85149;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background 0.15s;" onmouseover="this.style.background='#5a1a1a'" onmouseout="this.style.background='#3a1010'">⏹ Force Quit</button>
+        <button id="mc-force-quit-btn" style="display:none;padding:0 18px;height:48px;background:#141108;border:1px solid #1a1408;border-radius:8px;color:#ffffff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background 0.15s;" onmouseover="this.style.background='#1c1808'" onmouseout="this.style.background='#141108'">⏹ Force Quit</button>
       </div>
 
       <!-- Status bar -->
@@ -651,9 +651,9 @@
         <!-- Row 1: name + version + snapshots + preset -->
         <div style="display:flex;align-items:center;gap:10px;">
           <input id="srv-name" type="text" value="My Server" placeholder="Server name"
-            style="flex:2;min-width:100px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#f2f5f7;padding:9px 13px;font-size:13px;outline:none;font-family:'Roboto',sans-serif;"
+            style="flex:2;min-width:100px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#ffffff;padding:9px 13px;font-size:13px;outline:none;font-family:'Roboto',sans-serif;"
             onfocus="this.style.borderColor='#ffffff'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'" />
-          <select id="srv-version" style="flex:1;min-width:110px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#f2f5f7;padding:9px 12px;font-size:13px;outline:none;cursor:pointer;font-family:'Roboto',sans-serif;">
+          <select id="srv-version" style="flex:1;min-width:110px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#ffffff;padding:9px 12px;font-size:13px;outline:none;cursor:pointer;font-family:'Roboto',sans-serif;">
             <option disabled selected>Loading…</option>
           </select>
           <label style="display:flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer;flex-shrink:0;">
@@ -670,18 +670,18 @@
           <span style="font-size:13px;color:#ffffff;font-weight:600;min-width:28px;"><span id="srv-mem-val">2</span>G</span>
           <div style="flex:1;"></div>
           <button id="srv-start-btn" style="padding:9px 28px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#ffffff,#ffffff);border:none;border-radius:8px;color:#0c0800;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;font-family:'Roboto',sans-serif;">▶ Start Server</button>
-          <button id="srv-stop-btn" style="display:none;padding:9px 28px;font-size:13px;font-weight:700;background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.35);border-radius:8px;color:#f85149;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;font-family:'Roboto',sans-serif;">⏹ Stop Server</button>
+          <button id="srv-stop-btn" style="display:none;padding:9px 28px;font-size:13px;font-weight:700;background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.35);border-radius:8px;color:#ffffff;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;font-family:'Roboto',sans-serif;">⏹ Stop Server</button>
         </div>
 
         <!-- Status bar (shown when running) -->
         <div id="srv-info" style="display:none;align-items:center;gap:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:10px 16px;">
           <span style="color:#ffffff;font-size:12px;font-weight:600;white-space:nowrap;">● Running</span>
           <span style="color:#3a3018;font-size:12px;">│</span>
-          <span style="color:#ffffff;font-size:12px;">Port <span style="color:#f2f5f7;font-family:monospace;">25565</span></span>
+          <span style="color:#ffffff;font-size:12px;">Port <span style="color:#ffffff;font-family:monospace;">25565</span></span>
           <span style="color:#3a3018;font-size:12px;">│</span>
-          <span style="color:#ffffff;font-size:12px;white-space:nowrap;">MC <span id="srv-ver-display" style="color:#f2f5f7;font-family:monospace;"></span></span>
+          <span style="color:#ffffff;font-size:12px;white-space:nowrap;">MC <span id="srv-ver-display" style="color:#ffffff;font-family:monospace;"></span></span>
           <span style="color:#3a3018;font-size:12px;">│</span>
-          <span id="srv-address" style="color:#f2f5f7;font-family:monospace;font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">localhost:25565</span>
+          <span id="srv-address" style="color:#ffffff;font-family:monospace;font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">localhost:25565</span>
           <a href="https://playit.gg" target="_blank" style="font-size:11px;color:#ffffff;white-space:nowrap;flex-shrink:0;">playit.gg →</a>
         </div>
       </div>
@@ -698,7 +698,7 @@
         <div style="display:flex;border-top:1px solid rgba(255,255,255,0.1);flex-shrink:0;">
           <span style="padding:9px 12px;font-family:monospace;font-size:13px;color:#ffffff;background:rgba(0,0,0,0.3);border-right:1px solid rgba(255,255,255,0.1);">›</span>
           <input id="srv-cmd-input" type="text" placeholder="Command — e.g. list, say Hello, op player"
-            style="flex:1;background:rgba(0,0,0,0.3);border:none;color:#f2f5f7;padding:9px 12px;font-size:12px;font-family:monospace;outline:none;" />
+            style="flex:1;background:rgba(0,0,0,0.3);border:none;color:#ffffff;padding:9px 12px;font-size:12px;font-family:monospace;outline:none;" />
           <button id="srv-cmd-btn" style="padding:9px 18px;background:rgba(255,255,255,0.08);border:none;border-left:1px solid rgba(255,255,255,0.1);color:#ffffff;font-size:12px;cursor:pointer;font-weight:600;font-family:'Roboto',sans-serif;">Send</button>
         </div>
       </div>
@@ -966,7 +966,7 @@
             <div style="font-size:14px;font-weight:600;">Re-authenticate Microsoft</div>
             <div style="font-size:12px;color:#8a7a50;margin-top:3px;">Sign in again with a fresh token — fixes "Invalid session" errors on servers</div>
           </div>
-          <button id="mc-reauth-btn" style="padding:8px 18px;background:#1c1500;border:1px solid #2e2400;border-radius:7px;color:#f85149;font-size:13px;cursor:pointer;white-space:nowrap;">Re-authenticate</button>
+          <button id="mc-reauth-btn" style="padding:8px 18px;background:#1c1500;border:1px solid #2e2400;border-radius:7px;color:#ffffff;font-size:13px;cursor:pointer;white-space:nowrap;">Re-authenticate</button>
         </div>
       </div>
     </div>
