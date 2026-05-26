@@ -1048,7 +1048,7 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
     </div>
     <div class="mod-right">
       <a href="https://modrinth.com/modpack/${mod.project_id}" target="_blank"
-        style="padding:7px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:12px;text-decoration:none;white-space:nowrap;">Get →</a>
+        style="padding:7px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:12px;text-decoration:none;white-space:nowrap;">View on Modrinth →</a>
     </div>`;
   return card;
 }
@@ -1116,6 +1116,7 @@ interface PvpModDef {
   slug: string; emoji: string; name: string; desc: string;
   group: 'HUD' | 'Visual' | 'Utility' | 'Performance';
   deps?: string[];
+  conflicts?: string[];
 }
 
 const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
@@ -1190,8 +1191,8 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
       { slug: 'memoryleakfix',         emoji: '🧠', name: 'Memory Leak Fix',     desc: 'Fixes Minecraft memory leaks — fewer crashes', group: 'Performance' },
       { slug: 'ferrite-core',          emoji: '💾', name: 'Ferrite Core',        desc: 'Reduces RAM usage of block states (Feather perf)', group: 'Performance' },
       { slug: 'indium',                emoji: '🔩', name: 'Indium',              desc: 'Sodium addon — enables Fabric Rendering API for other mods', group: 'Performance', deps: ['sodium'] },
-      { slug: 'starlight',             emoji: '⭐', name: 'Starlight',           desc: 'Rewrites light engine for massive chunk load speedup', group: 'Performance' },
-      { slug: 'c2me-fabric',           emoji: '🧵', name: 'C2ME',               desc: 'Multithreaded chunk generation & I/O', group: 'Performance' },
+      { slug: 'starlight',             emoji: '⭐', name: 'Starlight',           desc: 'Rewrites light engine for massive chunk load speedup', group: 'Performance', conflicts: ['c2me-fabric'] },
+      { slug: 'c2me-fabric',           emoji: '🧵', name: 'C2ME',               desc: 'Multithreaded chunk generation & I/O', group: 'Performance', conflicts: ['starlight'] },
       { slug: 'noxesium',              emoji: '🚀', name: 'Noxesium',            desc: 'Reduces server-side lag on large servers', group: 'Performance' },
       { slug: 'immediatelyfast',       emoji: '💨', name: 'ImmediatelyFast',     desc: 'Optimizes immediate mode rendering (GUI, maps, text)', group: 'Performance' },
     ],
@@ -1289,6 +1290,27 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
     input.disabled = true;
     errEl.style.display = 'none';
     if (checked) {
+      // Check for conflicts before installing
+      const conflictSlugs = (mod.conflicts || []).filter(s => enabledMods.has(s));
+      if (conflictSlugs.length) {
+        const conflictNames = conflictSlugs.map(s => PVP_MOD_BY_SLUG.get(s)?.name ?? s).join(', ');
+        // Disable the conflicting mods
+        for (const cSlug of conflictSlugs) {
+          const cMod = PVP_MOD_BY_SLUG.get(cSlug);
+          if (cMod) {
+            const cInstalled = loadInstalledMods();
+            if (cInstalled[cSlug]) await mc?.removeMod({ filename: cInstalled[cSlug].filename });
+            const updated = loadInstalledMods(); delete updated[cSlug]; saveInstalledMods(updated);
+            enabledMods.delete(cSlug);
+          }
+        }
+        errEl.textContent = `⚠ Disabled ${conflictNames} — incompatible with ${mod.name}`;
+        errEl.style.color = '#f6c356';
+        errEl.style.display = 'block';
+        // Re-render so the conflicting cards update
+        setTimeout(() => renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? ''), 50);
+      }
+
       statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
       try {
         const ver = mcVersion.value || '1.21.4';
@@ -1407,6 +1429,81 @@ function initPvpMods() {
   }
   reinstallBtn?.addEventListener('click', () => reinstallAllMods(reinstallBtn));
   updateReinstallBtn();
+
+  // ── Mod Profiles ──────────────────────────────────────────────────────────
+  interface ModProfile { id: string; name: string; slugs: string[] }
+  const PROFILES_KEY = 'voxel_mod_profiles';
+  function loadProfiles(): ModProfile[] {
+    try { return JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]'); } catch { return []; }
+  }
+  function saveProfiles(p: ModProfile[]) { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); }
+
+  const profileSelect  = document.getElementById('pvp-profile-select')  as HTMLSelectElement;
+  const profileNameIn  = document.getElementById('pvp-profile-name')    as HTMLInputElement;
+  const profileSaveBtn = document.getElementById('pvp-profile-save-btn') as HTMLButtonElement;
+  const profileLoadBtn = document.getElementById('pvp-profile-load-btn') as HTMLButtonElement;
+  const profileDelBtn  = document.getElementById('pvp-profile-del-btn')  as HTMLButtonElement;
+
+  function refreshProfileSelect() {
+    const profiles = loadProfiles();
+    const cur = profileSelect.value;
+    profileSelect.innerHTML = '<option value="">— No Profile —</option>';
+    for (const p of profiles) {
+      const opt = document.createElement('option');
+      opt.value = p.id; opt.textContent = p.name;
+      profileSelect.appendChild(opt);
+    }
+    if (profiles.find(p => p.id === cur)) profileSelect.value = cur;
+  }
+  refreshProfileSelect();
+
+  profileSaveBtn.addEventListener('click', () => {
+    const name = profileNameIn.value.trim();
+    if (!name) { profileNameIn.focus(); return; }
+    const slugs = Array.from(enabledMods);
+    const profiles = loadProfiles();
+    const existing = profiles.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      existing.slugs = slugs;
+      saveProfiles(profiles);
+    } else {
+      profiles.push({ id: `${Date.now()}`, name, slugs });
+      saveProfiles(profiles);
+    }
+    refreshProfileSelect();
+    profileNameIn.value = '';
+    profileSaveBtn.textContent = '✓ Saved';
+    setTimeout(() => { profileSaveBtn.textContent = 'Save Profile'; }, 1800);
+  });
+
+  profileLoadBtn.addEventListener('click', async () => {
+    const id = profileSelect.value;
+    if (!id) return;
+    const profile = loadProfiles().find(p => p.id === id);
+    if (!profile) return;
+    profileLoadBtn.textContent = 'Loading…';
+    profileLoadBtn.disabled = true;
+    // Disable all currently enabled mods not in profile
+    const installed = loadInstalledMods();
+    for (const slug of Array.from(enabledMods)) {
+      if (!profile.slugs.includes(slug)) {
+        if (installed[slug]) await mc?.removeMod({ filename: installed[slug].filename });
+        const upd = loadInstalledMods(); delete upd[slug]; saveInstalledMods(upd);
+        enabledMods.delete(slug);
+      }
+    }
+    renderPvpMods(searchEl.value);
+    profileLoadBtn.textContent = 'Load';
+    profileLoadBtn.disabled = false;
+  });
+
+  profileDelBtn.addEventListener('click', () => {
+    const id = profileSelect.value;
+    if (!id) return;
+    const profiles = loadProfiles().filter(p => p.id !== id);
+    saveProfiles(profiles);
+    refreshProfileSelect();
+  });
 }
 
 // ── Resource Packs panel ──────────────────────────────────────────────────────
@@ -1418,7 +1515,17 @@ function saveInstalledRPs(data: Record<string, string>) {
   localStorage.setItem(RP_STORAGE_KEY, JSON.stringify(data));
 }
 
-function buildRPCard(name: string, slug: string, icon: string, desc: string, installed: boolean, url: string, filename: string): HTMLElement {
+async function fetchRPDownloadUrl(projectId: string): Promise<{ url: string; filename: string }> {
+  const r = await fetch(`https://api.modrinth.com/v2/project/${projectId}/version?limit=5`);
+  if (!r.ok) throw new Error(`Modrinth API ${r.status}`);
+  const versions: any[] = await r.json();
+  if (!versions.length) throw new Error('No versions found for this resource pack');
+  const file = versions[0].files?.find((f: any) => f.primary) ?? versions[0].files?.[0];
+  if (!file?.url) throw new Error('No download file found');
+  return { url: file.url, filename: file.filename };
+}
+
+function buildRPCard(name: string, slug: string, projectId: string, icon: string, desc: string, installed: boolean): HTMLElement {
   const card = document.createElement('div');
   card.className = 'mod-card' + (installed ? ' enabled' : '');
   card.innerHTML = `
@@ -1443,6 +1550,7 @@ function buildRPCard(name: string, slug: string, icon: string, desc: string, ins
     if (checked) {
       statusEl.textContent = '…'; statusEl.style.color = '#f5a623';
       try {
+        const { url, filename } = await fetchRPDownloadUrl(projectId);
         const res = await mc.installResourcePack({ url, filename });
         if (!res.ok) throw new Error(res.error);
         rps[slug] = filename;
@@ -1481,9 +1589,7 @@ async function searchResourcePacks(query: string) {
     rpLoading.style.display = 'none';
     for (const hit of (data.hits || [])) {
       const installed = !!rps[hit.slug];
-      const filename  = `${hit.slug}.zip`;
-      const dlUrl     = `https://cdn.modrinth.com/data/${hit.project_id}/featured`;
-      const card = buildRPCard(hit.title, hit.slug, '', hit.description, installed, dlUrl, filename);
+      const card = buildRPCard(hit.title, hit.slug, hit.project_id, '', hit.description, installed);
       rpList.appendChild(card);
     }
     if (!data.hits?.length) rpList.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:20px 0;">No results</div>';
