@@ -652,6 +652,26 @@
     <!-- Server Host panel -->
     <div id="server-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;background:#0d0d0d;font-family:'Roboto','Helvetica',sans-serif;">
 
+      <!-- Dedicated Server Mode bar -->
+      <div style="padding:12px 24px;background:rgba(245,166,35,0.06);border-bottom:1px solid rgba(245,166,35,0.2);flex-shrink:0;display:flex;align-items:center;gap:16px;">
+        <div style="display:flex;flex-direction:column;gap:2px;flex:1;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;font-weight:700;color:#f5a623;letter-spacing:1px;text-transform:uppercase;">Dedicated Server</span>
+            <span id="srv-dedicated-dot" style="width:7px;height:7px;border-radius:50%;background:#30363d;display:inline-block;flex-shrink:0;"></span>
+            <span id="srv-dedicated-status" style="font-size:11px;color:#555555;">Inactive</span>
+          </div>
+          <span style="font-size:11px;color:#555555;">Auto-starts when this app opens — keeps laptop awake 24/7</span>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0;">
+          <span style="font-size:12px;color:#aaaaaa;white-space:nowrap;">Dedicated Mode</span>
+          <label class="toggle toggle-sm"><input type="checkbox" id="srv-dedicated-toggle" /><span class="toggle-slider"></span></label>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0;">
+          <span style="font-size:12px;color:#aaaaaa;white-space:nowrap;">Start with Windows</span>
+          <label class="toggle toggle-sm"><input type="checkbox" id="srv-boot-toggle" /><span class="toggle-slider"></span></label>
+        </label>
+      </div>
+
       <!-- Config header -->
       <div style="padding:16px 24px;border-bottom:1px solid rgba(60,60,60,0.6);flex-shrink:0;display:flex;flex-direction:column;gap:12px;">
 

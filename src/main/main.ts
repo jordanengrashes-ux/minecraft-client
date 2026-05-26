@@ -834,6 +834,18 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
   }
 });
 
+ipcMain.handle('server-set-autostart', (_e, enabled: boolean) => {
+  try {
+    app.setLoginItemSettings({ openAtLogin: enabled, path: app.getPath('exe') });
+    return { ok: true };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('server-get-autostart', () => {
+  try { return { ok: true, enabled: app.getLoginItemSettings().openAtLogin }; }
+  catch { return { ok: true, enabled: false }; }
+});
+
 ipcMain.handle('server-stop', async () => {
   if (!serverProcess) return { ok: false, error: 'Not running' };
   srvUserStopped = true;

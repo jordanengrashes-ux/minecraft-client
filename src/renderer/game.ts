@@ -2038,6 +2038,54 @@ const srvIpInput   = document.getElementById('srv-ip') as HTMLInputElement;
 
 let srvRunning = false;
 let srvLogLines: string[] = [];
+
+// ── Dedicated server mode ──────────────────────────────────────────────────────
+const DEDICATED_KEY = 'voxel_srv_dedicated_v1';
+const dedicatedToggle = document.getElementById('srv-dedicated-toggle') as HTMLInputElement;
+const bootToggle      = document.getElementById('srv-boot-toggle')      as HTMLInputElement;
+const dedicatedDot    = document.getElementById('srv-dedicated-dot')!;
+const dedicatedStatus = document.getElementById('srv-dedicated-status')!;
+
+function setDedicatedDot(active: boolean) {
+  dedicatedDot.style.background   = active ? '#3fb950' : '#30363d';
+  dedicatedStatus.style.color     = active ? '#3fb950' : '#555555';
+  dedicatedStatus.textContent     = active ? 'Active — server will auto-start' : 'Inactive';
+}
+
+function saveDedicatedSettings() {
+  localStorage.setItem(DEDICATED_KEY, JSON.stringify({ dedicated: dedicatedToggle?.checked, boot: bootToggle?.checked }));
+}
+
+function loadDedicatedSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(DEDICATED_KEY) || '{}');
+    if (dedicatedToggle) dedicatedToggle.checked = !!s.dedicated;
+    if (bootToggle)      bootToggle.checked      = !!s.boot;
+    setDedicatedDot(!!s.dedicated);
+  } catch {}
+}
+
+dedicatedToggle?.addEventListener('change', () => {
+  saveDedicatedSettings();
+  setDedicatedDot(dedicatedToggle.checked);
+  if (dedicatedToggle.checked && !srvRunning) {
+    // Auto-start immediately if not already running
+    setTimeout(() => { if (!srvRunning) srvStartBtn?.click(); }, 500);
+  }
+});
+
+bootToggle?.addEventListener('change', async () => {
+  saveDedicatedSettings();
+  await (server as any)?.setAutoStart?.(bootToggle.checked);
+});
+
+// Sync boot toggle from OS setting on load
+(async () => {
+  const r = await (server as any)?.getAutoStart?.();
+  if (bootToggle && r?.ok) bootToggle.checked = !!r.enabled;
+})();
+
+loadDedicatedSettings();
 let myUid = '';
 let pendingSrvName = '';
 let pendingSrvVersion = '';
@@ -2297,9 +2345,20 @@ async function loadServerVersions() {
     ];
     populateSrvVersions();
   }
+  maybeDedicatedAutoStart();
 }
 
 document.getElementById('srv-snapshots-toggle')?.addEventListener('change', populateSrvVersions);
+
+function maybeDedicatedAutoStart() {
+  try {
+    const s = JSON.parse(localStorage.getItem(DEDICATED_KEY) || '{}');
+    if (s.dedicated && !srvRunning) {
+      srvAddLog('[Dedicated] Auto-starting server…');
+      setTimeout(() => { if (!srvRunning) srvStartBtn?.click(); }, 800);
+    }
+  } catch {}
+}
 
 // ── Persist server settings across sessions ────────────────────────────────────
 const SRV_SETTINGS_KEY = 'voxel_srv_settings';
@@ -2496,8 +2555,10 @@ if (server) {
       srvAddLog(`[Host] Server crashed (exit code ${code}) — scroll up for errors`);
       if (code === 1) srvAddLog('[Host] Tip: may be OOM — increase RAM allocation above');
       const autoRestart = (document.getElementById('srv-autorestart') as HTMLInputElement)?.checked;
-      if (autoRestart) {
-        srvAddLog('[Host] Auto-restart enabled — restarting in 5s…');
+      const dedicatedOn = (() => { try { return JSON.parse(localStorage.getItem(DEDICATED_KEY) || '{}').dedicated; } catch { return false; } })();
+      if (autoRestart || dedicatedOn) {
+        const label = dedicatedOn ? '[Dedicated]' : '[Host]';
+        srvAddLog(`${label} Restarting server in 5s…`);
         setTimeout(() => { if (!srvRunning) srvStartBtn.click(); }, 5000);
       }
     } else {
