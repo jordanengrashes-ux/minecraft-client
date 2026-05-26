@@ -1438,71 +1438,89 @@ function initPvpMods() {
   }
   function saveProfiles(p: ModProfile[]) { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); }
 
-  const profileSelect  = document.getElementById('pvp-profile-select')  as HTMLSelectElement;
-  const profileNameIn  = document.getElementById('pvp-profile-name')    as HTMLInputElement;
-  const profileSaveBtn = document.getElementById('pvp-profile-save-btn') as HTMLButtonElement;
-  const profileLoadBtn = document.getElementById('pvp-profile-load-btn') as HTMLButtonElement;
-  const profileDelBtn  = document.getElementById('pvp-profile-del-btn')  as HTMLButtonElement;
+  const profileListEl  = document.getElementById('pvp-profile-list')!;
+  const profileEmptyEl = document.getElementById('pvp-profile-empty')!;
+  const profileNameIn  = document.getElementById('pvp-profile-name')  as HTMLInputElement;
+  const importNewBtn   = document.getElementById('pvp-profile-import-new') as HTMLButtonElement;
+  const importSelBtn   = document.getElementById('pvp-profile-import-sel') as HTMLButtonElement;
 
-  function refreshProfileSelect() {
+  let activeProfileId: string | null = null;
+
+  function renderProfileChips() {
     const profiles = loadProfiles();
-    const cur = profileSelect.value;
-    profileSelect.innerHTML = '<option value="">— No Profile —</option>';
+    Array.from(profileListEl.children).forEach(c => { if (c.id !== 'pvp-profile-empty') c.remove(); });
+    if (!profiles.length) { profileEmptyEl.style.display = ''; return; }
+    profileEmptyEl.style.display = 'none';
     for (const p of profiles) {
-      const opt = document.createElement('option');
-      opt.value = p.id; opt.textContent = p.name;
-      profileSelect.appendChild(opt);
-    }
-    if (profiles.find(p => p.id === cur)) profileSelect.value = cur;
-  }
-  refreshProfileSelect();
+      const chip = document.createElement('span');
+      chip.className = 'profile-chip' + (p.id === activeProfileId ? ' active' : '');
+      chip.dataset.id = p.id;
 
-  profileSaveBtn.addEventListener('click', () => {
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = p.name;
+      chip.appendChild(nameSpan);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'del-chip';
+      delBtn.textContent = '×';
+      delBtn.title = 'Delete profile';
+      delBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const updated = loadProfiles().filter(x => x.id !== p.id);
+        saveProfiles(updated);
+        if (activeProfileId === p.id) activeProfileId = null;
+        renderProfileChips();
+      });
+      chip.appendChild(delBtn);
+
+      chip.addEventListener('click', async () => {
+        activeProfileId = p.id;
+        renderProfileChips();
+        const profile = loadProfiles().find(x => x.id === p.id);
+        if (!profile) return;
+        const installed = loadInstalledMods();
+        for (const slug of Array.from(enabledMods)) {
+          if (!profile.slugs.includes(slug)) {
+            if (installed[slug]) await mc?.removeMod({ filename: installed[slug].filename });
+            const upd = loadInstalledMods(); delete upd[slug]; saveInstalledMods(upd);
+            enabledMods.delete(slug);
+          }
+        }
+        renderPvpMods(searchEl.value);
+      });
+
+      profileListEl.insertBefore(chip, profileEmptyEl);
+    }
+  }
+  renderProfileChips();
+
+  importNewBtn.addEventListener('click', () => {
     const name = profileNameIn.value.trim();
     if (!name) { profileNameIn.focus(); return; }
-    const slugs = Array.from(enabledMods);
     const profiles = loadProfiles();
-    const existing = profiles.find(p => p.name.toLowerCase() === name.toLowerCase());
-    if (existing) {
-      existing.slugs = slugs;
-      saveProfiles(profiles);
-    } else {
-      profiles.push({ id: `${Date.now()}`, name, slugs });
-      saveProfiles(profiles);
-    }
-    refreshProfileSelect();
-    profileNameIn.value = '';
-    profileSaveBtn.textContent = '✓ Saved';
-    setTimeout(() => { profileSaveBtn.textContent = 'Save Profile'; }, 1800);
-  });
-
-  profileLoadBtn.addEventListener('click', async () => {
-    const id = profileSelect.value;
-    if (!id) return;
-    const profile = loadProfiles().find(p => p.id === id);
-    if (!profile) return;
-    profileLoadBtn.textContent = 'Loading…';
-    profileLoadBtn.disabled = true;
-    // Disable all currently enabled mods not in profile
-    const installed = loadInstalledMods();
-    for (const slug of Array.from(enabledMods)) {
-      if (!profile.slugs.includes(slug)) {
-        if (installed[slug]) await mc?.removeMod({ filename: installed[slug].filename });
-        const upd = loadInstalledMods(); delete upd[slug]; saveInstalledMods(upd);
-        enabledMods.delete(slug);
-      }
-    }
-    renderPvpMods(searchEl.value);
-    profileLoadBtn.textContent = 'Load';
-    profileLoadBtn.disabled = false;
-  });
-
-  profileDelBtn.addEventListener('click', () => {
-    const id = profileSelect.value;
-    if (!id) return;
-    const profiles = loadProfiles().filter(p => p.id !== id);
+    const id = `${Date.now()}`;
+    profiles.push({ id, name, slugs: Array.from(enabledMods) });
     saveProfiles(profiles);
-    refreshProfileSelect();
+    activeProfileId = id;
+    profileNameIn.value = '';
+    renderProfileChips();
+    importNewBtn.textContent = '✓ Saved';
+    setTimeout(() => { importNewBtn.textContent = 'Import to New Profile'; }, 1800);
+  });
+
+  importSelBtn.addEventListener('click', () => {
+    if (!activeProfileId) {
+      importSelBtn.textContent = '← Select a profile first';
+      setTimeout(() => { importSelBtn.textContent = 'Import to Selected'; }, 2000);
+      return;
+    }
+    const profiles = loadProfiles();
+    const profile = profiles.find(p => p.id === activeProfileId);
+    if (!profile) return;
+    profile.slugs = Array.from(enabledMods);
+    saveProfiles(profiles);
+    importSelBtn.textContent = '✓ Updated';
+    setTimeout(() => { importSelBtn.textContent = 'Import to Selected'; }, 1800);
   });
 }
 

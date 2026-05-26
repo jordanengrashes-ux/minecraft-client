@@ -182,6 +182,13 @@
     .toggle-sm input:checked + .toggle-slider::before { transform: translateX(13px); }
 
     .mod-icon-img { width: 34px; height: 34px; border-radius: 5px; object-fit: cover; flex-shrink: 0; }
+
+    /* Mod profile chips */
+    .profile-chip { display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;background:#141414;border:1px solid #2a2a2a;color:#777777;cursor:pointer;transition:all 0.12s;white-space:nowrap;user-select:none; }
+    .profile-chip:hover { border-color:#444444;color:#ffffff; }
+    .profile-chip.active { background:rgba(245,166,35,0.12);border-color:rgba(245,166,35,0.5);color:#f5a623;font-weight:600; }
+    .profile-chip .del-chip { background:none;border:none;color:inherit;opacity:0.5;font-size:13px;cursor:pointer;padding:0 0 0 2px;line-height:1; }
+    .profile-chip .del-chip:hover { opacity:1; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Cosmetics */
@@ -519,14 +526,16 @@
           <span style="font-size:11px;color:#ffffff;">Enable <strong>Fabric Loader</strong> on the Play tab before launching — mods need it to run</span>
         </div>
         <!-- Mod Profiles -->
-        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
-          <select id="pvp-profile-select" style="flex:1;min-width:120px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;padding:7px 12px;color:#ffffff;font-size:12px;outline:none;cursor:pointer;">
-            <option value="">— No Profile —</option>
-          </select>
-          <button id="pvp-profile-load-btn" style="padding:7px 13px;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:8px;color:#f5a623;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Load</button>
-          <input id="pvp-profile-name" type="text" placeholder="Profile name…" maxlength="32" style="flex:1;min-width:110px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;padding:7px 12px;color:#ffffff;font-size:12px;outline:none;" />
-          <button id="pvp-profile-save-btn" style="padding:7px 13px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:8px;color:#ffffff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Save Profile</button>
-          <button id="pvp-profile-del-btn" style="padding:7px 10px;background:none;border:1px solid #2a2a2a;border-radius:8px;color:#555555;font-size:12px;cursor:pointer;white-space:nowrap;">✕</button>
+        <div id="pvp-profiles-section" style="margin-top:10px;padding:10px 12px;background:#0a0a10;border:1px solid #1e1e1e;border-radius:8px;">
+          <div style="font-size:10px;color:#444;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Mod Profiles</div>
+          <div id="pvp-profile-list" style="display:flex;gap:6px;flex-wrap:wrap;min-height:26px;margin-bottom:10px;">
+            <span id="pvp-profile-empty" style="font-size:12px;color:#444444;">No profiles yet — import your current mods to get started</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input id="pvp-profile-name" type="text" placeholder="Profile name…" maxlength="32" style="flex:1;min-width:120px;background:#111;border:1px solid #2a2a2a;border-radius:7px;padding:6px 10px;color:#fff;font-size:12px;outline:none;font-family:inherit;" />
+            <button id="pvp-profile-import-new" style="padding:6px 12px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:7px;color:#f5a623;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Import to New Profile</button>
+            <button id="pvp-profile-import-sel" style="padding:6px 12px;background:#141414;border:1px solid #2a2a2a;border-radius:7px;color:#777777;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Import to Selected</button>
+          </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
           <input id="pvp-search" type="text" placeholder="Search mods..." style="flex:1;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;padding:8px 14px;color:#ffffff;font-size:13px;font-family:inherit;outline:none;" />
