@@ -2374,11 +2374,17 @@ if ((window as any).electron) {
 
 
 
-async function onServerReady(name: string, version: string) {
+async function onServerReady(name: string, version: string, port: number) {
   const manualIp = srvIpInput.value.trim();
   const ip = manualIp || await getPublicIP();
   if (!manualIp) srvIpInput.value = ip;
-  srvAddress.textContent = `localhost:25565   (public: ${ip}:25565)`;
+  srvAddress.textContent = `localhost:${port}   (public: ${ip}:${port})`;
+  // Update status dot to green "Ready"
+  const dot = document.getElementById('srv-dedicated-dot');
+  const status = document.getElementById('srv-dedicated-status');
+  if (dot) dot.style.background = '#3fb950';
+  if (status) { status.textContent = 'Ready — accepting connections'; status.style.color = '#3fb950'; }
+  srvAddLog(`[Host] ✓ Server is READY — connect with localhost:${port}`);
   await publishServer(name, version, ip);
 }
 
@@ -2393,11 +2399,6 @@ function srvAddLog(text: string) {
                     : l.includes('[Host]') ? '#f6c356' : '#6e7681';
     div.textContent = l;
     srvLog.appendChild(div);
-    // Detect when MC server finishes starting — show connection address
-    if (srvRunning && srvAddress.textContent?.includes('Starting') &&
-        (l.includes(' Done (') || l.includes('!  Done'))) {
-      onServerReady(pendingSrvName, pendingSrvVersion);
-    }
   });
   // Remove placeholder
   const placeholder = srvLog.querySelector('div[style*="30363d"]');
@@ -2685,6 +2686,10 @@ srvStopBtn?.addEventListener('click', async () => {
 if (server) {
   server.onLog((line: string) => srvAddLog(line));
 
+  (server as any).onReady?.((port: number) => {
+    onServerReady(pendingSrvName, pendingSrvVersion, port);
+  });
+
   (server as any).onPlayerJoin?.((name: string) => {
     srvAddLog(`[Host] >> ${name} joined the server`);
     // Flash a toast notification
@@ -2708,6 +2713,11 @@ if (server) {
     const userStopped = typeof info === 'object' ? info?.userStopped : false;
     srvRunning = false;
     srvInfo.style.display = 'none';
+    // Reset ready indicator
+    const dot = document.getElementById('srv-dedicated-dot');
+    const status = document.getElementById('srv-dedicated-status');
+    if (dot) dot.style.background = '#30363d';
+    if (status) { status.textContent = 'Inactive'; status.style.color = '#555555'; }
     srvStopBtn.style.display = 'none';
     srvStopBtn.disabled = false;
     srvStopBtn.textContent = '⏹ Stop Server';

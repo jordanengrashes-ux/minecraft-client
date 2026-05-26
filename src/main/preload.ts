@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('server', {
   setAutoStart:  (on: boolean) => ipcRenderer.invoke('server-set-autostart', on),
   getAutoStart:  ()            => ipcRenderer.invoke('server-get-autostart'),
   onLog:         (cb: (l: string) => void)             => ipcRenderer.on('server-log',          (_e, l)    => cb(l)),
+  onReady:       (cb: (port: number) => void)          => ipcRenderer.on('server-ready',        (_e, p)    => cb(p)),
   onClosed:      (cb: (info: any) => void)             => ipcRenderer.on('server-closed',       (_e, info) => cb(info)),
   onPlayerJoin:  (cb: (name: string) => void)          => ipcRenderer.on('server-player-join',  (_e, n)    => cb(n)),
   onPlayerCount: (cb: (cur: number, max: number) => void) => ipcRenderer.on('server-player-count', (_e, c, m) => cb(c, m)),

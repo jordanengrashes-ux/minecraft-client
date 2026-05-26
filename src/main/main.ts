@@ -822,6 +822,15 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
 
     const port    = opts.port ?? 25565;
     const minMemM = (opts.minMem ?? 512);
+
+    // Open Windows Firewall for this port so clients can connect (best-effort, no UAC required for local rules)
+    try {
+      spawnSync('netsh', [
+        'advfirewall', 'firewall', 'add', 'rule',
+        `name=VoxelClientServer_${port}`, 'dir=in', 'action=allow', 'protocol=TCP', `localport=${port}`,
+      ], { windowsHide: true });
+    } catch {}
+
     gameWin?.webContents.send('server-log', `[Host] Starting Minecraft ${opts.version} on port ${port}…`);
     serverProcess = spawn(javaExe, [
       `-Xmx${opts.maxMem}G`, `-Xms${minMemM}M`, '-jar', 'server.jar', '--nogui',
@@ -831,9 +840,15 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
     srvUserStopped = false;
     if (keepAwakeId === null) keepAwakeId = powerSaveBlocker.start('prevent-display-sleep');
 
+    let serverReady = false;
     const handleOut = (d: Buffer) => {
       const text = d.toString();
       gameWin?.webContents.send('server-log', text);
+      // Detect server fully started
+      if (!serverReady && (text.includes(' Done (') || text.includes('! Done'))) {
+        serverReady = true;
+        gameWin?.webContents.send('server-ready', port);
+      }
       // Player join → restore window + notify renderer
       const joinM = text.match(/(\w+) joined the game/);
       if (joinM) {
