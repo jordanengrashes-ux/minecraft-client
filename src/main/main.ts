@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker } from 'electron';
+import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { execSync, spawnSync, spawn, ChildProcess } from 'child_process';
 import https from 'https';
@@ -739,8 +739,26 @@ function downloadFileTo(url: string, dest: string, onPct?: (p: number) => void):
   });
 }
 
+function copyDirRecursive(src: string, dest: string) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const s = path.join(src, entry.name);
+    const d = path.join(dest, entry.name);
+    entry.isDirectory() ? copyDirRecursive(s, d) : fs.copyFileSync(s, d);
+  }
+}
+
+ipcMain.handle('server-pick-world', async () => {
+  const result = await dialog.showOpenDialog(gameWin!, {
+    title: 'Select Minecraft World Folder',
+    properties: ['openDirectory'],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  return result.filePaths[0];
+});
+
 // ── IPC: server hosting ───────────────────────────────────────────────────────
-ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: number; minMem?: number; name: string; port?: number; maxPlayers?: number; motd?: string; }) => {
+ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: number; minMem?: number; name: string; port?: number; maxPlayers?: number; motd?: string; seed?: string; worldPath?: string; }) => {
   if (serverProcess) return { ok: false, error: 'Server is already running' };
   try {
     const serverDir = path.join(app.getPath('userData'), 'mc-server', opts.version);
@@ -770,6 +788,14 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
     // Always accept EULA
     fs.writeFileSync(path.join(serverDir, 'eula.txt'), 'eula=true\n');
 
+    // Import world folder if provided and no world exists yet in this serverDir
+    const worldDestDir = path.join(serverDir, 'world');
+    if (opts.worldPath && !fs.existsSync(worldDestDir)) {
+      gameWin?.webContents.send('server-log', '[Host] Importing world — this may take a moment…');
+      copyDirRecursive(opts.worldPath, worldDestDir);
+      gameWin?.webContents.send('server-log', '[Host] World imported');
+    }
+
     // Write server.properties — online-mode=false avoids Mojang auth socket errors
     const propsPath = path.join(serverDir, 'server.properties');
     // Patch server.properties — write defaults on first run, then patch specific keys each start
@@ -781,6 +807,7 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
       'view-distance':'10',
       'motd':         opts.motd               || 'Voxel Client Server',
     };
+    if (opts.seed) patchProps['level-seed'] = opts.seed;
     let propsContent = fs.existsSync(propsPath) ? fs.readFileSync(propsPath, 'utf-8') : '';
     for (const [k, v] of Object.entries(patchProps)) {
       const re = new RegExp(`^${k}=.*`, 'm');

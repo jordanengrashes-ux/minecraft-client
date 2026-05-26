@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('updater', {
 
 contextBridge.exposeInMainWorld('server', {
   start:      (opts: any)    => ipcRenderer.invoke('server-start',       opts),
+  pickWorld:  ()             => ipcRenderer.invoke('server-pick-world'),
   stop:       ()             => ipcRenderer.invoke('server-stop'),
   command:    (cmd: string)  => ipcRenderer.invoke('server-command',     cmd),
   openFolder: (ver: string)  => ipcRenderer.invoke('server-open-folder', ver),

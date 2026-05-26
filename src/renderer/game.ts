@@ -2161,6 +2161,30 @@ const srv247Toggle = document.getElementById('srv-247-toggle') as HTMLInputEleme
 const srvIpInput   = document.getElementById('srv-ip') as HTMLInputElement;
 
 let srvRunning = false;
+let selectedWorldPath: string | null = null;
+
+// Import World button
+const srvImportWorldBtn  = document.getElementById('srv-import-world-btn') as HTMLButtonElement | null;
+const srvWorldLabel      = document.getElementById('srv-world-label')!;
+const srvClearWorldBtn   = document.getElementById('srv-clear-world-btn') as HTMLButtonElement | null;
+
+srvImportWorldBtn?.addEventListener('click', async () => {
+  if (!server) return;
+  const picked = await server.pickWorld();
+  if (!picked) return;
+  selectedWorldPath = picked;
+  const folderName = picked.replace(/\\/g, '/').split('/').pop() ?? picked;
+  srvWorldLabel.textContent = `World: ${folderName}`;
+  srvWorldLabel.style.color = '#f5a623';
+  if (srvClearWorldBtn) srvClearWorldBtn.style.display = 'inline-flex';
+});
+
+srvClearWorldBtn?.addEventListener('click', () => {
+  selectedWorldPath = null;
+  srvWorldLabel.textContent = 'No world imported — generates fresh each time';
+  srvWorldLabel.style.color = '#555555';
+  srvClearWorldBtn.style.display = 'none';
+});
 let srvLogLines: string[] = [];
 
 // ── Dedicated server mode ──────────────────────────────────────────────────────
@@ -2611,6 +2635,8 @@ srvStartBtn?.addEventListener('click', async () => {
   const port       = parseInt((document.getElementById('srv-port') as HTMLInputElement)?.value || '25565', 10);
   const maxPlayers = parseInt((document.getElementById('srv-maxplayers') as HTMLInputElement)?.value || '20', 10);
   const motd       = (document.getElementById('srv-motd') as HTMLInputElement)?.value.trim() || 'Voxel Client Server';
+  const seed       = (document.getElementById('srv-seed') as HTMLInputElement)?.value.trim() || undefined;
+  const worldPath  = selectedWorldPath ?? undefined;
 
   srvRunning = true;
   srvStopBtn.style.display = 'inline-flex';
@@ -2623,7 +2649,7 @@ srvStartBtn?.addEventListener('click', async () => {
   pendingSrvName    = name;
   pendingSrvVersion = version;
 
-  const res = await server.start({ version, maxMem, minMem, name, port, maxPlayers, motd });
+  const res = await server.start({ version, maxMem, minMem, name, port, maxPlayers, motd, seed, worldPath });
   if (!res.ok) {
     srvAddLog(`[Error] ${res.error}`);
     srvRunning = false;
