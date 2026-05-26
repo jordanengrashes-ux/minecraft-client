@@ -2091,7 +2091,7 @@ let pendingSrvName = '';
 let pendingSrvVersion = '';
 
 // ── Saved servers (localStorage) ──────────────────────────────────────────────
-interface SavedServer { id: string; name: string; ip: string; version: string; publish: boolean; }
+interface SavedServer { id: string; name: string; ip: string; version: string; publish: boolean; port?: number; maxPlayers?: number; motd?: string; maxMem?: number; minMem?: number; }
 
 function loadSavedServers(): SavedServer[] {
   try { return JSON.parse(localStorage.getItem('voxel_saved_servers') || '[]'); } catch { return []; }
@@ -2113,6 +2113,24 @@ async function unpublish247() {
   await set(ref(rtdb, `mc_servers/${myUid}/publish`), false);
 }
 
+function applyServerConfig(srv: SavedServer) {
+  (document.getElementById('srv-name') as HTMLInputElement).value = srv.name;
+  srvIpInput.value = srv.ip;
+  srv247Toggle.checked = srv.publish;
+  const sel = document.getElementById('srv-version') as HTMLSelectElement;
+  if (Array.from(sel.options).find(o => o.value === srv.version)) sel.value = srv.version;
+  const portEl = document.getElementById('srv-port') as HTMLInputElement;
+  if (portEl) portEl.value = String(srv.port ?? 25565);
+  const maxPlayersEl = document.getElementById('srv-maxplayers') as HTMLInputElement;
+  if (maxPlayersEl) maxPlayersEl.value = String(srv.maxPlayers ?? 20);
+  const motdEl = document.getElementById('srv-motd') as HTMLInputElement;
+  if (motdEl) motdEl.value = srv.motd ?? 'Voxel Client Server';
+  const memEl = document.getElementById('srv-mem') as HTMLInputElement;
+  if (memEl) { memEl.value = String(srv.maxMem ?? 2); document.getElementById('srv-mem-val')!.textContent = String(srv.maxMem ?? 2); }
+  const minMemEl = document.getElementById('srv-minmem') as HTMLInputElement;
+  if (minMemEl) { minMemEl.value = String(srv.minMem ?? 512); document.getElementById('srv-minmem-val')!.textContent = String(srv.minMem ?? 512); }
+}
+
 function renderSavedServers() {
   const list = loadSavedServers();
   savedSrvEmpty.style.display = list.length ? 'none' : 'block';
@@ -2121,7 +2139,7 @@ function renderSavedServers() {
   list.forEach(srv => {
     const card = document.createElement('div');
     card.className = 'mod-card saved-srv-card';
-    card.style.cursor = 'default';
+    card.style.cursor = 'pointer';
     card.innerHTML = `
       <div class="mod-icon" style="font-size:20px;"></div>
       <div class="mod-info">
@@ -2132,19 +2150,11 @@ function renderSavedServers() {
         </div>
       </div>
       <div class="mod-right" style="gap:6px;">
-        <button data-id="${srv.id}" class="srv-load-btn" style="padding:5px 12px;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:6px;color:#f5a623;font-size:11px;cursor:pointer;white-space:nowrap;">Load</button>
         <button data-id="${srv.id}" class="srv-del-btn" style="padding:5px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:11px;cursor:pointer;">✕</button>
       </div>`;
-    card.querySelector('.srv-load-btn')!.addEventListener('click', () => {
-      (document.getElementById('srv-name') as HTMLInputElement).value = srv.name;
-      srvIpInput.value   = srv.ip;
-      srv247Toggle.checked = srv.publish;
-      const sel = document.getElementById('srv-version') as HTMLSelectElement;
-      if (Array.from(sel.options).find(o => o.value === srv.version)) sel.value = srv.version;
-      // Auto-start unless already running
-      if (!srvRunning) srvStartBtn.click();
-    });
-    card.querySelector('.srv-del-btn')!.addEventListener('click', async () => {
+    card.addEventListener('click', () => applyServerConfig(srv));
+    card.querySelector('.srv-del-btn')!.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const updated = loadSavedServers().filter(s => s.id !== srv.id);
       persistSavedServers(updated);
       if (srv.publish) await unpublish247();
@@ -2173,10 +2183,15 @@ srvNewBtn?.addEventListener('click', () => {
 });
 
 srvSaveBtn?.addEventListener('click', async () => {
-  const name    = (document.getElementById('srv-name') as HTMLInputElement).value.trim() || 'My Server';
-  const ip      = srvIpInput.value.trim();
-  const version = (document.getElementById('srv-version') as HTMLSelectElement).value;
-  const publish = srv247Toggle.checked;
+  const name       = (document.getElementById('srv-name') as HTMLInputElement).value.trim() || 'My Server';
+  const ip         = srvIpInput.value.trim();
+  const version    = (document.getElementById('srv-version') as HTMLSelectElement).value;
+  const publish    = srv247Toggle.checked;
+  const port       = parseInt((document.getElementById('srv-port') as HTMLInputElement)?.value) || 25565;
+  const maxPlayers = parseInt((document.getElementById('srv-maxplayers') as HTMLInputElement)?.value) || 20;
+  const motd       = (document.getElementById('srv-motd') as HTMLInputElement)?.value.trim() || 'Voxel Client Server';
+  const maxMem     = parseInt((document.getElementById('srv-mem') as HTMLInputElement)?.value) || 2;
+  const minMem     = parseInt((document.getElementById('srv-minmem') as HTMLInputElement)?.value) || 512;
 
   if (publish && !isValidServerDomain(ip)) {
     srvSaveStatus.textContent = 'Enter a domain address to list publicly (e.g. play.yourserver.net)';
@@ -2186,7 +2201,7 @@ srvSaveBtn?.addEventListener('click', async () => {
   }
 
   const id  = `${Date.now()}`;
-  const srv: SavedServer = { id, name, ip, version, publish };
+  const srv: SavedServer = { id, name, ip, version, publish, port, maxPlayers, motd, maxMem, minMem };
   const list = loadSavedServers().filter(s => s.name !== name);
   list.unshift(srv);
   persistSavedServers(list);
