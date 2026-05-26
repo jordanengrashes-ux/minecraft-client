@@ -55,9 +55,13 @@ jobs:
           version=$(node -p "require('./package.json').version")
           tag="v$version"
           echo "Publishing $tag"
-          files=$(find dist -type f | tr '\n' ' ')
-          echo "Files: $files"
+          ls -la dist/
           gh release delete "$tag" --yes 2>/dev/null || true
-          gh release create "$tag" --title "$tag" --notes "Voxel Client $tag" --draft=false $files
+          gh release create "$tag" \
+            --title "Voxel Client $tag" \
+            --notes "Voxel Client $tag" \
+            dist/VoxelClient-Setup-*.exe \
+            dist/*.blockmap \
+            dist/latest.yml
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
