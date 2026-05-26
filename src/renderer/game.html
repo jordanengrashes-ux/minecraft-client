@@ -95,7 +95,7 @@
     #play-row { padding: 0 26px 18px; }
     #mc-play-btn {
       width: 100%; padding: 14px; font-size: 14px; font-weight: 800; letter-spacing: 2.5px;
-      background: #f5a623; border: none; border-radius: 7px; color: #0d0d0d;
+      background: #f5a623; border: none; border-radius: 7px; color: #000000;
       cursor: pointer; transition: background 0.1s, transform 0.1s, box-shadow 0.1s;
       display: flex; align-items: center; justify-content: center; gap: 8px; text-transform: uppercase;
     }
@@ -226,7 +226,7 @@
   <div id="update-banner" style="display:none;position:fixed;top:32px;left:0;right:0;z-index:200;background:#1a1a1a;border-bottom:1px solid #f5a623;padding:7px 16px;font-size:12px;display:none;align-items:center;gap:10px;">
     <span id="update-text" style="flex:1;color:#ffffff;"></span>
     <div id="update-progress-wrap" style="width:120px;height:4px;background:#1e1e1e;border-radius:2px;overflow:hidden;display:none"><div id="update-progress-bar" style="height:100%;background:#f5a623;width:0%;transition:width 0.3s;border-radius:2px"></div></div>
-    <button id="update-install-btn" style="display:none;padding:4px 14px;background:#e8940d;border:1px solid #f5a623;border-radius:6px;color:#111111;font-size:12px;cursor:pointer;">Restart & Update</button>
+    <button id="update-install-btn" style="display:none;padding:4px 14px;background:#e8940d;border:1px solid #f5a623;border-radius:6px;color:#000000;font-size:12px;cursor:pointer;">Restart & Update</button>
   </div>
 
   <div id="titlebar">
@@ -575,7 +575,7 @@
             <button id="skin-upload-btn" style="background:#1e1e1e;border:1px solid #2a2a2a;color:#ffffff;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px;">Choose PNG file...</button>
             <span id="skin-file-name" style="color:#777777;font-size:12px;margin-left:10px;"></span>
           </div>
-          <button id="skin-apply-btn" style="background:#e8940d;border:none;color:#111111;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;width:fit-content;display:none;">Apply Skin</button>
+          <button id="skin-apply-btn" style="background:#e8940d;border:none;color:#000000;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;width:fit-content;display:none;">Apply Skin</button>
           <div id="skin-status" style="font-size:12px;color:#aaaaaa;"></div>
         </div>
       </div>
@@ -611,7 +611,7 @@
         <div style="display:flex;gap:10px;align-items:center;">
           <input id="account-name-input" type="text" placeholder="Enter username..." maxlength="16"
             style="flex:1;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;padding:9px 14px;color:#ffffff;font-size:13px;font-family:inherit;outline:none;" />
-          <button id="account-add-btn" style="background:#e8940d;border:none;color:#111111;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;">Add Account</button>
+          <button id="account-add-btn" style="background:#e8940d;border:none;color:#000000;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;">Add Account</button>
         </div>
         <div id="accounts-list" style="display:flex;flex-direction:column;gap:8px;"></div>
         <div style="background:rgba(30,37,48,0.3);border:1px solid #1e1e1e;border-radius:10px;padding:14px 18px;">
@@ -700,7 +700,7 @@
           <input type="range" id="srv-minmem" min="256" max="4096" step="256" value="512" style="flex:1;max-width:100px;accent-color:#ffffff;" />
           <span style="font-size:12px;color:#ffffff;font-weight:600;min-width:42px;"><span id="srv-minmem-val">512</span>M</span>
           <div style="flex:1;"></div>
-          <button id="srv-start-btn" style="padding:9px 28px;font-size:13px;font-weight:700;background:#f5a623;border:none;border-radius:8px;color:#0d0d0d;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;font-family:'Roboto',sans-serif;">▶ Start Server</button>
+          <button id="srv-start-btn" style="padding:9px 28px;font-size:13px;font-weight:700;background:#f5a623;border:none;border-radius:8px;color:#000000;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;font-family:'Roboto',sans-serif;">▶ Start Server</button>
           <button id="srv-stop-btn" style="display:none;padding:9px 28px;font-size:13px;font-weight:700;background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.35);border-radius:8px;color:#ffffff;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;font-family:'Roboto',sans-serif;">⏹ Stop Server</button>
         </div>
 
@@ -951,7 +951,7 @@
               <div class="control-card">
                 <label>Skin Model</label>
                 <div style="display:flex;gap:8px;margin-top:8px;">
-                  <button id="skin-slim-off" class="model-btn active" data-model="classic" style="flex:1;padding:8px;background:#e8940d;border:1px solid #f5a623;border-radius:6px;color:#111111;font-size:12px;cursor:pointer;">Classic (Steve)</button>
+                  <button id="skin-slim-off" class="model-btn active" data-model="classic" style="flex:1;padding:8px;background:#e8940d;border:1px solid #f5a623;border-radius:6px;color:#000000;font-size:12px;cursor:pointer;">Classic (Steve)</button>
                   <button id="skin-slim-on" class="model-btn" data-model="slim" style="flex:1;padding:8px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:6px;color:#aaaaaa;font-size:12px;cursor:pointer;">Slim (Alex)</button>
                 </div>
               </div>
