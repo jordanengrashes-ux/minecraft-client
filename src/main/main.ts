@@ -800,12 +800,13 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
     const propsPath = path.join(serverDir, 'server.properties');
     // Patch server.properties — write defaults on first run, then patch specific keys each start
     const patchProps: Record<string, string> = {
-      'online-mode':  'false',
-      'server-port':  String(opts.port        ?? 25565),
-      'server-ip':    '',
-      'max-players':  String(opts.maxPlayers  ?? 20),
-      'view-distance':'10',
-      'motd':         opts.motd               || 'Voxel Client Server',
+      'online-mode':              'false',
+      'server-port':              String(opts.port        ?? 25565),
+      'server-ip':                '',
+      'max-players':              String(opts.maxPlayers  ?? 20),
+      'view-distance':            '10',
+      'motd':                     opts.motd               || 'Voxel Client Server',
+      'pause-when-empty-seconds': '0',
     };
     if (opts.seed) patchProps['level-seed'] = opts.seed;
     let propsContent = fs.existsSync(propsPath) ? fs.readFileSync(propsPath, 'utf-8') : '';
