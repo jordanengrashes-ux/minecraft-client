@@ -2388,6 +2388,14 @@ async function onServerReady(name: string, version: string, port: number) {
   await publishServer(name, version, ip);
 }
 
+function srvAddHint(msg: string) {
+  const div = document.createElement('div');
+  div.style.cssText = 'line-height:1.6;color:#f5a623;padding-left:14px;font-style:italic;';
+  div.textContent = `↳ ${msg}`;
+  srvLog.appendChild(div);
+  srvLogLines.push(`↳ ${msg}`);
+}
+
 function srvAddLog(text: string) {
   const lines = text.split('\n').filter(l => l.trim());
   lines.forEach(l => {
@@ -2395,14 +2403,33 @@ function srvAddLog(text: string) {
     if (srvLogLines.length > 300) srvLogLines.shift();
     const div = document.createElement('div');
     div.style.lineHeight = '1.6';
-    div.style.color = l.includes('ERROR') || l.includes('WARN') ? '#f6c356'
-                    : l.includes('[Host]') ? '#f6c356' : '#6e7681';
+    if (l.includes('[Host] ✓')) {
+      div.style.color = '#3fb950'; div.style.fontWeight = '600';
+    } else if (l.includes('FATAL') || l.includes('Exception in') || l.includes(']: Error') || l.includes('crashed')) {
+      div.style.color = '#f85149';
+    } else if (l.includes('ERROR') || l.includes('WARN')) {
+      div.style.color = '#f6c356';
+    } else if (l.includes('[Host]')) {
+      div.style.color = '#f6c356';
+    } else {
+      div.style.color = '#6e7681';
+    }
     div.textContent = l;
     srvLog.appendChild(div);
+
+    // Inline hints for common failure patterns
+    if (l.includes('Address already in use') || l.includes('FAILED TO BIND TO PORT')) {
+      srvAddHint('Port already taken — change the port number above and restart');
+    } else if (l.includes('OutOfMemoryError') || l.includes('Could not reserve enough space')) {
+      srvAddHint('Out of memory — increase Max RAM above');
+    } else if (l.includes('Invalid or corrupt jarfile') || l.includes('Error opening zip file')) {
+      srvAddHint('server.jar is corrupt — open the Files folder, delete server.jar, and restart');
+    } else if (l.includes('Unable to access jarfile')) {
+      srvAddHint('server.jar not found — it may have been moved or deleted');
+    } else if (l.includes('UnsupportedClassVersionError')) {
+      srvAddHint('Java version too old for this Minecraft version — restart to re-download Java');
+    }
   });
-  // Remove placeholder
-  const placeholder = srvLog.querySelector('div[style*="30363d"]');
-  if (placeholder) placeholder.remove();
   document.getElementById('srv-log-placeholder')?.remove();
   srvLog.scrollTop = srvLog.scrollHeight;
 }
@@ -2727,8 +2754,19 @@ if (server) {
     srvStartBtn.textContent = '▶ Start Server';
     srvStartBtn.disabled = false;
     if (!userStopped && code !== 0 && code != null) {
-      srvAddLog(`[Host] Server crashed (exit code ${code}) — scroll up for errors`);
-      if (code === 1) srvAddLog('[Host] Tip: may be OOM — increase RAM allocation above');
+      const codeHex = code < 0 ? `0x${(code >>> 0).toString(16).toUpperCase()}` : String(code);
+      const codeDesc: Record<number, string> = {
+        1:             'General server error',
+        2:             'Bad Java arguments',
+        137:           'Killed by OS — likely out of memory',
+        [-1073741819]: 'Windows access violation (0xC0000005) — corrupt JAR or Java install',
+        [-1073741571]: 'Windows stack overflow (0xC00000FD) — try increasing RAM',
+        [-1073740791]: 'Windows heap corruption — try reinstalling Java',
+      };
+      const desc = codeDesc[code] || 'Unexpected exit';
+      srvAddLog(`[Host] ✗ Server stopped — exit code ${codeHex} (${desc})`);
+      srvLog.lastElementChild && ((srvLog.lastElementChild as HTMLElement).style.color = '#f85149');
+      srvLog.lastElementChild && ((srvLog.lastElementChild as HTMLElement).style.fontWeight = '600');
       const autoRestart = (document.getElementById('srv-autorestart') as HTMLInputElement)?.checked;
       const dedicatedOn = (() => { try { return JSON.parse(localStorage.getItem(DEDICATED_KEY) || '{}').dedicated; } catch { return false; } })();
       if (autoRestart || dedicatedOn) {
