@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('overlay', {
 
 contextBridge.exposeInMainWorld('files', {
   listWorlds:       () => ipcRenderer.invoke('mc-list-worlds'),
+  savesDir:         () => ipcRenderer.invoke('mc-saves-dir'),
   installWorld:     (p: string) => ipcRenderer.invoke('mc-install-world', p),
   listSchematics:   () => ipcRenderer.invoke('mc-list-schematics'),
   installSchematic: (p: string) => ipcRenderer.invoke('mc-install-schematic', p),

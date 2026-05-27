@@ -2163,25 +2163,66 @@ const srvIpInput   = document.getElementById('srv-ip') as HTMLInputElement;
 let srvRunning = false;
 let selectedWorldPath: string | null = null;
 
-// Import World button
-const srvImportWorldBtn  = document.getElementById('srv-import-world-btn') as HTMLButtonElement | null;
-const srvWorldLabel      = document.getElementById('srv-world-label')!;
-const srvClearWorldBtn   = document.getElementById('srv-clear-world-btn') as HTMLButtonElement | null;
+// World selector (From Saves dropdown + Browse Folder fallback)
+const srvWorldLabel    = document.getElementById('srv-world-label')!;
+const srvClearWorldBtn = document.getElementById('srv-clear-world-btn') as HTMLButtonElement | null;
+const fromSavesBtn     = document.getElementById('srv-from-saves-btn')  as HTMLButtonElement | null;
+const savesMenu        = document.getElementById('srv-saves-menu')!;
+const browseWorldBtn   = document.getElementById('srv-browse-world-btn') as HTMLButtonElement | null;
 
-srvImportWorldBtn?.addEventListener('click', async () => {
+function setWorldPath(fullPath: string, label: string) {
+  selectedWorldPath = fullPath;
+  srvWorldLabel.textContent = `World: ${label}`;
+  srvWorldLabel.style.color = '#f5a623';
+  if (srvClearWorldBtn) srvClearWorldBtn.style.display = 'inline-flex';
+}
+
+fromSavesBtn?.addEventListener('click', async () => {
+  if (savesMenu.style.display !== 'none') { savesMenu.style.display = 'none'; return; }
+  savesMenu.innerHTML = '<div style="padding:8px 14px;font-size:12px;color:#555;">Loading…</div>';
+  savesMenu.style.display = 'block';
+
+  const files = (window as any).files;
+  const saves: string[] = await files?.listWorlds() ?? [];
+  const savesDir: string = await files?.savesDir() ?? '';
+  const sep = savesDir.includes('\\') ? '\\' : '/';
+
+  savesMenu.innerHTML = '';
+  if (!saves.length) {
+    savesMenu.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:#555;">No worlds found — play single-player first</div>';
+    return;
+  }
+  for (const name of saves) {
+    const item = document.createElement('div');
+    item.style.cssText = 'padding:9px 14px;font-size:12px;color:#cccccc;cursor:pointer;border-bottom:1px solid #1e1e1e;';
+    item.textContent = name;
+    item.addEventListener('mouseenter', () => { item.style.background = '#1e1e1e'; });
+    item.addEventListener('mouseleave', () => { item.style.background = ''; });
+    item.addEventListener('click', () => {
+      setWorldPath(`${savesDir}${sep}${name}`, name);
+      savesMenu.style.display = 'none';
+    });
+    savesMenu.appendChild(item);
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (!fromSavesBtn?.contains(e.target as Node) && !savesMenu?.contains(e.target as Node)) {
+    savesMenu.style.display = 'none';
+  }
+});
+
+browseWorldBtn?.addEventListener('click', async () => {
   if (!server) return;
   const picked = await server.pickWorld();
   if (!picked) return;
-  selectedWorldPath = picked;
   const folderName = picked.replace(/\\/g, '/').split('/').pop() ?? picked;
-  srvWorldLabel.textContent = `World: ${folderName}`;
-  srvWorldLabel.style.color = '#f5a623';
-  if (srvClearWorldBtn) srvClearWorldBtn.style.display = 'inline-flex';
+  setWorldPath(picked, folderName);
 });
 
 srvClearWorldBtn?.addEventListener('click', () => {
   selectedWorldPath = null;
-  srvWorldLabel.textContent = 'No world imported — generates fresh each time';
+  srvWorldLabel.textContent = 'No world selected — generates fresh each time';
   srvWorldLabel.style.color = '#555555';
   srvClearWorldBtn.style.display = 'none';
 });

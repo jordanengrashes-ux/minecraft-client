@@ -788,10 +788,11 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
     // Always accept EULA
     fs.writeFileSync(path.join(serverDir, 'eula.txt'), 'eula=true\n');
 
-    // Import world folder if provided and no world exists yet in this serverDir
+    // Import world folder — always overwrite so the user's chosen save is used
     const worldDestDir = path.join(serverDir, 'world');
-    if (opts.worldPath && !fs.existsSync(worldDestDir)) {
+    if (opts.worldPath) {
       gameWin?.webContents.send('server-log', '[Host] Importing world — this may take a moment…');
+      if (fs.existsSync(worldDestDir)) fs.rmSync(worldDestDir, { recursive: true, force: true });
       copyDirRecursive(opts.worldPath, worldDestDir);
       gameWin?.webContents.send('server-log', '[Host] World imported');
     }
@@ -1128,6 +1129,8 @@ ipcMain.handle('mc-list-worlds', async () => {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter((f: string) => fs.statSync(path.join(dir, f)).isDirectory());
 });
+
+ipcMain.handle('mc-saves-dir', () => path.join(mcRoot(), 'saves'));
 
 ipcMain.handle('mc-install-world', async (_e, filePath: string) => {
   try {

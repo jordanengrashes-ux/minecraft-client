@@ -759,8 +759,12 @@
           <input id="srv-seed" type="text" placeholder="Random" maxlength="64"
             style="width:130px;background:rgba(60,60,60,0.35);border:1px solid rgba(60,60,60,0.8);border-radius:7px;color:#ffffff;padding:6px 10px;font-size:12px;outline:none;font-family:monospace;"
             onfocus="this.style.borderColor='#f5a623'" onblur="this.style.borderColor='rgba(60,60,60,0.8)'" />
-          <button id="srv-import-world-btn" style="padding:6px 13px;background:rgba(60,60,60,0.4);border:1px solid rgba(60,60,60,0.8);border-radius:7px;color:#aaaaaa;font-size:12px;cursor:pointer;white-space:nowrap;font-family:'Roboto',sans-serif;">Import World…</button>
-          <span id="srv-world-label" style="font-size:11px;color:#555555;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">No world imported — generates fresh each time</span>
+          <div style="position:relative;flex-shrink:0;">
+            <button id="srv-from-saves-btn" style="padding:6px 13px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:7px;color:#f5a623;font-size:12px;cursor:pointer;white-space:nowrap;font-family:'Roboto',sans-serif;">From Saves ▾</button>
+            <div id="srv-saves-menu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:#141414;border:1px solid #2a2a2a;border-radius:8px;min-width:200px;max-height:200px;overflow-y:auto;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.6);"></div>
+          </div>
+          <button id="srv-browse-world-btn" style="padding:6px 13px;background:rgba(60,60,60,0.4);border:1px solid rgba(60,60,60,0.8);border-radius:7px;color:#aaaaaa;font-size:12px;cursor:pointer;white-space:nowrap;font-family:'Roboto',sans-serif;">Browse Folder…</button>
+          <span id="srv-world-label" style="font-size:11px;color:#555555;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">No world selected — generates fresh each time</span>
           <button id="srv-clear-world-btn" style="display:none;padding:4px 8px;background:none;border:1px solid rgba(248,81,73,0.3);border-radius:5px;color:#888;font-size:11px;cursor:pointer;white-space:nowrap;">Remove</button>
         </div>
 
