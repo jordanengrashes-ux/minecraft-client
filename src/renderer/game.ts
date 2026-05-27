@@ -1408,6 +1408,118 @@ async function reinstallAllMods(btn: HTMLElement) {
   renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
 }
 
+// ── Mod Profiles ──────────────────────────────────────────────────────────
+interface ModProfile { id: string; name: string; slugs: string[] }
+const PROFILES_KEY = 'voxel_mod_profiles';
+const ACTIVE_PROFILE_KEY = 'voxel_active_profile';
+function loadProfiles(): ModProfile[] {
+  try { return JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]'); } catch { return []; }
+}
+function saveProfiles(ps: ModProfile[]) { localStorage.setItem(PROFILES_KEY, JSON.stringify(ps)); }
+function getActiveProfileId(): string | null { return localStorage.getItem(ACTIVE_PROFILE_KEY); }
+function setActiveProfileId(id: string | null) {
+  if (id) localStorage.setItem(ACTIVE_PROFILE_KEY, id); else localStorage.removeItem(ACTIVE_PROFILE_KEY);
+}
+
+function renderModProfiles() {
+  const listEl  = document.getElementById('mod-profiles-list');
+  const emptyEl = document.getElementById('mod-profiles-empty');
+  if (!listEl) return;
+  const profiles = loadProfiles();
+  const activeId = getActiveProfileId();
+  Array.from(listEl.children).forEach(c => { if (c.id !== 'mod-profiles-empty') c.remove(); });
+  if (!profiles.length) { if (emptyEl) emptyEl.style.display = 'block'; return; }
+  if (emptyEl) emptyEl.style.display = 'none';
+  for (const profile of profiles) {
+    const isActive = profile.id === activeId;
+    const card = document.createElement('div');
+    card.className = 'control-card';
+    card.style.cssText = `display:flex;align-items:center;gap:12px;padding:10px 14px;transition:border-color 0.15s,background 0.15s;${isActive ? 'border-color:rgba(245,166,35,0.4);background:rgba(245,166,35,0.04);' : ''}`;
+
+    const toggleLabel = document.createElement('label');
+    toggleLabel.className = 'toggle';
+    toggleLabel.style.cursor = 'pointer';
+    const toggleInput = document.createElement('input');
+    toggleInput.type = 'checkbox';
+    toggleInput.checked = isActive;
+    const toggleSlider = document.createElement('span');
+    toggleSlider.className = 'toggle-slider';
+    toggleLabel.appendChild(toggleInput);
+    toggleLabel.appendChild(toggleSlider);
+
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0;';
+    info.innerHTML = `<div style="font-size:13px;font-weight:600;color:#ffffff;">${profile.name}</div><div style="font-size:11px;color:#444444;margin-top:1px;">${profile.slugs.length} mod${profile.slugs.length !== 1 ? 's' : ''}</div>`;
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Delete';
+    delBtn.style.cssText = 'padding:4px 10px;background:none;border:1px solid rgba(248,81,73,0.25);border-radius:5px;color:#666;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.15s;';
+
+    card.appendChild(toggleLabel);
+    card.appendChild(info);
+    card.appendChild(delBtn);
+    listEl.insertBefore(card, emptyEl ?? null);
+
+    toggleInput.addEventListener('change', async () => {
+      if (toggleInput.checked) {
+        setActiveProfileId(profile.id);
+        const installed = loadInstalledMods();
+        for (const slug of Array.from(enabledMods)) {
+          if (!profile.slugs.includes(slug)) {
+            if (installed[slug]) await mc?.removeMod({ filename: installed[slug].filename });
+            const upd = loadInstalledMods(); delete upd[slug]; saveInstalledMods(upd);
+            enabledMods.delete(slug);
+          }
+        }
+        updateModsBadge();
+      } else {
+        if (getActiveProfileId() === profile.id) setActiveProfileId(null);
+      }
+      renderModProfiles();
+    });
+
+    let confirmPending = false;
+    let confirmTimer: ReturnType<typeof setTimeout> | null = null;
+    delBtn.addEventListener('click', () => {
+      if (!confirmPending) {
+        confirmPending = true;
+        delBtn.textContent = 'Sure?';
+        delBtn.style.color = '#f85149';
+        delBtn.style.borderColor = 'rgba(248,81,73,0.7)';
+        confirmTimer = setTimeout(() => {
+          confirmPending = false;
+          delBtn.textContent = 'Delete';
+          delBtn.style.color = '#666';
+          delBtn.style.borderColor = 'rgba(248,81,73,0.25)';
+        }, 3000);
+      } else {
+        if (confirmTimer) clearTimeout(confirmTimer);
+        const updated = loadProfiles().filter(p => p.id !== profile.id);
+        saveProfiles(updated);
+        if (getActiveProfileId() === profile.id) setActiveProfileId(null);
+        renderModProfiles();
+      }
+    });
+  }
+}
+
+document.getElementById('mod-profile-save-btn')?.addEventListener('click', () => {
+  const nameEl = document.getElementById('mod-profile-name-input') as HTMLInputElement | null;
+  const name = nameEl?.value.trim() ?? '';
+  if (!name) { nameEl?.focus(); return; }
+  const profiles = loadProfiles();
+  const id = `${Date.now()}`;
+  profiles.push({ id, name, slugs: Array.from(enabledMods) });
+  saveProfiles(profiles);
+  setActiveProfileId(id);
+  if (nameEl) nameEl.value = '';
+  renderModProfiles();
+  const btn = document.getElementById('mod-profile-save-btn') as HTMLButtonElement;
+  if (btn) { btn.textContent = '✓ Saved!'; setTimeout(() => { btn.textContent = 'Save Current Mods'; }, 1500); }
+});
+
+renderModProfiles();
+
 function initPvpMods() {
   renderPvpMods('');
   const searchEl = document.getElementById('pvp-search') as HTMLInputElement;
@@ -1429,99 +1541,6 @@ function initPvpMods() {
   }
   reinstallBtn?.addEventListener('click', () => reinstallAllMods(reinstallBtn));
   updateReinstallBtn();
-
-  // ── Mod Profiles ──────────────────────────────────────────────────────────
-  interface ModProfile { id: string; name: string; slugs: string[] }
-  const PROFILES_KEY = 'voxel_mod_profiles';
-  function loadProfiles(): ModProfile[] {
-    try { return JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]'); } catch { return []; }
-  }
-  function saveProfiles(p: ModProfile[]) { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); }
-
-  const profileListEl  = document.getElementById('pvp-profile-list')!;
-  const profileEmptyEl = document.getElementById('pvp-profile-empty')!;
-  const profileNameIn  = document.getElementById('pvp-profile-name')  as HTMLInputElement;
-  const importNewBtn   = document.getElementById('pvp-profile-import-new') as HTMLButtonElement;
-  const importSelBtn   = document.getElementById('pvp-profile-import-sel') as HTMLButtonElement;
-
-  let activeProfileId: string | null = null;
-
-  function renderProfileChips() {
-    const profiles = loadProfiles();
-    Array.from(profileListEl.children).forEach(c => { if (c.id !== 'pvp-profile-empty') c.remove(); });
-    if (!profiles.length) { profileEmptyEl.style.display = ''; return; }
-    profileEmptyEl.style.display = 'none';
-    for (const p of profiles) {
-      const chip = document.createElement('span');
-      chip.className = 'profile-chip' + (p.id === activeProfileId ? ' active' : '');
-      chip.dataset.id = p.id;
-
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = p.name;
-      chip.appendChild(nameSpan);
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'del-chip';
-      delBtn.textContent = '×';
-      delBtn.title = 'Delete profile';
-      delBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        const updated = loadProfiles().filter(x => x.id !== p.id);
-        saveProfiles(updated);
-        if (activeProfileId === p.id) activeProfileId = null;
-        renderProfileChips();
-      });
-      chip.appendChild(delBtn);
-
-      chip.addEventListener('click', async () => {
-        activeProfileId = p.id;
-        renderProfileChips();
-        const profile = loadProfiles().find(x => x.id === p.id);
-        if (!profile) return;
-        const installed = loadInstalledMods();
-        for (const slug of Array.from(enabledMods)) {
-          if (!profile.slugs.includes(slug)) {
-            if (installed[slug]) await mc?.removeMod({ filename: installed[slug].filename });
-            const upd = loadInstalledMods(); delete upd[slug]; saveInstalledMods(upd);
-            enabledMods.delete(slug);
-          }
-        }
-        renderPvpMods(searchEl.value);
-      });
-
-      profileListEl.insertBefore(chip, profileEmptyEl);
-    }
-  }
-  renderProfileChips();
-
-  importNewBtn.addEventListener('click', () => {
-    const name = profileNameIn.value.trim();
-    if (!name) { profileNameIn.focus(); return; }
-    const profiles = loadProfiles();
-    const id = `${Date.now()}`;
-    profiles.push({ id, name, slugs: Array.from(enabledMods) });
-    saveProfiles(profiles);
-    activeProfileId = id;
-    profileNameIn.value = '';
-    renderProfileChips();
-    importNewBtn.textContent = '✓ Saved';
-    setTimeout(() => { importNewBtn.textContent = 'Import to New Profile'; }, 1800);
-  });
-
-  importSelBtn.addEventListener('click', () => {
-    if (!activeProfileId) {
-      importSelBtn.textContent = '← Select a profile first';
-      setTimeout(() => { importSelBtn.textContent = 'Import to Selected'; }, 2000);
-      return;
-    }
-    const profiles = loadProfiles();
-    const profile = profiles.find(p => p.id === activeProfileId);
-    if (!profile) return;
-    profile.slugs = Array.from(enabledMods);
-    saveProfiles(profiles);
-    importSelBtn.textContent = '✓ Updated';
-    setTimeout(() => { importSelBtn.textContent = 'Import to Selected'; }, 1800);
-  });
 }
 
 // ── Resource Packs panel ──────────────────────────────────────────────────────

@@ -361,6 +361,18 @@
               onfocus="this.style.borderColor='#f5a623'" onblur="this.style.borderColor='#2a2a2a'" />
           </div>
         </div>
+        <div class="section-label" style="grid-column:1/-1">Mod Profiles</div>
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:8px;">
+          <div id="mod-profiles-list">
+            <div id="mod-profiles-empty" style="font-size:12px;color:#444444;padding:6px 0;">No profiles saved yet — configure mods on the PvP Mods tab, then save here</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="mod-profile-name-input" type="text" placeholder="Profile name…" maxlength="32"
+              style="flex:1;background:#080808;border:1px solid #222222;border-radius:5px;color:#ffffff;padding:7px 10px;font-size:12px;outline:none;font-family:inherit;"
+              onfocus="this.style.borderColor='#f5a623'" onblur="this.style.borderColor='#222222'" />
+            <button id="mod-profile-save-btn" style="padding:7px 14px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:5px;color:#f5a623;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Save Current Mods</button>
+          </div>
+        </div>
         <div class="section-label" style="grid-column:1/-1">Microsoft Account</div>
         <div style="grid-column:1/-1">
           <button id="mc-auth-btn">Login with Microsoft to Play</button>
@@ -524,18 +536,6 @@
         </div>
         <div style="display:flex;align-items:center;gap:8px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:8px 12px;margin-bottom:10px;">
           <span style="font-size:11px;color:#ffffff;">Enable <strong>Fabric Loader</strong> on the Play tab before launching — mods need it to run</span>
-        </div>
-        <!-- Mod Profiles -->
-        <div id="pvp-profiles-section" style="margin-top:10px;padding:10px 12px;background:#0a0a10;border:1px solid #1e1e1e;border-radius:8px;">
-          <div style="font-size:10px;color:#444;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Mod Profiles</div>
-          <div id="pvp-profile-list" style="display:flex;gap:6px;flex-wrap:wrap;min-height:26px;margin-bottom:10px;">
-            <span id="pvp-profile-empty" style="font-size:12px;color:#444444;">No profiles yet — import your current mods to get started</span>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input id="pvp-profile-name" type="text" placeholder="Profile name…" maxlength="32" style="flex:1;min-width:120px;background:#111;border:1px solid #2a2a2a;border-radius:7px;padding:6px 10px;color:#fff;font-size:12px;outline:none;font-family:inherit;" />
-            <button id="pvp-profile-import-new" style="padding:6px 12px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:7px;color:#f5a623;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Import to New Profile</button>
-            <button id="pvp-profile-import-sel" style="padding:6px 12px;background:#141414;border:1px solid #2a2a2a;border-radius:7px;color:#777777;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Import to Selected</button>
-          </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
           <input id="pvp-search" type="text" placeholder="Search mods..." style="flex:1;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;padding:8px 14px;color:#ffffff;font-size:13px;font-family:inherit;outline:none;" />
