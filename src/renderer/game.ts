@@ -1274,7 +1274,8 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
       <div class="pvp-err" style="font-size:11px;color:#e05500;margin-top:4px;display:none;"></div>
     </div>
     <div class="mod-right">
-      <div class="mod-version" style="color:${on ? (wrongVer ? '#f6c356' : '#f5a623') : 'transparent'}">${on ? (wrongVer ? '↻' : '✓') : ''}</div>
+      ${wrongVer ? '<button class="pvp-update-btn" style="padding:3px 9px;background:rgba(246,195,86,0.12);border:1px solid rgba(246,195,86,0.4);border-radius:5px;color:#f6c356;font-size:10px;font-weight:600;cursor:pointer;white-space:nowrap;">↻ Update</button>' : ''}
+      <div class="mod-version" style="color:${on ? (wrongVer ? 'transparent' : '#f5a623') : 'transparent'}">${on && !wrongVer ? '✓' : ''}</div>
       <label class="toggle">
         <input type="checkbox" ${on ? 'checked' : ''} />
         <span class="toggle-slider"></span>
@@ -1284,6 +1285,19 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
   const input    = card.querySelector('input') as HTMLInputElement;
   const statusEl = card.querySelector('.mod-version') as HTMLElement;
   const errEl    = card.querySelector('.pvp-err') as HTMLElement;
+  const updateBtn = card.querySelector('.pvp-update-btn') as HTMLButtonElement | null;
+
+  updateBtn?.addEventListener('click', async () => {
+    updateBtn.disabled = true;
+    updateBtn.textContent = 'Updating…';
+    try {
+      await installOneMod(mod, mcVersion.value || '1.21.4');
+      renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
+    } catch {
+      updateBtn.textContent = '✗ Failed';
+      updateBtn.disabled = false;
+    }
+  });
 
   input.addEventListener('change', async e => {
     const checked = (e.target as HTMLInputElement).checked;
@@ -1439,6 +1453,10 @@ function renderModProfiles() {
     info.className = 'mod-info';
     info.innerHTML = `<div class="mod-name">${profile.name}</div><div class="mod-desc">${profile.slugs.length} mod${profile.slugs.length !== 1 ? 's' : ''}</div>`;
 
+    const updateProfileBtn = document.createElement('button');
+    updateProfileBtn.textContent = '↻ Update';
+    updateProfileBtn.style.cssText = 'padding:4px 9px;background:rgba(246,195,86,0.1);border:1px solid rgba(246,195,86,0.35);border-radius:5px;color:#f6c356;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.15s;';
+
     const delBtn = document.createElement('button');
     delBtn.textContent = 'Delete';
     delBtn.style.cssText = 'padding:4px 10px;background:none;border:1px solid rgba(248,81,73,0.25);border-radius:5px;color:#666;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.15s;';
@@ -1454,6 +1472,7 @@ function renderModProfiles() {
     toggleSlider.className = 'toggle-slider';
     toggleLabel.appendChild(toggleInput);
     toggleLabel.appendChild(toggleSlider);
+    right.appendChild(updateProfileBtn);
     right.appendChild(delBtn);
     right.appendChild(toggleLabel);
 
@@ -1477,6 +1496,21 @@ function renderModProfiles() {
         if (getActiveProfileId() === profile.id) setActiveProfileId(null);
       }
       renderModProfiles();
+    });
+
+    updateProfileBtn.addEventListener('click', async () => {
+      const ver = mcVersion.value || '1.21.4';
+      updateProfileBtn.disabled = true;
+      let done = 0;
+      for (const slug of profile.slugs) {
+        const mod = PVP_MOD_BY_SLUG.get(slug);
+        if (!mod) continue;
+        updateProfileBtn.textContent = `↻ ${done}/${profile.slugs.length}`;
+        try { await installOneMod(mod, ver); done++; } catch {}
+      }
+      updateProfileBtn.textContent = `✓ ${done} updated`;
+      updateProfileBtn.disabled = false;
+      setTimeout(() => { updateProfileBtn.textContent = '↻ Update'; }, 2000);
     });
 
     let confirmPending = false;
