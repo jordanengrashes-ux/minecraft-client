@@ -1084,6 +1084,15 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
       statusEl.textContent = '…';
       modpackProgressEl = statusEl;
       try {
+        // Remove any currently installed modpacks before installing this one
+        const existing = loadInstalledModpacks();
+        for (const pack of Object.values(existing)) {
+          for (const filename of pack.filenames) {
+            try { await mc.removeMod({ filename }); } catch {}
+          }
+        }
+        saveInstalledModpacks({});
+
         const result = await mc.installModpack({ projectId: mod.project_id });
         if (!result.ok) throw new Error(result.error);
         const updated = loadInstalledModpacks();
