@@ -894,6 +894,16 @@ function saveInstalledMods(data: Record<string, InstalledMod>) {
   localStorage.setItem('voxel_installed_mods', JSON.stringify(data));
 }
 
+// ── Installed modpacks (persisted) ───────────────────────────────────────────
+interface InstalledModpack { projectId: string; title: string; mcVersion: string; filenames: string[] }
+const INSTALLED_MODPACKS_KEY = 'voxel_installed_modpacks';
+function loadInstalledModpacks(): Record<string, InstalledModpack> {
+  try { return JSON.parse(localStorage.getItem(INSTALLED_MODPACKS_KEY) || '{}'); } catch { return {}; }
+}
+function saveInstalledModpacks(data: Record<string, InstalledModpack>) {
+  localStorage.setItem(INSTALLED_MODPACKS_KEY, JSON.stringify(data));
+}
+
 // ── Modrinth mod search ────────────────────────────────────────────────────────
 const enabledMods = new Set<string>(Object.keys(loadInstalledMods()));
 const modsList    = document.getElementById('mods-list')!;
@@ -901,6 +911,13 @@ const modsSearch  = document.getElementById('mods-search') as HTMLInputElement;
 const modsLoading = document.getElementById('mods-loading')!;
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let modsTabType: 'mod' | 'modpack' = 'mod';
+let modpackProgressEl: HTMLElement | null = null;
+mc?.onModpackProgress?.((e: any) => {
+  if (!modpackProgressEl) return;
+  if (e.phase === 'fetching')    modpackProgressEl.textContent = '…';
+  else if (e.phase === 'downloading') modpackProgressEl.textContent = `⬇ ${e.pct}%`;
+  else if (e.phase === 'mods')        modpackProgressEl.textContent = `⬇ ${e.current}/${e.total}`;
+});
 
 const modsTypeSwitch = document.getElementById('mods-type-switch') as HTMLInputElement;
 const modsLabelMods  = document.getElementById('mods-label-mods')!;
@@ -1031,8 +1048,10 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
 }
 
 function buildModpackCard(mod: ModrinthHit): HTMLElement {
+  const packs = loadInstalledModpacks();
+  const isInstalled = !!packs[mod.project_id];
   const card = document.createElement('div');
-  card.className = 'mod-card';
+  card.className = 'mod-card' + (isInstalled ? ' enabled' : '');
   const iconHtml = mod.icon_url
     ? `<img src="${mod.icon_url}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
     : `<div class="mod-icon"></div>`;
@@ -1047,9 +1066,58 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
       <div class="mod-tags">${tagHtml}</div>
     </div>
     <div class="mod-right">
-      <a href="https://modrinth.com/modpack/${mod.project_id}" target="_blank"
-        style="padding:7px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:12px;text-decoration:none;white-space:nowrap;">View on Modrinth →</a>
+      <div class="mod-version" style="color:${isInstalled ? '#f5a623' : 'transparent'}">${isInstalled ? '✓' : ''}</div>
+      <label class="toggle">
+        <input type="checkbox" ${isInstalled ? 'checked' : ''} />
+        <span class="toggle-slider"></span>
+      </label>
     </div>`;
+
+  const input    = card.querySelector('input') as HTMLInputElement;
+  const statusEl = card.querySelector('.mod-version') as HTMLElement;
+
+  input.addEventListener('change', async e => {
+    const checked = (e.target as HTMLInputElement).checked;
+    input.disabled = true;
+    if (checked) {
+      statusEl.style.color = '#f6c356';
+      statusEl.textContent = '…';
+      modpackProgressEl = statusEl;
+      try {
+        const result = await mc.installModpack({ projectId: mod.project_id });
+        if (!result.ok) throw new Error(result.error);
+        const updated = loadInstalledModpacks();
+        updated[mod.project_id] = { projectId: mod.project_id, title: mod.title, mcVersion: result.mcVersion, filenames: result.filenames };
+        saveInstalledModpacks(updated);
+        card.className = 'mod-card enabled';
+        statusEl.textContent = '✓';
+        statusEl.style.color = '#f5a623';
+      } catch (err: any) {
+        input.checked = false;
+        card.className = 'mod-card';
+        statusEl.textContent = '✗';
+        statusEl.style.color = '#e05500';
+        statusEl.title = err.message;
+      } finally {
+        modpackProgressEl = null;
+      }
+    } else {
+      const updated = loadInstalledModpacks();
+      const pack = updated[mod.project_id];
+      if (pack) {
+        for (const filename of pack.filenames) {
+          try { await mc.removeMod({ filename }); } catch {}
+        }
+        delete updated[mod.project_id];
+        saveInstalledModpacks(updated);
+      }
+      card.className = 'mod-card';
+      statusEl.textContent = '';
+      statusEl.style.color = 'transparent';
+    }
+    input.disabled = false;
+  });
+
   return card;
 }
 

@@ -4,6 +4,7 @@ import { execSync, spawnSync, spawn, ChildProcess } from 'child_process';
 import https from 'https';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Client } = require('minecraft-launcher-core');
@@ -715,6 +716,45 @@ ipcMain.handle('mc-upload-skin', async (_e, opts: { base64: string; variant: 'cl
 });
 
 // ── Helper: stream download to disk ──────────────────────────────────────────
+// Minimal ZIP extractor — reads a single named entry from a .zip / .mrpack
+function extractFromZip(buf: Buffer, target: string): Promise<Buffer> {
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= 0; i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) return Promise.reject(new Error('Not a valid ZIP file'));
+  const cdOffset = buf.readUInt32LE(eocd + 16);
+  const cdSize   = buf.readUInt32LE(eocd + 12);
+  let pos = cdOffset;
+  while (pos < cdOffset + cdSize) {
+    if (buf.readUInt32LE(pos) !== 0x02014b50) break;
+    const method     = buf.readUInt16LE(pos + 10);
+    const compSize   = buf.readUInt32LE(pos + 20);
+    const fnLen      = buf.readUInt16LE(pos + 28);
+    const extraLen   = buf.readUInt16LE(pos + 30);
+    const commentLen = buf.readUInt16LE(pos + 32);
+    const lhOffset   = buf.readUInt32LE(pos + 42);
+    const name       = buf.slice(pos + 46, pos + 46 + fnLen).toString('utf-8');
+    if (name === target) {
+      const lhFnLen    = buf.readUInt16LE(lhOffset + 26);
+      const lhExtraLen = buf.readUInt16LE(lhOffset + 28);
+      const dataStart  = lhOffset + 30 + lhFnLen + lhExtraLen;
+      const compressed = buf.slice(dataStart, dataStart + compSize);
+      if (method === 0) return Promise.resolve(Buffer.from(compressed));
+      if (method === 8) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const zlibMod = require('zlib');
+        return new Promise((res, rej) =>
+          zlibMod.inflateRaw(compressed, (err: Error | null, r: Buffer) => err ? rej(err) : res(r))
+        );
+      }
+      return Promise.reject(new Error(`Unsupported ZIP compression: ${method}`));
+    }
+    pos += 46 + fnLen + extraLen + commentLen;
+  }
+  return Promise.reject(new Error(`'${target}' not found in archive`));
+}
+
 function downloadFileTo(url: string, dest: string, onPct?: (p: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
@@ -952,6 +992,52 @@ ipcMain.handle('mc-toggle-mod', async (_e, opts: { filename: string; enable: boo
     const dst = opts.enable ? path.join(modsDir, opts.filename)     : path.join(disabledDir, opts.filename);
     if (fs.existsSync(src)) fs.renameSync(src, dst);
     return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mc-install-modpack', async (_e: any, opts: { projectId: string }) => {
+  const send = (data: object) => gameWin?.webContents.send('mc-modpack-progress', data);
+  try {
+    const modsDir = path.join(app.getPath('userData'), '.minecraft', 'mods');
+    fs.mkdirSync(modsDir, { recursive: true });
+
+    send({ phase: 'fetching' });
+    const versions = await fetchJson(`https://api.modrinth.com/v2/project/${opts.projectId}/version?limit=5`);
+    if (!Array.isArray(versions) || !versions.length) throw new Error('No versions found');
+
+    const mrpackFile = (versions[0].files as any[]).find((f: any) => f.filename?.endsWith('.mrpack'));
+    if (!mrpackFile) throw new Error('No .mrpack file in latest release');
+
+    const tmpPath = path.join(os.tmpdir(), `voxel-modpack-${opts.projectId}.mrpack`);
+    send({ phase: 'downloading', pct: 0 });
+    await downloadFileTo(mrpackFile.url, tmpPath, pct => send({ phase: 'downloading', pct }));
+
+    const zipBuf = fs.readFileSync(tmpPath);
+    const indexBuf = await extractFromZip(zipBuf, 'modrinth.index.json');
+    const index = JSON.parse(indexBuf.toString('utf-8'));
+    try { fs.unlinkSync(tmpPath); } catch {}
+
+    const modFiles: any[] = (index.files || []).filter((f: any) =>
+      Array.isArray(f.downloads) && f.downloads.length && typeof f.path === 'string' && f.path.startsWith('mods/')
+    );
+    const installed: string[] = [];
+    for (let i = 0; i < modFiles.length; i++) {
+      const f = modFiles[i];
+      const filename = path.basename(f.path);
+      send({ phase: 'mods', current: i + 1, total: modFiles.length });
+      try {
+        await downloadFileTo(f.downloads[0], path.join(modsDir, filename));
+        installed.push(filename);
+      } catch {}
+    }
+    return {
+      ok: true,
+      filenames: installed,
+      mcVersion: (index.dependencies?.minecraft ?? '') as string,
+      fabricVersion: (index.dependencies?.['fabric-loader'] ?? '') as string,
+    };
   } catch (err: any) {
     return { ok: false, error: err.message };
   }

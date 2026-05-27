@@ -77,6 +77,8 @@ contextBridge.exposeInMainWorld('mc', {
   listResourcePacks:     () => ipcRenderer.invoke('mc-list-resourcepacks'),
   installResourcePack:   (opts: { url: string; filename: string }) => ipcRenderer.invoke('mc-install-resourcepack', opts),
   removeResourcePack:    (opts: { filename: string }) => ipcRenderer.invoke('mc-remove-resourcepack', opts),
+  installModpack:      (opts: { projectId: string }) => ipcRenderer.invoke('mc-install-modpack', opts),
+  onModpackProgress:   (cb: (e: any) => void) => ipcRenderer.on('mc-modpack-progress', (_e, e) => cb(e)),
   onAlreadyAuthed: (cb: (name: string) => void) => ipcRenderer.on('mc-already-authed', (_e, n) => cb(n)),
   onLog:           (cb: (line: string) => void) => ipcRenderer.on('mc-log',      (_e, l) => cb(l)),
   onProgress:      (cb: (e: any) => void)       => ipcRenderer.on('mc-progress', (_e, e) => cb(e)),
