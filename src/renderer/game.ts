@@ -2678,19 +2678,13 @@ async function unpublishServer() {
 
 let srvAllVersions: { id: string; type: string }[] = [];
 
-function parseMcVer(id: string): number[] { return id.split('.').map(n => parseInt(n,10)||0); }
-function mcVerLte(id: string): boolean {
-  const v = parseMcVer(id); const m = [1,21,11];
-  for (let i=0;i<3;i++) { if((v[i]??0)<m[i]) return true; if((v[i]??0)>m[i]) return false; } return true;
-}
-
 function populateSrvVersions() {
   const sel = document.getElementById('srv-version') as HTMLSelectElement;
   const showSnaps = (document.getElementById('srv-snapshots-toggle') as HTMLInputElement)?.checked;
   const prev = sel.value;
   sel.innerHTML = '';
   const filtered = srvAllVersions.filter(v =>
-    (v.type === 'release' || (showSnaps && v.type === 'snapshot')) && mcVerLte(v.id)
+    v.type === 'release' || (showSnaps && v.type === 'snapshot')
   );
   filtered.forEach((v, i) => {
     const opt = document.createElement('option');
@@ -2715,10 +2709,11 @@ async function loadServerVersions() {
     populateSrvVersions();
   } catch {
     srvAllVersions = [
-      { id: '1.21.4', type: 'release' }, { id: '1.21.3', type: 'release' },
-      { id: '1.21.1', type: 'release' }, { id: '1.21',   type: 'release' },
-      { id: '1.20.6', type: 'release' }, { id: '1.20.4', type: 'release' },
-      { id: '1.20.1', type: 'release' }, { id: '1.19.4', type: 'release' },
+      { id: '1.21.5', type: 'release' }, { id: '1.21.4', type: 'release' },
+      { id: '1.21.3', type: 'release' }, { id: '1.21.1', type: 'release' },
+      { id: '1.21',   type: 'release' }, { id: '1.20.6', type: 'release' },
+      { id: '1.20.4', type: 'release' }, { id: '1.20.1', type: 'release' },
+      { id: '1.19.4', type: 'release' },
     ];
     populateSrvVersions();
   }
