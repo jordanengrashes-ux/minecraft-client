@@ -465,7 +465,7 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
 
   // If no cached token, or token is stale, run the auth flow inline
   const tokenAge = Date.now() - (mcAuthToken?.cached_at ?? 0);
-  const needsAuth = !mcAuthToken || tokenAge > 30 * 60 * 1000;
+  const needsAuth = !mcAuthToken || tokenAge > 4 * 60 * 60 * 1000; // re-validate every 4h, not 30min
   if (needsAuth) {
     const tokenOk = mcAuthToken ? await validateToken(mcAuthToken) : false;
     if (!tokenOk) {
@@ -524,7 +524,7 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
       version: { number: mcVer, type: 'release', ...(isFabric ? { custom: opts.version } : {}) },
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
-      overrides: { maxSockets: 64 },
+      overrides: { maxSockets: 64, checkHash: false },
     });
     launcher.on('data',     (d: string)  => gameWin?.webContents.send('mc-log',      d));
     launcher.on('progress', (e: any)     => gameWin?.webContents.send('mc-progress', e));
@@ -575,7 +575,7 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
       version: { number: mcVerOff, type: 'release', ...(isFabricOff ? { custom: opts.version } : {}) },
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
-      overrides: { maxSockets: 0 },
+      overrides: { maxSockets: 0, checkHash: false },
     });
     launcher.on('data',     (d: string) => gameWin?.webContents.send('mc-log',      d));
     launcher.on('progress', (e: any)    => gameWin?.webContents.send('mc-progress', e));

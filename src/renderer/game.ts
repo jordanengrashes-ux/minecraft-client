@@ -2475,7 +2475,14 @@ function srvAddLog(text: string) {
   srvLog.scrollTop = srvLog.scrollHeight;
 }
 
-srvLogCopy?.addEventListener('click', () => copyToClipboard(srvLogLines.join('\n'), srvLogCopy));
+document.getElementById('srv-log-copy')?.addEventListener('click', function() {
+  const text = srvLogLines.join('\n');
+  if (!text) { (this as HTMLButtonElement).textContent = 'Nothing yet'; setTimeout(() => { (this as HTMLButtonElement).textContent = 'Copy'; }, 1200); return; }
+  (window as any).electron?.copyText(text);
+  (this as HTMLButtonElement).textContent = '✓ Copied!';
+  (this as HTMLButtonElement).style.color = '#f5a623';
+  setTimeout(() => { (this as HTMLButtonElement).textContent = 'Copy'; (this as HTMLButtonElement).style.color = ''; }, 1500);
+});
 
 // Copy address button
 document.getElementById('srv-copy-addr-btn')?.addEventListener('click', () => {
