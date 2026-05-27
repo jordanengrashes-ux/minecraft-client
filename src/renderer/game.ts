@@ -1433,12 +1433,20 @@ function renderModProfiles() {
   for (const profile of profiles) {
     const isActive = profile.id === activeId;
     const card = document.createElement('div');
-    card.className = 'control-card';
-    card.style.cssText = `display:flex;align-items:center;gap:12px;padding:10px 14px;transition:border-color 0.15s,background 0.15s;${isActive ? 'border-color:rgba(245,166,35,0.4);background:rgba(245,166,35,0.04);' : ''}`;
+    card.className = 'mod-card' + (isActive ? ' enabled' : '');
 
+    const info = document.createElement('div');
+    info.className = 'mod-info';
+    info.innerHTML = `<div class="mod-name">${profile.name}</div><div class="mod-desc">${profile.slugs.length} mod${profile.slugs.length !== 1 ? 's' : ''}</div>`;
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Delete';
+    delBtn.style.cssText = 'padding:4px 10px;background:none;border:1px solid rgba(248,81,73,0.25);border-radius:5px;color:#666;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.15s;';
+
+    const right = document.createElement('div');
+    right.className = 'mod-right';
     const toggleLabel = document.createElement('label');
     toggleLabel.className = 'toggle';
-    toggleLabel.style.cursor = 'pointer';
     const toggleInput = document.createElement('input');
     toggleInput.type = 'checkbox';
     toggleInput.checked = isActive;
@@ -1446,18 +1454,11 @@ function renderModProfiles() {
     toggleSlider.className = 'toggle-slider';
     toggleLabel.appendChild(toggleInput);
     toggleLabel.appendChild(toggleSlider);
+    right.appendChild(delBtn);
+    right.appendChild(toggleLabel);
 
-    const info = document.createElement('div');
-    info.style.cssText = 'flex:1;min-width:0;';
-    info.innerHTML = `<div style="font-size:13px;font-weight:600;color:#ffffff;">${profile.name}</div><div style="font-size:11px;color:#444444;margin-top:1px;">${profile.slugs.length} mod${profile.slugs.length !== 1 ? 's' : ''}</div>`;
-
-    const delBtn = document.createElement('button');
-    delBtn.textContent = 'Delete';
-    delBtn.style.cssText = 'padding:4px 10px;background:none;border:1px solid rgba(248,81,73,0.25);border-radius:5px;color:#666;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.15s;';
-
-    card.appendChild(toggleLabel);
     card.appendChild(info);
-    card.appendChild(delBtn);
+    card.appendChild(right);
     listEl.insertBefore(card, emptyEl ?? null);
 
     toggleInput.addEventListener('change', async () => {
