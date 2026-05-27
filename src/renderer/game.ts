@@ -2179,6 +2179,12 @@ function setWorldPath(fullPath: string, label: string) {
 
 fromSavesBtn?.addEventListener('click', async () => {
   if (savesMenu.style.display !== 'none') { savesMenu.style.display = 'none'; return; }
+
+  // Position below the button using fixed coords so overflow:hidden doesn't clip it
+  const rect = fromSavesBtn!.getBoundingClientRect();
+  savesMenu.style.top  = `${rect.bottom + 4}px`;
+  savesMenu.style.left = `${rect.left}px`;
+
   savesMenu.innerHTML = '<div style="padding:8px 14px;font-size:12px;color:#555;">Loading…</div>';
   savesMenu.style.display = 'block';
 
@@ -2207,7 +2213,8 @@ fromSavesBtn?.addEventListener('click', async () => {
 });
 
 document.addEventListener('click', (e) => {
-  if (!fromSavesBtn?.contains(e.target as Node) && !savesMenu?.contains(e.target as Node)) {
+  if (!savesMenu || savesMenu.style.display === 'none') return;
+  if (!fromSavesBtn?.contains(e.target as Node) && !savesMenu.contains(e.target as Node)) {
     savesMenu.style.display = 'none';
   }
 });
