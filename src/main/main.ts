@@ -13,6 +13,7 @@ let loginWin:   BrowserWindow | null = null;
 let gameWin:    BrowserWindow | null = null;
 let overlayWin: BrowserWindow | null = null;
 let mcAuthToken: any = null;
+let updateReady = false;
 let serverProcess: ChildProcess | null = null;
 let keepAwakeId: number | null = null;
 let srvUserStopped = false;
@@ -410,7 +411,14 @@ function createGameWindow() {
   } else {
     gameWin.loadFile(path.join(__dirname, '../dist/game.html'));
   }
-  gameWin.on('closed', () => { gameWin = null; app.quit(); });
+  gameWin.on('closed', () => {
+    gameWin = null;
+    if (updateReady) {
+      try { autoUpdater.quitAndInstall(true, false); } catch { app.quit(); }
+    } else {
+      app.quit();
+    }
+  });
   gameWin.webContents.once('did-finish-load', () => { if (!DEV) setupAutoUpdater(); });
 }
 
@@ -1275,14 +1283,14 @@ ipcMain.on('win-maximize', () => { const w = BrowserWindow.getFocusedWindow(); i
 
 // ── Auto-updater ──────────────────────────────────────────────────────────────
 function setupAutoUpdater() {
-  autoUpdater.autoDownload    = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoDownload         = true;
+  autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on('checking-for-update',  () => gameWin?.webContents.send('update-checking'));
   autoUpdater.on('update-not-available', () => gameWin?.webContents.send('update-not-available'));
   autoUpdater.on('update-available',   info => gameWin?.webContents.send('update-available',  info.version));
   autoUpdater.on('download-progress',     p => gameWin?.webContents.send('update-progress',   Math.round(p.percent)));
-  autoUpdater.on('update-downloaded',     () => gameWin?.webContents.send('update-downloaded'));
+  autoUpdater.on('update-downloaded',     () => { updateReady = true; gameWin?.webContents.send('update-downloaded'); });
   autoUpdater.on('error', err => {
     console.error('[updater] error:', err?.message);
     gameWin?.webContents.send('update-error', err?.message ?? 'Unknown error');
