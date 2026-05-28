@@ -91,7 +91,7 @@ function populateVersions() {
       : ((v.type === 'release' && isJava21Compatible(v.id)) ||
          (showSnapshots && v.type === 'snapshot' && isJava21Compatible(v.id)))
   );
-  const prev = mcVersion.value;
+  const prev = localStorage.getItem('voxel_mc_version') || mcVersion.value;
   mcVersion.innerHTML = '';
   for (const v of filtered) {
     const opt = document.createElement('option');
@@ -126,11 +126,16 @@ fetch('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json')
   });
 
 snapshotsToggle.addEventListener('change', populateVersions);
-javaVersionSel.addEventListener('change', populateVersions);
+javaVersionSel.addEventListener('change', () => {
+  localStorage.setItem('voxel_java_version', javaVersionSel.value);
+  populateVersions();
+});
+mcVersion.addEventListener('change', () => localStorage.setItem('voxel_mc_version', mcVersion.value));
 
 // ── Memory slider ──────────────────────────────────────────────────────────────
 mcMemory.addEventListener('input', () => {
   mcMemoryVal.textContent = mcMemory.value;
+  localStorage.setItem('voxel_mc_memory', mcMemory.value);
 });
 
 // ── Log panel open/close ──────────────────────────────────────────────────────
@@ -239,6 +244,10 @@ fabricToggle.addEventListener('change', () => {
   const savedOffline = localStorage.getItem('voxel_offline_mode') === 'true';
   if (savedFabric)  fabricToggle.checked = true;
   if (savedOffline) { offlineToggle.checked = true; applyOfflineState(true); }
+  const savedMemory = localStorage.getItem('voxel_mc_memory');
+  if (savedMemory) { mcMemory.value = savedMemory; mcMemoryVal.textContent = savedMemory; }
+  const savedJava = localStorage.getItem('voxel_java_version');
+  if (savedJava && javaVersionSel) javaVersionSel.value = savedJava;
   updateModsBadge();
 }
 
