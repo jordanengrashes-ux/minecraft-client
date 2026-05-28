@@ -3003,18 +3003,16 @@ if (updater) {
     setTimeout(() => { if (updateSub) updateSub.textContent = 'Updates download automatically in the background'; }, 3000);
   });
   updater.onAvailable((ver: string) => {
-    banner.style.display = 'flex';
-    updateText.textContent = `Update v${ver} downloading…`;
-    progressWrap2.style.display = 'block';
+    // Download silently — don't interrupt the user until it's ready
     if (checkBtn) { checkBtn.textContent = 'Downloading…'; checkBtn.disabled = true; }
-    if (updateSub) updateSub.textContent = `Downloading v${ver}…`;
+    if (updateSub) updateSub.textContent = `Downloading v${ver} in background…`;
   });
   updater.onProgress((pct: number) => {
-    progressBar2.style.width = `${pct}%`;
-    updateText.textContent = `Downloading update… ${pct}%`;
     if (updateSub) updateSub.textContent = `Downloading update… ${pct}%`;
   });
   updater.onDownloaded(() => {
+    // Only show the banner once the update is fully downloaded and ready
+    banner.style.display = 'flex';
     progressWrap2.style.display = 'none';
     updateText.textContent = 'Update ready — restart to apply';
     installBtn.style.display = 'inline-block';
@@ -3024,8 +3022,6 @@ if (updater) {
   });
 
   updater.onError?.((msg: string) => {
-    progressWrap2.style.display = 'none';
-    updateText.textContent = `Update error: ${msg}`;
     if (checkBtn) { checkBtn.textContent = 'Retry'; checkBtn.disabled = false; }
     if (updateSub) updateSub.textContent = `Update failed: ${msg}`;
   });
