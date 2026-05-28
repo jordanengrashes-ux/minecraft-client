@@ -122,24 +122,21 @@ jobs:
         with:
           name: release-mac
           path: dist/mac
-      - name: Publish GitHub release
-        run: |
-          version=$(node -p "require('./package.json').version")
-          tag="v$version"
-          echo "=== Files available ==="
-          find dist -type f | sort
-          echo "=== Publishing $tag ==="
-          gh release delete "$tag" --yes 2>/dev/null || true
-          gh release create "$tag" \
-            --title "Voxel Client $tag" \
-            --notes "Voxel Client $tag"
-          echo "=== Uploading Windows ==="
-          gh release upload "$tag" dist/windows/*
-          echo "=== Uploading Linux ==="
-          gh release upload "$tag" dist/linux/*
-          if [ -d dist/mac ] && [ "$(ls -A dist/mac)" ]; then
-            echo "=== Uploading Mac ==="
-            gh release upload "$tag" dist/mac/*
-          fi
+      - name: Get version
+        id: version
+        run: echo "tag=v$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
+      - name: Delete existing release
+        run: gh release delete "${{ steps.version.outputs.tag }}" --yes 2>/dev/null || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Voxel Client ${{ steps.version.outputs.tag }}
+          body: Voxel Client ${{ steps.version.outputs.tag }}
+          files: |
+            dist/windows/*
+            dist/linux/*
+            dist/mac/*
+          fail_on_unmatched_files: false
