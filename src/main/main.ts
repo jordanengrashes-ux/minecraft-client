@@ -414,7 +414,7 @@ function createGameWindow() {
   gameWin.on('closed', () => {
     gameWin = null;
     if (updateReady) {
-      try { autoUpdater.quitAndInstall(true, false); } catch { app.quit(); }
+      try { autoUpdater.quitAndInstall(true, true); } catch { app.quit(); }
     } else {
       app.quit();
     }
@@ -1299,7 +1299,7 @@ function setupAutoUpdater() {
   autoUpdater.checkForUpdates().catch(() => {});
 }
 
-ipcMain.on('install-update',    () => autoUpdater.quitAndInstall(false, true));
+ipcMain.on('install-update',    () => autoUpdater.quitAndInstall(true, true));
 ipcMain.on('check-for-updates', () => { autoUpdater.checkForUpdates().catch(() => {}); });
 
 // ── IPC: overlay mod state (reads/writes game window's localStorage) ──────────
