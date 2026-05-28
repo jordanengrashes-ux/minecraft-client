@@ -122,19 +122,16 @@ jobs:
         with:
           name: release-mac
           path: dist/mac
-      - name: Get version
-        id: version
-        run: echo "tag=v$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
       - name: Delete existing release
-        run: gh release delete "${{ steps.version.outputs.tag }}" --yes 2>/dev/null || true
+        run: gh release delete "${{ github.ref_name }}" --yes 2>/dev/null || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Voxel Client ${{ steps.version.outputs.tag }}
-          body: Voxel Client ${{ steps.version.outputs.tag }}
+          tag_name: ${{ github.ref_name }}
+          name: Voxel Client ${{ github.ref_name }}
+          body: Voxel Client ${{ github.ref_name }}
           files: |
             dist/windows/*
             dist/linux/*
