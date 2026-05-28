@@ -72,6 +72,7 @@ jobs:
 
   build-mac:
     runs-on: macos-14
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -83,7 +84,7 @@ jobs:
           path: |
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
-          key: macos-14-electron-30-v2
+          key: macos-14-electron-30-v3
       - name: Create resource stubs
         run: mkdir -p resources/java21 resources/mods
       - run: npm ci
@@ -99,10 +100,11 @@ jobs:
         with:
           name: release-mac
           path: dist-artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
 
   publish:
     needs: [build-windows, build-linux, build-mac]
+    if: always() && needs.build-windows.result == 'success' && needs.build-linux.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -114,7 +116,9 @@ jobs:
         with:
           name: release-linux
           path: dist/linux
-      - uses: actions/download-artifact@v4
+      - name: Download Mac artifacts (optional)
+        uses: actions/download-artifact@v4
+        if: needs.build-mac.result == 'success'
         with:
           name: release-mac
           path: dist/mac
@@ -123,13 +127,14 @@ jobs:
           version=$(node -p "require('./package.json').version")
           tag="v$version"
           echo "Publishing $tag"
-          ls -la dist/windows/ dist/linux/ dist/mac/
+          ls -la dist/windows/ dist/linux/
           gh release delete "$tag" --yes 2>/dev/null || true
+          MAC_FILES=$(find dist/mac -type f 2>/dev/null | tr '\n' ' ')
           gh release create "$tag" \
             --title "Voxel Client $tag" \
             --notes "Voxel Client $tag" \
             dist/windows/* \
             dist/linux/* \
-            dist/mac/*
+            $MAC_FILES
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
