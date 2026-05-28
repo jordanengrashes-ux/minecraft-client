@@ -2456,10 +2456,8 @@ function applyServerConfig(srv: SavedServer) {
   if (memEl) { memEl.value = String(srv.maxMem ?? 2); document.getElementById('srv-mem-val')!.textContent = String(srv.maxMem ?? 2); }
   const minMemEl = document.getElementById('srv-minmem') as HTMLInputElement;
   if (minMemEl) { minMemEl.value = String(srv.minMem ?? 512); document.getElementById('srv-minmem-val')!.textContent = String(srv.minMem ?? 512); }
-  if (!srvRunning) {
-    srvLog.innerHTML = '<div id="srv-log-placeholder" style="color:#444444;">Select a version and click Start Server</div>';
-    srvLogLines = [];
-  }
+  srvLog.innerHTML = '<div id="srv-log-placeholder" style="color:#444444;">Select a version and click Start Server</div>';
+  srvLogLines = [];
 }
 
 function renderSavedServers() {
