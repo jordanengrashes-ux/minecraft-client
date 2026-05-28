@@ -127,14 +127,14 @@ jobs:
           version=$(node -p "require('./package.json').version")
           tag="v$version"
           echo "Publishing $tag"
-          ls -la dist/windows/ dist/linux/
+          mkdir -p all-dist
+          cp dist/windows/* dist/linux/* all-dist/
+          [ -d dist/mac ] && cp dist/mac/* all-dist/ || true
+          ls -la all-dist/
           gh release delete "$tag" --yes 2>/dev/null || true
-          MAC_FILES=$(find dist/mac -type f 2>/dev/null | tr '\n' ' ')
           gh release create "$tag" \
             --title "Voxel Client $tag" \
             --notes "Voxel Client $tag" \
-            dist/windows/* \
-            dist/linux/* \
-            $MAC_FILES
+            all-dist/*
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
