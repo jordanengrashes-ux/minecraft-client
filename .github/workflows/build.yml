@@ -71,7 +71,7 @@ jobs:
           if-no-files-found: error
 
   build-mac:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -83,7 +83,7 @@ jobs:
           path: |
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
-          key: ${{ runner.os }}-electron-30
+          key: macos-14-electron-30-v2
       - name: Create resource stubs
         run: mkdir -p resources/java21 resources/mods
       - run: npm ci
