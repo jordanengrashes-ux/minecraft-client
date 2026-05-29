@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker, dialog, session } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { execSync, spawnSync, spawn, ChildProcess } from 'child_process';
 import https from 'https';
@@ -94,6 +94,7 @@ const MC_RUNTIME_MAP: Record<number, string[]> = {
   8:  ['java-runtime-legacy'],
   17: ['java-runtime-gamma', 'java-runtime-gamma-snapshot'],
   21: ['java-runtime-delta'],
+  25: ['java-runtime-epsilon'],
 };
 
 async function ensureJava(major: number, log: (msg: string) => void): Promise<string> {
@@ -806,7 +807,7 @@ ipcMain.handle('server-pick-world', async () => {
 });
 
 // ── IPC: server hosting ───────────────────────────────────────────────────────
-ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: number; minMem?: number; name: string; port?: number; maxPlayers?: number; motd?: string; seed?: string; worldPath?: string; }) => {
+ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: number; minMem?: number; name: string; port?: number; maxPlayers?: number; motd?: string; seed?: string; worldPath?: string; javaVersion?: number; }) => {
   if (serverProcess) return { ok: false, error: 'Server is already running' };
   try {
     const serverDir = path.join(app.getPath('userData'), 'mc-server', opts.version);
@@ -867,7 +868,8 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
 
     // Resolve Java the same way as game launch (bundled → cache → system → download)
     // Use java.exe not javaw.exe — server needs stdout
-    const javawPath = await ensureJava21((msg) => gameWin?.webContents.send('server-log', msg));
+    const srvJava = opts.javaVersion ?? 21;
+    const javawPath = await ensureJava(srvJava, (msg) => gameWin?.webContents.send('server-log', msg));
     const javaExe   = javawPath.replace(/javaw(\.exe)?$/i, 'java$1');
 
     const port    = opts.port ?? 25565;
@@ -1325,6 +1327,9 @@ ipcMain.on('overlay-close', () => { overlayWin?.hide(); });
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((_wc: any, permission: string, callback: (granted: boolean) => void) => {
+    callback(permission === 'media' || permission === 'microphone' || permission === 'notifications');
+  });
   loadCachedAuth();
   createLoginWindow();
   globalShortcut.register('Shift+F9', toggleOverlay);

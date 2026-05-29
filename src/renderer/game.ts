@@ -1,6 +1,6 @@
 ﻿// Launcher logic — no Three.js, just UI wiring for Minecraft launch
 
-import { ref, set, onValue, serverTimestamp, onDisconnect, update, get, increment } from 'firebase/database';
+import { ref, set, push, remove, onValue, onChildAdded, query, limitToLast, serverTimestamp, onDisconnect, update, get, increment } from 'firebase/database';
 import { rtdb } from './firebase';
 
 
@@ -300,14 +300,16 @@ function getEffectiveJavaVersion(): number {
   if (sel !== 'auto') return parseInt(sel, 10);
   // Auto: pick based on MC version
   const id = mcVersion.value;
-  const m = id.match(/^(\d+)\.(\d+)/);
+  const m = id.match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
   if (!m) return 21;
   const maj = parseInt(m[1]);
-  if (maj !== 1) return 21;       // year-based versions (26.x.x …)
+  if (maj !== 1) return 25;             // year-based (26.x.x …) → Java 25
   const min = parseInt(m[2]);
+  const patch = m[3] ? parseInt(m[3]) : 0;
   if (min < 17) return 8;
   if (min < 21) return 17;
-  return 21;
+  if (min === 21 && patch <= 11) return 21;
+  return 25;                            // 1.21.12+ and 1.22+ → Java 25
 }
 
 // ── Launch ─────────────────────────────────────────────────────────────────────
@@ -479,8 +481,10 @@ const navFriends        = document.getElementById('nav-friends')!;
 const serverPanelEl     = document.getElementById('server-panel')!;
 const cosmeticsPanelEl  = document.getElementById('cosmetics-panel')!;
 const friendsPanelEl    = document.getElementById('friends-panel')!;
-const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl];
-const allNavs   = [navPlay, navBedrock, navMods, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navServer, navCosmetics, navFriends, navCustomize, navSettings];
+const chatPanelEl = document.getElementById('chat-panel')!;
+const navChat     = document.getElementById('nav-chat')!;
+const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl, chatPanelEl];
+const allNavs   = [navPlay, navBedrock, navMods, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navServer, navCosmetics, navFriends, navCustomize, navSettings, navChat];
 
 function showPanel(panel: HTMLElement, nav: HTMLElement) {
   allPanels.forEach(p => p.style.display = 'none');
@@ -2857,6 +2861,8 @@ srvStartBtn?.addEventListener('click', async () => {
   const motd       = (document.getElementById('srv-motd') as HTMLInputElement)?.value.trim() || 'Voxel Client Server';
   const seed       = (document.getElementById('srv-seed') as HTMLInputElement)?.value.trim() || undefined;
   const worldPath  = selectedWorldPath ?? undefined;
+  const srvJavaSel = (document.getElementById('srv-java-version') as HTMLSelectElement)?.value ?? 'auto';
+  const javaVersion = srvJavaSel === 'auto' ? undefined : parseInt(srvJavaSel, 10);
 
   srvRunning = true;
   srvStopBtn.style.display = 'inline-flex';
@@ -2869,7 +2875,7 @@ srvStartBtn?.addEventListener('click', async () => {
   pendingSrvName    = name;
   pendingSrvVersion = version;
 
-  const res = await server.start({ version, maxMem, minMem, name, port, maxPlayers, motd, seed, worldPath });
+  const res = await server.start({ version, maxMem, minMem, name, port, maxPlayers, motd, seed, worldPath, javaVersion });
   if (!res.ok) {
     srvAddLog(`[Error] ${res.error}`);
     srvRunning = false;
@@ -3132,4 +3138,317 @@ function initFiles() {
   refreshFileLists();
 }
 
+// ── Global Chat & Voice Calls ─────────────────────────────────────────────────
+const STUN_CONFIG: RTCConfiguration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ],
+};
+
+let localStream: MediaStream | null = null;
+let peerConn: RTCPeerConnection | null = null;
+let remoteAudioEl: HTMLAudioElement | null = null;
+let activeCallId: string | null = null;
+let isMuted = false;
+let chatUnread = 0;
+let chatNotifEnabled = localStorage.getItem('voxel_chat_notif') !== 'false';
+let chatStartedAt = 0;
+
+function getChatClientId(): string {
+  let id = localStorage.getItem('voxel_client_id');
+  if (!id) {
+    id = `vc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem('voxel_client_id', id);
+  }
+  return id;
+}
+
+function getChatUsername(): string {
+  const mcName = (document.getElementById('mc-ign') as HTMLElement | null)?.textContent?.trim();
+  if (mcName && mcName !== 'Loading…') return mcName;
+  const offName = (document.getElementById('offline-username') as HTMLInputElement | null)?.value?.trim();
+  if (offName) return offName;
+  let guest = localStorage.getItem('voxel_guest_name');
+  if (!guest) {
+    guest = 'Guest_' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    localStorage.setItem('voxel_guest_name', guest);
+  }
+  return guest;
+}
+
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function updateChatBadge() {
+  const badge = document.getElementById('chat-badge')!;
+  if (chatUnread > 0) {
+    badge.textContent = chatUnread > 99 ? '99+' : String(chatUnread);
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function appendChatMessage(m: { user: string; text: string; ts: number }, container: HTMLElement, myName: string) {
+  const isMe = m.user === myName;
+  const time = new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const div = document.createElement('div');
+  div.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};gap:2px;`;
+  div.innerHTML =
+    `<span style="font-size:10px;color:#484f58;">${isMe ? '' : escHtml(m.user) + ' · '}${time}</span>` +
+    `<div style="max-width:78%;background:${isMe ? 'rgba(245,166,35,0.15)' : '#141414'};border:1px solid ${isMe ? 'rgba(245,166,35,0.28)' : '#222222'};border-radius:10px;padding:6px 11px;font-size:13px;color:#ffffff;word-break:break-word;">${escHtml(m.text)}</div>`;
+  container.appendChild(div);
+}
+
+function renderChatUsers(snap: any, container: HTMLElement) {
+  container.innerHTML = '';
+  const myId = getChatClientId();
+  const myName = getChatUsername();
+
+  // self row
+  const selfRow = document.createElement('div');
+  selfRow.className = 'chat-user-row';
+  selfRow.innerHTML = `<span style="width:7px;height:7px;background:#3fb950;border-radius:50%;flex-shrink:0;"></span><span style="font-size:12px;color:#f5a623;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">${escHtml(myName)}</span>`;
+  container.appendChild(selfRow);
+
+  const val = snap.val() || {};
+  Object.entries(val).forEach(([id, v]: [string, any]) => {
+    if (id === myId) return;
+    const row = document.createElement('div');
+    row.className = 'chat-user-row';
+    row.innerHTML =
+      `<span style="width:7px;height:7px;background:#3fb950;border-radius:50%;flex-shrink:0;"></span>` +
+      `<span style="font-size:12px;color:#ffffff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(v.name)}</span>` +
+      `<button class="chat-call-btn" title="Voice call ${escHtml(v.name)}">📞</button>`;
+    row.querySelector('.chat-call-btn')!.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startVoiceCall(v.name);
+    });
+    container.appendChild(row);
+  });
+}
+
+function showCallBar(withName: string) {
+  const bar = document.getElementById('chat-call-bar')!;
+  bar.style.display = 'flex';
+  document.getElementById('chat-call-with')!.textContent = withName;
+}
+
+function hideCallBar() {
+  document.getElementById('chat-call-bar')!.style.display = 'none';
+}
+
+function showIncomingCall(callId: string, callerName: string) {
+  const overlay = document.getElementById('chat-incoming-call')!;
+  document.getElementById('chat-caller-name')!.textContent = callerName;
+  overlay.style.display = 'block';
+  document.getElementById('chat-answer-btn')!.onclick = () => answerVoiceCall(callId, callerName);
+  document.getElementById('chat-decline-btn')!.onclick = async () => {
+    await update(ref(rtdb, `voxel_voice/calls/${callId}`), { status: 'ended' }).catch(() => {});
+    await remove(ref(rtdb, `voxel_voice/incoming/${getChatUsername()}`)).catch(() => {});
+    overlay.style.display = 'none';
+  };
+  if (Notification.permission === 'granted') {
+    new Notification('📞 Incoming Voice Call', { body: `${callerName} is calling you in Voxel Client` });
+  }
+}
+
+async function startVoiceCall(targetName: string) {
+  if (activeCallId) { return; }
+  const myName = getChatUsername();
+  if (!localStream) {
+    try { localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
+    catch { alert('Microphone access denied — allow it in settings to use voice calls.'); return; }
+  }
+  const callId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  peerConn = new RTCPeerConnection(STUN_CONFIG);
+  localStream.getTracks().forEach(t => peerConn!.addTrack(t, localStream!));
+  const remoteStream = new MediaStream();
+  remoteAudioEl = new Audio();
+  peerConn.ontrack = e => {
+    e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
+    remoteAudioEl!.srcObject = remoteStream;
+    remoteAudioEl!.play().catch(() => {});
+  };
+  peerConn.onicecandidate = e => {
+    if (e.candidate) push(ref(rtdb, `voxel_voice/calls/${callId}/offerCandidates`), e.candidate.toJSON()).catch(() => {});
+  };
+  const offer = await peerConn.createOffer();
+  await peerConn.setLocalDescription(offer);
+  await set(ref(rtdb, `voxel_voice/calls/${callId}`), {
+    offer: { type: offer.type, sdp: offer.sdp }, caller: myName, callee: targetName, status: 'pending',
+  }).catch(() => {});
+  await set(ref(rtdb, `voxel_voice/incoming/${targetName}`), { callId, caller: myName, ts: Date.now() }).catch(() => {});
+  activeCallId = callId;
+  showCallBar(targetName);
+  onValue(ref(rtdb, `voxel_voice/calls/${callId}/answer`), async snap => {
+    if (!snap.exists() || !peerConn || peerConn.currentRemoteDescription) return;
+    await peerConn.setRemoteDescription(new RTCSessionDescription(snap.val())).catch(() => {});
+  });
+  onChildAdded(ref(rtdb, `voxel_voice/calls/${callId}/answerCandidates`), async snap => {
+    if (peerConn) await peerConn.addIceCandidate(new RTCIceCandidate(snap.val())).catch(() => {});
+  });
+}
+
+async function answerVoiceCall(callId: string, callerName: string) {
+  const myName = getChatUsername();
+  document.getElementById('chat-incoming-call')!.style.display = 'none';
+  if (!localStream) {
+    try { localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
+    catch { alert('Microphone access denied.'); return; }
+  }
+  peerConn = new RTCPeerConnection(STUN_CONFIG);
+  localStream.getTracks().forEach(t => peerConn!.addTrack(t, localStream!));
+  const remoteStream = new MediaStream();
+  remoteAudioEl = new Audio();
+  peerConn.ontrack = e => {
+    e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
+    remoteAudioEl!.srcObject = remoteStream;
+    remoteAudioEl!.play().catch(() => {});
+  };
+  peerConn.onicecandidate = e => {
+    if (e.candidate) push(ref(rtdb, `voxel_voice/calls/${callId}/answerCandidates`), e.candidate.toJSON()).catch(() => {});
+  };
+  const callSnap = await get(ref(rtdb, `voxel_voice/calls/${callId}`)).catch(() => null);
+  if (!callSnap?.exists()) { hangUpVoiceCall(); return; }
+  await peerConn.setRemoteDescription(new RTCSessionDescription(callSnap.val().offer));
+  const answer = await peerConn.createAnswer();
+  await peerConn.setLocalDescription(answer);
+  await update(ref(rtdb, `voxel_voice/calls/${callId}`), { answer: { type: answer.type, sdp: answer.sdp }, status: 'active' }).catch(() => {});
+  await remove(ref(rtdb, `voxel_voice/incoming/${myName}`)).catch(() => {});
+  onChildAdded(ref(rtdb, `voxel_voice/calls/${callId}/offerCandidates`), async snap => {
+    if (peerConn) await peerConn.addIceCandidate(new RTCIceCandidate(snap.val())).catch(() => {});
+  });
+  activeCallId = callId;
+  showCallBar(callerName);
+}
+
+function hangUpVoiceCall() {
+  if (activeCallId) {
+    update(ref(rtdb, `voxel_voice/calls/${activeCallId}`), { status: 'ended' }).catch(() => {});
+    activeCallId = null;
+  }
+  localStream?.getTracks().forEach(t => t.stop());
+  localStream = null;
+  peerConn?.close();
+  peerConn = null;
+  if (remoteAudioEl) { remoteAudioEl.srcObject = null; remoteAudioEl = null; }
+  isMuted = false;
+  hideCallBar();
+  document.getElementById('chat-mute-btn')!.textContent = '🎙 Mute';
+}
+
+function initChat() {
+  const myName    = getChatUsername();
+  const myId      = getChatClientId();
+  const msgsEl    = document.getElementById('chat-messages')!;
+  const inputEl   = document.getElementById('chat-input') as HTMLInputElement;
+  const sendBtn   = document.getElementById('chat-send-btn')!;
+  const notifBtn  = document.getElementById('chat-notif-btn')!;
+  const usersEl   = document.getElementById('chat-users-list')!;
+  const countEl   = document.getElementById('chat-online-count')!;
+
+  // Notification toggle
+  const syncNotifBtn = () => { notifBtn.textContent = chatNotifEnabled ? '🔔 On' : '🔕 Off'; };
+  syncNotifBtn();
+  notifBtn.addEventListener('click', () => {
+    chatNotifEnabled = !chatNotifEnabled;
+    localStorage.setItem('voxel_chat_notif', String(chatNotifEnabled));
+    syncNotifBtn();
+  });
+
+  // Chat presence
+  const presRef = ref(rtdb, `voxel_chat_online/${myId}`);
+  set(presRef, { name: myName, ts: Date.now() }).catch(() => {});
+  onDisconnect(presRef).remove().catch(() => {});
+
+  // Online users
+  onValue(ref(rtdb, 'voxel_chat_online'), snap => {
+    const val = snap.val() || {};
+    const total = Object.keys(val).length;
+    countEl.textContent = String(total);
+    renderChatUsers(snap, usersEl);
+  });
+
+  // Messages — initial load
+  const msgsQuery = query(ref(rtdb, 'voxel_chat/messages'), limitToLast(100));
+  onValue(msgsQuery, snap => {
+    const val = snap.val() || {};
+    const msgs: { user: string; text: string; ts: number }[] = Object.values(val);
+    msgs.sort((a, b) => a.ts - b.ts);
+    const atBottom = msgsEl.scrollHeight - msgsEl.scrollTop <= msgsEl.clientHeight + 60;
+    msgsEl.innerHTML = '';
+    if (msgs.length === 0) {
+      msgsEl.innerHTML = '<div style="color:#2a2a2a;font-size:12px;text-align:center;margin:auto;">No messages yet — say hi!</div>';
+    } else {
+      msgs.forEach(m => appendChatMessage(m, msgsEl, myName));
+    }
+    if (atBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
+  }, { onlyOnce: true });
+
+  // New messages (for notifications + live feed)
+  chatStartedAt = Date.now();
+  onChildAdded(query(ref(rtdb, 'voxel_chat/messages'), limitToLast(50)), snap => {
+    const m = snap.val() as { user: string; text: string; ts: number };
+    if (!m || m.ts < chatStartedAt - 2000) return;
+    if (m.user !== myName) {
+      const visible = chatPanelEl.style.display !== 'none';
+      if (!visible && chatNotifEnabled) {
+        chatUnread++;
+        updateChatBadge();
+        if (Notification.permission === 'granted') {
+          new Notification(m.user, { body: m.text });
+        }
+      }
+    }
+    const atBottom = msgsEl.scrollHeight - msgsEl.scrollTop <= msgsEl.clientHeight + 80;
+    appendChatMessage(m, msgsEl, myName);
+    if (atBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
+  });
+
+  // Send message
+  const send = () => {
+    const text = inputEl.value.trim();
+    if (!text) return;
+    inputEl.value = '';
+    push(ref(rtdb, 'voxel_chat/messages'), { user: getChatUsername(), text, ts: Date.now() }).catch(() => {});
+    setTimeout(() => { msgsEl.scrollTop = msgsEl.scrollHeight; }, 80);
+  };
+  sendBtn.addEventListener('click', send);
+  inputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+
+  // Incoming call listener
+  onValue(ref(rtdb, `voxel_voice/incoming/${myName}`), snap => {
+    if (!snap.exists()) { document.getElementById('chat-incoming-call')!.style.display = 'none'; return; }
+    if (activeCallId) return;
+    const { callId, caller } = snap.val();
+    showIncomingCall(callId, caller);
+  });
+
+  // Mute / hang up buttons
+  document.getElementById('chat-mute-btn')!.addEventListener('click', () => {
+    isMuted = !isMuted;
+    localStream?.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
+    const btn = document.getElementById('chat-mute-btn')!;
+    btn.textContent = isMuted ? '🔇 Unmute' : '🎙 Mute';
+    (btn as HTMLElement).style.borderColor = isMuted ? '#f85149' : '#2a2a2a';
+  });
+  document.getElementById('chat-hangup-btn')!.addEventListener('click', hangUpVoiceCall);
+
+  // Notification permission
+  if (Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+}
+
+navChat.addEventListener('click', () => {
+  chatUnread = 0;
+  updateChatBadge();
+  showPanel(chatPanelEl, navChat);
+  if (!chatPanelEl.dataset.loaded) {
+    chatPanelEl.dataset.loaded = '1';
+    initChat();
+  }
+});
 
