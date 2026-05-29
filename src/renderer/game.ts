@@ -3155,6 +3155,10 @@ let isMuted = false;
 let chatUnread = 0;
 let chatNotifEnabled = localStorage.getItem('voxel_chat_notif') !== 'false';
 let chatStartedAt = 0;
+let adminList: Set<string> = new Set();
+let chatTimeouts: Record<string, { until: number; reason: string; by: string }> = {};
+let timeoutTargetUser = '';
+let timeoutDurMins = 5;
 
 function getChatClientId(): string {
   let id = localStorage.getItem('voxel_client_id');
@@ -3192,43 +3196,79 @@ function updateChatBadge() {
   }
 }
 
-function appendChatMessage(m: { user: string; text: string; ts: number }, container: HTMLElement, myName: string) {
-  const isMe = m.user === myName;
+function appendChatMessage(m: { user: string; text: string; ts: number; type?: string }, container: HTMLElement, myName: string) {
   const time = new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (m.type === 'announcement') {
+    const div = document.createElement('div');
+    div.className = 'chat-announcement';
+    div.innerHTML =
+      `<span style="font-size:10px;color:#f56423;font-weight:800;letter-spacing:0.5px;">📢 ANNOUNCEMENT</span>` +
+      `<div style="color:#ffffff;font-size:13px;margin-top:5px;word-break:break-word;">${escHtml(m.text)}</div>` +
+      `<span style="font-size:10px;color:#484f58;margin-top:4px;display:block;">— ${escHtml(m.user)} · ${time}</span>`;
+    container.appendChild(div);
+    return;
+  }
+  const isMe = m.user === myName;
+  const isAdmin = adminList.has(m.user);
+  const adminBadge = isAdmin ? ` <span class="chat-admin-badge">ADMIN</span>` : '';
   const div = document.createElement('div');
   div.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};gap:2px;`;
   div.innerHTML =
-    `<span style="font-size:10px;color:#484f58;">${isMe ? '' : escHtml(m.user) + ' · '}${time}</span>` +
+    `<span style="font-size:10px;color:#484f58;">${isMe ? '' : escHtml(m.user) + adminBadge + ' · '}${time}</span>` +
     `<div style="max-width:78%;background:${isMe ? 'rgba(245,166,35,0.15)' : '#141414'};border:1px solid ${isMe ? 'rgba(245,166,35,0.28)' : '#222222'};border-radius:10px;padding:6px 11px;font-size:13px;color:#ffffff;word-break:break-word;">${escHtml(m.text)}</div>`;
   container.appendChild(div);
 }
 
-function renderChatUsers(snap: any, container: HTMLElement) {
+function renderChatUsers(val: Record<string, any>, container: HTMLElement) {
   container.innerHTML = '';
   const myId = getChatClientId();
   const myName = getChatUsername();
+  const amIAdmin = adminList.has(myName);
 
   // self row
   const selfRow = document.createElement('div');
   selfRow.className = 'chat-user-row';
-  selfRow.innerHTML = `<span style="width:7px;height:7px;background:#3fb950;border-radius:50%;flex-shrink:0;"></span><span style="font-size:12px;color:#f5a623;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">${escHtml(myName)}</span>`;
+  const selfBadge = amIAdmin ? ` <span class="chat-admin-badge">ADMIN</span>` : '';
+  selfRow.innerHTML =
+    `<span style="width:7px;height:7px;background:#3fb950;border-radius:50%;flex-shrink:0;"></span>` +
+    `<span style="font-size:12px;color:#f5a623;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">${escHtml(myName)}${selfBadge}</span>`;
   container.appendChild(selfRow);
 
-  const val = snap.val() || {};
   Object.entries(val).forEach(([id, v]: [string, any]) => {
     if (id === myId) return;
+    const isThisAdmin = adminList.has(v.name);
+    const adminBadge = isThisAdmin ? ` <span class="chat-admin-badge">ADMIN</span>` : '';
+    const timeoutBtn = (amIAdmin && !isThisAdmin) ? `<button class="chat-timeout-btn" title="Timeout ${escHtml(v.name)}">⏱</button>` : '';
     const row = document.createElement('div');
     row.className = 'chat-user-row';
     row.innerHTML =
       `<span style="width:7px;height:7px;background:#3fb950;border-radius:50%;flex-shrink:0;"></span>` +
-      `<span style="font-size:12px;color:#ffffff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(v.name)}</span>` +
-      `<button class="chat-call-btn" title="Voice call ${escHtml(v.name)}">📞</button>`;
+      `<span style="font-size:12px;color:#ffffff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(v.name)}${adminBadge}</span>` +
+      `<button class="chat-call-btn" title="Voice call ${escHtml(v.name)}">📞</button>` +
+      timeoutBtn;
     row.querySelector('.chat-call-btn')!.addEventListener('click', (e) => {
       e.stopPropagation();
       startVoiceCall(v.name);
     });
+    if (amIAdmin && !isThisAdmin) {
+      row.querySelector<HTMLButtonElement>('.chat-timeout-btn')!.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openTimeoutModal(v.name);
+      });
+    }
     container.appendChild(row);
   });
+}
+
+function openTimeoutModal(username: string) {
+  timeoutTargetUser = username;
+  timeoutDurMins = 5;
+  document.getElementById('timeout-target-name')!.textContent = username;
+  (document.getElementById('timeout-reason') as HTMLInputElement).value = '';
+  document.querySelectorAll<HTMLButtonElement>('.timeout-dur-btn').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.mins) === 5);
+  });
+  (document.getElementById('chat-timeout-modal') as HTMLElement).style.display = 'flex';
 }
 
 function showCallBar(withName: string) {
@@ -3365,19 +3405,53 @@ function initChat() {
   set(presRef, { name: myName, ts: Date.now() }).catch(() => {});
   onDisconnect(presRef).remove().catch(() => {});
 
+  // Track last known online val so admin/user list can re-render on either change
+  let lastOnlineVal: Record<string, any> = {};
+
+  // Admin list subscription
+  onValue(ref(rtdb, 'voxel_admins'), adminSnap => {
+    const adminVal = adminSnap.val() || {};
+    adminList = new Set(Object.keys(adminVal));
+    document.getElementById('chat-admin-bar')!.style.display = adminList.has(myName) ? 'flex' : 'none';
+    renderChatUsers(lastOnlineVal, usersEl);
+  });
+
+  // Timeout subscription for myself
+  const toNotice = document.getElementById('chat-timeout-notice')!;
+  onValue(ref(rtdb, `voxel_timeouts/${myName}`), toSnap => {
+    if (!toSnap.exists()) {
+      delete chatTimeouts[myName];
+      toNotice.style.display = 'none';
+      inputEl.disabled = false;
+      (document.getElementById('chat-send-btn') as HTMLButtonElement).disabled = false;
+      return;
+    }
+    const toData = toSnap.val() as { until: number; reason: string; by: string };
+    if (Date.now() >= toData.until) {
+      remove(ref(rtdb, `voxel_timeouts/${myName}`)).catch(() => {});
+      return;
+    }
+    chatTimeouts[myName] = toData;
+    const left = Math.ceil((toData.until - Date.now()) / 60000);
+    toNotice.textContent = `You are timed out for ${left} more minute${left === 1 ? '' : 's'}${toData.reason ? ' — ' + toData.reason : ''}.`;
+    toNotice.style.display = 'block';
+    inputEl.disabled = true;
+    (document.getElementById('chat-send-btn') as HTMLButtonElement).disabled = true;
+  });
+
   // Online users
   onValue(ref(rtdb, 'voxel_chat_online'), snap => {
-    const val = snap.val() || {};
-    const total = Object.keys(val).length;
+    lastOnlineVal = snap.val() || {};
+    const total = Object.keys(lastOnlineVal).length;
     countEl.textContent = String(total);
-    renderChatUsers(snap, usersEl);
+    renderChatUsers(lastOnlineVal, usersEl);
   });
 
   // Messages — initial load
   const msgsQuery = query(ref(rtdb, 'voxel_chat/messages'), limitToLast(100));
   onValue(msgsQuery, snap => {
     const val = snap.val() || {};
-    const msgs: { user: string; text: string; ts: number }[] = Object.values(val);
+    const msgs: { user: string; text: string; ts: number; type?: string }[] = Object.values(val);
     msgs.sort((a, b) => a.ts - b.ts);
     const atBottom = msgsEl.scrollHeight - msgsEl.scrollTop <= msgsEl.clientHeight + 60;
     msgsEl.innerHTML = '';
@@ -3392,7 +3466,7 @@ function initChat() {
   // New messages (for notifications + live feed)
   chatStartedAt = Date.now();
   onChildAdded(query(ref(rtdb, 'voxel_chat/messages'), limitToLast(50)), snap => {
-    const m = snap.val() as { user: string; text: string; ts: number };
+    const m = snap.val() as { user: string; text: string; ts: number; type?: string };
     if (!m || m.ts < chatStartedAt - 2000) return;
     if (m.user !== myName) {
       const visible = chatPanelEl.style.display !== 'none';
@@ -3400,7 +3474,8 @@ function initChat() {
         chatUnread++;
         updateChatBadge();
         if (Notification.permission === 'granted') {
-          new Notification(m.user, { body: m.text });
+          const title = m.type === 'announcement' ? '📢 Announcement' : m.user;
+          new Notification(title, { body: m.text });
         }
       }
     }
@@ -3413,6 +3488,8 @@ function initChat() {
   const send = () => {
     const text = inputEl.value.trim();
     if (!text) return;
+    const to = chatTimeouts[myName];
+    if (to && Date.now() < to.until) return;
     inputEl.value = '';
     push(ref(rtdb, 'voxel_chat/messages'), { user: getChatUsername(), text, ts: Date.now() }).catch(() => {});
     setTimeout(() => { msgsEl.scrollTop = msgsEl.scrollHeight; }, 80);
@@ -3437,6 +3514,43 @@ function initChat() {
     (btn as HTMLElement).style.borderColor = isMuted ? '#f85149' : '#2a2a2a';
   });
   document.getElementById('chat-hangup-btn')!.addEventListener('click', hangUpVoiceCall);
+
+  // Announce modal
+  const announceModal = document.getElementById('chat-announce-modal')!;
+  document.getElementById('chat-announce-btn')!.addEventListener('click', () => {
+    (document.getElementById('chat-announce-text') as HTMLTextAreaElement).value = '';
+    announceModal.style.display = 'flex';
+  });
+  document.getElementById('chat-announce-cancel')!.addEventListener('click', () => {
+    announceModal.style.display = 'none';
+  });
+  document.getElementById('chat-announce-send')!.addEventListener('click', () => {
+    const text = (document.getElementById('chat-announce-text') as HTMLTextAreaElement).value.trim();
+    if (!text) return;
+    push(ref(rtdb, 'voxel_chat/messages'), { user: myName, text, ts: Date.now(), type: 'announcement' }).catch(() => {});
+    announceModal.style.display = 'none';
+    setTimeout(() => { msgsEl.scrollTop = msgsEl.scrollHeight; }, 80);
+  });
+
+  // Timeout modal
+  const timeoutModal = document.getElementById('chat-timeout-modal')!;
+  document.querySelectorAll<HTMLButtonElement>('.timeout-dur-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      timeoutDurMins = Number(btn.dataset.mins);
+      document.querySelectorAll<HTMLButtonElement>('.timeout-dur-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+  document.getElementById('timeout-cancel')!.addEventListener('click', () => {
+    timeoutModal.style.display = 'none';
+  });
+  document.getElementById('timeout-confirm')!.addEventListener('click', () => {
+    if (!timeoutTargetUser) return;
+    const reason = (document.getElementById('timeout-reason') as HTMLInputElement).value.trim();
+    const until = Date.now() + timeoutDurMins * 60 * 1000;
+    set(ref(rtdb, `voxel_timeouts/${timeoutTargetUser}`), { until, reason, by: myName, ts: Date.now() }).catch(() => {});
+    timeoutModal.style.display = 'none';
+  });
 
   // Notification permission
   if (Notification.permission === 'default') Notification.requestPermission().catch(() => {});
