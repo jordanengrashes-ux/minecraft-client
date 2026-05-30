@@ -1284,6 +1284,15 @@ ipcMain.on('win-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());
 ipcMain.on('win-maximize', () => { const w = BrowserWindow.getFocusedWindow(); if (w?.isMaximized()) w.unmaximize(); else w?.maximize(); });
 
 // ── Auto-updater ──────────────────────────────────────────────────────────────
+const UPDATE_ACK_FILE = path.join(app.getPath('userData'), 'update-ack.json');
+
+function getAckedVersion(): string {
+  try { return JSON.parse(fs.readFileSync(UPDATE_ACK_FILE, 'utf-8')).version ?? ''; } catch { return ''; }
+}
+function setAckedVersion(v: string) {
+  try { fs.writeFileSync(UPDATE_ACK_FILE, JSON.stringify({ version: v })); } catch {}
+}
+
 function setupAutoUpdater() {
   autoUpdater.autoDownload         = true;
   autoUpdater.autoInstallOnAppQuit = false;
@@ -1292,12 +1301,20 @@ function setupAutoUpdater() {
   autoUpdater.on('update-not-available', () => gameWin?.webContents.send('update-not-available'));
   autoUpdater.on('update-available',   info => gameWin?.webContents.send('update-available',  info.version));
   autoUpdater.on('download-progress',     p => gameWin?.webContents.send('update-progress',   Math.round(p.percent)));
-  autoUpdater.on('update-downloaded',     () => { updateReady = true; gameWin?.webContents.send('update-downloaded'); });
+  autoUpdater.on('update-downloaded',   (info: { version: string }) => {
+    // If this device already installed this exact version, skip silently
+    if (info.version === app.getVersion()) { return; }
+    setAckedVersion(info.version);
+    updateReady = true;
+    gameWin?.webContents.send('update-downloaded');
+  });
   autoUpdater.on('error', err => {
     console.error('[updater] error:', err?.message);
     gameWin?.webContents.send('update-error', err?.message ?? 'Unknown error');
   });
 
+  // Skip check if this device already acked the current version recently
+  if (getAckedVersion() === app.getVersion()) return;
   autoUpdater.checkForUpdates().catch(() => {});
 }
 
