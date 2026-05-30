@@ -3334,27 +3334,38 @@ function appendChatMessage(m: { user: string; text: string; ts: number; type?: s
   const isMe = m.user === myName;
   const isAdmin = adminList.has(m.user);
   const adminBadge = isAdmin ? ` <span class="chat-admin-badge">ADMIN</span>` : '';
-  const div = document.createElement('div');
-  div.style.cssText = `display:flex;align-items:flex-end;gap:6px;${isMe ? 'flex-direction:row-reverse;' : ''}`;
 
-  const avatarColor = usernameColor(m.user);
-  const initial = (m.user[0] || '?').toUpperCase();
-  const avatarImg = `<span class="chat-msg-avatar" style="background:${avatarColor};">${initial}</span>`;
+  const row = document.createElement('div');
+  // My messages: bubble pushed to right. Others: avatar + bubble on left.
+  row.style.cssText = `display:flex;align-items:flex-end;gap:7px;${isMe ? 'justify-content:flex-end;' : ''}`;
 
   const bubble = document.createElement('div');
-  bubble.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};gap:2px;max-width:78%;`;
+  bubble.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};gap:2px;max-width:75%;`;
   bubble.innerHTML =
     `<span style="font-size:10px;color:#484f58;">${isMe ? '' : escHtml(m.user) + adminBadge + ' · '}${time}</span>` +
     `<div style="background:${isMe ? 'rgba(245,166,35,0.15)' : '#141414'};border:1px solid ${isMe ? 'rgba(245,166,35,0.28)' : '#222222'};border-radius:10px;padding:6px 11px;font-size:13px;color:#ffffff;word-break:break-word;">${escHtml(m.text)}</div>`;
 
-  const avatarWrap = document.createElement('div');
-  avatarWrap.style.cssText = 'flex-shrink:0;display:flex;position:relative;';
-  avatarWrap.innerHTML = avatarImg;
+  if (!isMe) {
+    // Show skin face for others, colored initial as fallback
+    const avatarColor = usernameColor(m.user);
+    const initial = (m.user[0] || '?').toUpperCase();
+    const avatarWrap = document.createElement('div');
+    avatarWrap.style.cssText = 'flex-shrink:0;width:24px;height:24px;position:relative;';
+    const img = document.createElement('img');
+    img.src = `https://minotar.net/avatar/${encodeURIComponent(m.user)}/24`;
+    img.style.cssText = 'width:24px;height:24px;border-radius:50%;image-rendering:pixelated;display:block;';
+    const fallback = document.createElement('span');
+    fallback.className = 'chat-msg-avatar';
+    fallback.style.cssText = `display:none;background:${avatarColor};`;
+    fallback.textContent = initial;
+    img.onerror = () => { img.style.display = 'none'; fallback.style.display = 'flex'; };
+    avatarWrap.appendChild(img);
+    avatarWrap.appendChild(fallback);
+    row.appendChild(avatarWrap);
+  }
 
-  if (!isMe) div.appendChild(avatarWrap);
-  div.appendChild(bubble);
-  if (isMe) div.appendChild(avatarWrap);
-  container.appendChild(div);
+  row.appendChild(bubble);
+  container.appendChild(row);
 }
 
 function renderChatUsers(val: Record<string, any>, container: HTMLElement) {
@@ -3457,10 +3468,15 @@ async function joinVoiceChannel() {
     const toast = document.createElement('div');
     toast.id = 'mic-blocked-toast';
     toast.style.cssText = 'position:fixed;bottom:80px;right:24px;background:#141414;border:1px solid rgba(248,81,73,0.5);border-radius:10px;padding:14px 18px;z-index:9999;max-width:280px;font-family:inherit;box-shadow:0 8px 32px rgba(0,0,0,0.7);';
-    toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:6px;">🎙 Microphone blocked</div>
-      <div style="color:#aaaaaa;font-size:12px;line-height:1.5;margin-bottom:10px;">Windows Settings opened — enable mic access for desktop apps, then click <strong style="color:#ffffff;">Try Again</strong>.</div>
+    toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:8px;">🎙 Microphone blocked</div>
+      <div style="color:#aaaaaa;font-size:12px;line-height:1.7;margin-bottom:10px;">
+        Windows Settings just opened. Find and turn <strong style="color:#ffffff;">ON</strong> these two toggles:<br>
+        <span style="color:#f5a623;">①</span> <strong style="color:#ffffff;">Microphone access</strong><br>
+        <span style="color:#f5a623;">②</span> <strong style="color:#ffffff;">Let desktop apps access your microphone</strong><br>
+        Then click Try Again below.
+      </div>
       <div style="display:flex;gap:8px;">
-        <button id="mic-retry" style="flex:1;padding:7px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:6px;color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">Try Again</button>
+        <button id="mic-retry" style="flex:1;padding:7px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:6px;color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">✓ Try Again</button>
         <button id="mic-dismiss" style="padding:7px 12px;background:none;border:1px solid #2a2a2a;border-radius:6px;color:#777777;font-size:12px;cursor:pointer;">✕</button>
       </div>`;
     document.body.appendChild(toast);
