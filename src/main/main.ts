@@ -1302,8 +1302,8 @@ function setupAutoUpdater() {
   autoUpdater.on('update-available',   info => gameWin?.webContents.send('update-available',  info.version));
   autoUpdater.on('download-progress',     p => gameWin?.webContents.send('update-progress',   Math.round(p.percent)));
   autoUpdater.on('update-downloaded',   (info: { version: string }) => {
-    // If this device already installed this exact version, skip silently
-    if (info.version === app.getVersion()) { return; }
+    if (info.version === app.getVersion()) { return; }   // already on this version
+    if (getAckedVersion() === info.version) { return; }  // banner already shown for this version
     setAckedVersion(info.version);
     updateReady = true;
     gameWin?.webContents.send('update-downloaded');
@@ -1313,8 +1313,6 @@ function setupAutoUpdater() {
     gameWin?.webContents.send('update-error', err?.message ?? 'Unknown error');
   });
 
-  // Skip check if this device already acked the current version recently
-  if (getAckedVersion() === app.getVersion()) return;
   autoUpdater.checkForUpdates().catch(() => {});
 }
 
