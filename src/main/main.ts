@@ -1347,6 +1347,9 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((_wc: any, permission: string, callback: (granted: boolean) => void) => {
     callback(permission === 'media' || permission === 'microphone' || permission === 'notifications');
   });
+  session.defaultSession.setPermissionCheckHandler((_wc: any, permission: string) => {
+    return permission === 'media' || permission === 'microphone' || permission === 'notifications';
+  });
   loadCachedAuth();
   createLoginWindow();
   globalShortcut.register('Shift+F9', toggleOverlay);

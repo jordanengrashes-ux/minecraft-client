@@ -49,19 +49,47 @@ if ((window as any).electron) {
   if (stored) userName.textContent = JSON.parse(stored).name || 'Player';
 }
 
+const mcSwitchBtn = document.getElementById('mc-switch-btn') as HTMLButtonElement | null;
+
+function setMcAuthed(name: string) {
+  authed = true;
+  mcAuthBtn.textContent = `Logged in as ${name}`;
+  mcAuthBtn.classList.add('authed');
+  if (mcSwitchBtn) mcSwitchBtn.style.display = 'block';
+  mcIgnSpan.textContent = name;
+  mcIgnBadge.style.display = 'inline-block';
+  mcPlayBtn.disabled = false;
+  setStatus(`Authenticated as ${name}`, 'green');
+  if (myUid) registerUserIndex(myUid, name);
+}
+
+function clearMcAuthed() {
+  authed = false;
+  mcPlayBtn.disabled = true;
+  mcAuthBtn.textContent = 'Login with Microsoft to Play';
+  mcAuthBtn.classList.remove('authed');
+  if (mcSwitchBtn) mcSwitchBtn.style.display = 'none';
+  mcIgnBadge.style.display = 'none';
+}
+
 // ── Cached MC auth (no login needed) ──────────────────────────────────────────
 if (mc) {
   mc.onAlreadyAuthed((name: string) => {
-    authed = true;
-    mcAuthBtn.textContent = `Logged in as ${name}`;
-    mcAuthBtn.classList.add('authed');
-    mcIgnSpan.textContent = name;
-    mcIgnBadge.style.display = 'inline-block';
-    mcPlayBtn.disabled = false;
-    setStatus(`Authenticated as ${name}`, 'green');
-    if (myUid) registerUserIndex(myUid, name);
+    setMcAuthed(name);
   });
 }
+
+mcSwitchBtn?.addEventListener('click', async () => {
+  if (!mc) return;
+  clearMcAuthed();
+  setStatus('Opening Microsoft login…', 'yellow');
+  const res = await mc.reauth();
+  if (res?.ok) {
+    setMcAuthed(res.username);
+  } else {
+    setStatus(`Auth failed: ${res?.error || 'Cancelled'}`, 'red');
+  }
+});
 
 // ── Version list from Mojang ───────────────────────────────────────────────────
 const snapshotsToggle = document.getElementById('snapshots-toggle') as HTMLInputElement;
@@ -281,14 +309,7 @@ mcAuthBtn.addEventListener('click', async () => {
   const res = await mc.auth();
   mcAuthBtn.disabled = false;
   if (res.ok) {
-    authed = true;
-    mcAuthBtn.textContent = `Logged in as ${res.username}`;
-    mcAuthBtn.classList.add('authed');
-    mcIgnSpan.textContent = res.username;
-    mcIgnBadge.style.display = 'inline-block';
-    mcPlayBtn.disabled = false;
-    setStatus(`Authenticated as ${res.username}`, 'green');
-    if (myUid) registerUserIndex(myUid, res.username);
+    setMcAuthed(res.username);
   } else {
     setStatus(`Auth failed: ${res.error}`, 'red');
     addLog(`Auth error: ${res.error}`, 'error');
@@ -689,21 +710,11 @@ document.getElementById('repair-btn')?.addEventListener('click', async () => {
 // ── Reauth button ──────────────────────────────────────────────────────────────
 document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => {
   if (!mc) return;
-  authed = false;
-  mcPlayBtn.disabled = true;
-  mcAuthBtn.textContent = 'Login with Microsoft to Play';
-  mcAuthBtn.classList.remove('authed');
-  mcIgnBadge.style.display = 'none';
+  clearMcAuthed();
   setStatus('Opening Microsoft login…', 'yellow');
   const res = await mc.reauth();
   if (res?.ok) {
-    authed = true;
-    mcAuthBtn.textContent = `Logged in as ${res.username}`;
-    mcAuthBtn.classList.add('authed');
-    mcIgnSpan.textContent = res.username;
-    mcIgnBadge.style.display = 'inline-block';
-    mcPlayBtn.disabled = false;
-    setStatus(`Authenticated as ${res.username}`, 'green');
+    setMcAuthed(res.username);
   } else {
     setStatus(`Auth failed: ${res?.error || 'Unknown error'}`, 'red');
   }
@@ -1783,7 +1794,42 @@ function initResourcePacks() {
   searchResourcePacks('');
 }
 
-// ── Skins panel ───────────────────────────────────────────────────────────────
+// ── Skins / Wardrobe panel ────────────────────────────────────────────────────
+const WARDROBE_PRESETS = [
+  { name: 'Steve',    user: 'MHF_Steve',    variant: 'classic' },
+  { name: 'Alex',     user: 'MHF_Alex',     variant: 'slim'    },
+  { name: 'Herobrine',user: 'MHF_Herobrine',variant: 'classic' },
+  { name: 'Enderman', user: 'MHF_Enderman', variant: 'classic' },
+  { name: 'Creeper',  user: 'MHF_Creeper',  variant: 'classic' },
+  { name: 'Villager', user: 'MHF_Villager', variant: 'classic' },
+  { name: 'Iron Golem',user:'MHF_Golem',    variant: 'classic' },
+  { name: 'Piglin',   user: 'MHF_PigZombie',variant: 'classic' },
+  { name: 'TNT',      user: 'MHF_TNT',      variant: 'classic' },
+  { name: 'Notch',    user: 'Notch',         variant: 'classic' },
+];
+
+async function fetchSkinBase64(username: string): Promise<string | null> {
+  try {
+    const profileRes = await fetch(`https://api.mojang.com/users/profiles/minecraft/${username}`);
+    if (!profileRes.ok) return null;
+    const { id } = await profileRes.json();
+    const sessionRes = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${id}`);
+    if (!sessionRes.ok) return null;
+    const session = await sessionRes.json();
+    const texProp = session.properties?.find((p: any) => p.name === 'textures');
+    if (!texProp) return null;
+    const texData = JSON.parse(atob(texProp.value));
+    const skinUrl = texData.textures?.SKIN?.url;
+    if (!skinUrl) return null;
+    const imgRes = await fetch(skinUrl);
+    const buf = await imgRes.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    bytes.forEach(b => { bin += String.fromCharCode(b); });
+    return btoa(bin);
+  } catch { return null; }
+}
+
 function initSkins() {
   const previewImg   = document.getElementById('skin-preview') as HTMLImageElement;
   const skinNameEl   = document.getElementById('skin-name')!;
@@ -1792,19 +1838,75 @@ function initSkins() {
   const fileNameEl   = document.getElementById('skin-file-name')!;
   const applyBtn     = document.getElementById('skin-apply-btn') as HTMLButtonElement;
   const statusEl     = document.getElementById('skin-status')!;
+  const lookupInput  = document.getElementById('skin-lookup-input') as HTMLInputElement;
+  const lookupBtn    = document.getElementById('skin-lookup-btn') as HTMLButtonElement;
+  const wardrobeGrid = document.getElementById('skin-wardrobe-grid')!;
   let selectedBase64 = '';
+  let selectedVariant: 'classic' | 'slim' = 'classic';
 
   const cosmetics = (window as any).cosmetics;
   cosmetics.getUuid().then((uuid: string | null) => {
     if (uuid) {
       previewImg.src = `https://crafatar.com/renders/body/${uuid}?size=200&overlay`;
-      skinNameEl.textContent = uuid;
+      skinNameEl.textContent = 'Current skin';
     } else {
       previewImg.src = 'https://crafatar.com/renders/body/MHF_Steve?size=200&overlay';
-      skinNameEl.textContent = 'Offline — sign in to change skin';
+      skinNameEl.textContent = 'Not logged in';
     }
   });
 
+  // Build preset grid
+  WARDROBE_PRESETS.forEach(preset => {
+    const card = document.createElement('div');
+    card.className = 'wardrobe-card';
+    card.innerHTML = `<img src="https://mc-heads.net/avatar/${preset.user}/48" alt="${escHtml(preset.name)}" onerror="this.src='https://crafatar.com/avatars/MHF_Steve?size=48'"><span>${escHtml(preset.name)}</span>`;
+    card.addEventListener('click', async () => {
+      wardrobeGrid.querySelectorAll('.wardrobe-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      statusEl.textContent = `Loading ${preset.name}…`; statusEl.style.color = '#f6c356';
+      applyBtn.style.display = 'none';
+      const b64 = await fetchSkinBase64(preset.user);
+      if (b64) {
+        selectedBase64 = b64;
+        selectedVariant = preset.variant as 'classic' | 'slim';
+        previewImg.src = `https://crafatar.com/renders/body/${preset.user}?size=200&overlay`;
+        skinNameEl.textContent = preset.name;
+        applyBtn.style.display = 'inline-block';
+        statusEl.textContent = `${preset.name} ready — click Apply`;
+        statusEl.style.color = '#aaaaaa';
+      } else {
+        statusEl.textContent = `Could not load ${preset.name} skin`; statusEl.style.color = '#e05500';
+      }
+    });
+    wardrobeGrid.appendChild(card);
+  });
+
+  // Lookup by username
+  const doLookup = async () => {
+    const name = lookupInput.value.trim();
+    if (!name) return;
+    lookupBtn.disabled = true;
+    lookupBtn.textContent = '…';
+    statusEl.textContent = `Loading ${name}…`; statusEl.style.color = '#f6c356';
+    applyBtn.style.display = 'none';
+    wardrobeGrid.querySelectorAll('.wardrobe-card').forEach(c => c.classList.remove('selected'));
+    const b64 = await fetchSkinBase64(name);
+    lookupBtn.disabled = false; lookupBtn.textContent = 'Load';
+    if (b64) {
+      selectedBase64 = b64;
+      selectedVariant = 'classic';
+      previewImg.src = `https://crafatar.com/renders/body/${encodeURIComponent(name)}?size=200&overlay`;
+      skinNameEl.textContent = name;
+      applyBtn.style.display = 'inline-block';
+      statusEl.textContent = `${name}'s skin ready — click Apply`; statusEl.style.color = '#aaaaaa';
+    } else {
+      statusEl.textContent = `Player "${name}" not found`; statusEl.style.color = '#e05500';
+    }
+  };
+  lookupBtn.addEventListener('click', doLookup);
+  lookupInput.addEventListener('keydown', e => { if (e.key === 'Enter') doLookup(); });
+
+  // File upload
   uploadBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
@@ -1814,20 +1916,35 @@ function initSkins() {
     reader.onload = e => {
       const dataUrl = e.target?.result as string;
       selectedBase64 = dataUrl.split(',')[1];
+      selectedVariant = (document.querySelector('input[name="skin-variant"]:checked') as HTMLInputElement)?.value as 'classic' | 'slim' || 'classic';
       previewImg.src = dataUrl;
-      applyBtn.style.display = 'block';
+      skinNameEl.textContent = file.name;
+      wardrobeGrid.querySelectorAll('.wardrobe-card').forEach(c => c.classList.remove('selected'));
+      applyBtn.style.display = 'inline-block';
+      statusEl.textContent = 'Custom skin loaded — click Apply'; statusEl.style.color = '#aaaaaa';
     };
     reader.readAsDataURL(file);
   });
 
+  document.querySelectorAll('input[name="skin-variant"]').forEach(r => {
+    r.addEventListener('change', () => {
+      selectedVariant = (r as HTMLInputElement).value as 'classic' | 'slim';
+    });
+  });
+
   applyBtn.addEventListener('click', async () => {
-    const variant = (document.querySelector('input[name="skin-variant"]:checked') as HTMLInputElement)?.value as 'classic' | 'slim' || 'classic';
+    if (!selectedBase64) return;
+    const variant = selectedVariant;
     applyBtn.disabled = true;
-    statusEl.textContent = 'Uploading...'; statusEl.style.color = '#f6c356';
+    statusEl.textContent = 'Uploading…'; statusEl.style.color = '#f6c356';
     const res = await mc.uploadSkin({ base64: selectedBase64, variant });
     applyBtn.disabled = false;
-    if (res.ok) { statusEl.textContent = '✓ Skin applied!'; statusEl.style.color = '#f5a623'; }
-    else         { statusEl.textContent = `✗ ${res.error}`; statusEl.style.color = '#e05500'; }
+    if (res.ok) {
+      statusEl.textContent = '✓ Skin applied!'; statusEl.style.color = '#f5a623';
+      if (res.uuid) previewImg.src = `https://crafatar.com/renders/body/${res.uuid}?size=200&overlay`;
+    } else {
+      statusEl.textContent = `✗ ${res.error}`; statusEl.style.color = '#e05500';
+    }
   });
 }
 
@@ -3198,6 +3315,13 @@ function updateChatBadge() {
   }
 }
 
+function usernameColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return `hsl(${hue},55%,42%)`;
+}
+
 function appendChatMessage(m: { user: string; text: string; ts: number; type?: string }, container: HTMLElement, myName: string) {
   const time = new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   if (m.type === 'announcement') {
@@ -3214,10 +3338,26 @@ function appendChatMessage(m: { user: string; text: string; ts: number; type?: s
   const isAdmin = adminList.has(m.user);
   const adminBadge = isAdmin ? ` <span class="chat-admin-badge">ADMIN</span>` : '';
   const div = document.createElement('div');
-  div.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};gap:2px;`;
-  div.innerHTML =
+  div.style.cssText = `display:flex;align-items:flex-end;gap:6px;${isMe ? 'flex-direction:row-reverse;' : ''}`;
+
+  const avatarColor = usernameColor(m.user);
+  const initial = (m.user[0] || '?').toUpperCase();
+  const avatarImg = `<img src="https://mc-heads.net/avatar/${encodeURIComponent(m.user)}/22" style="width:22px;height:22px;border-radius:50%;image-rendering:pixelated;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` +
+    `<span class="chat-msg-avatar" style="display:none;background:${avatarColor};">${initial}</span>`;
+
+  const bubble = document.createElement('div');
+  bubble.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};gap:2px;max-width:78%;`;
+  bubble.innerHTML =
     `<span style="font-size:10px;color:#484f58;">${isMe ? '' : escHtml(m.user) + adminBadge + ' · '}${time}</span>` +
-    `<div style="max-width:78%;background:${isMe ? 'rgba(245,166,35,0.15)' : '#141414'};border:1px solid ${isMe ? 'rgba(245,166,35,0.28)' : '#222222'};border-radius:10px;padding:6px 11px;font-size:13px;color:#ffffff;word-break:break-word;">${escHtml(m.text)}</div>`;
+    `<div style="background:${isMe ? 'rgba(245,166,35,0.15)' : '#141414'};border:1px solid ${isMe ? 'rgba(245,166,35,0.28)' : '#222222'};border-radius:10px;padding:6px 11px;font-size:13px;color:#ffffff;word-break:break-word;">${escHtml(m.text)}</div>`;
+
+  const avatarWrap = document.createElement('div');
+  avatarWrap.style.cssText = 'flex-shrink:0;display:flex;position:relative;';
+  avatarWrap.innerHTML = avatarImg;
+
+  if (!isMe) div.appendChild(avatarWrap);
+  div.appendChild(bubble);
+  if (isMe) div.appendChild(avatarWrap);
   container.appendChild(div);
 }
 
