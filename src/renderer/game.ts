@@ -3448,21 +3448,24 @@ async function joinVoiceChannel() {
   if (inGroom) return;
   try { groomStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
   catch {
+    // Auto-open Windows mic privacy settings immediately
+    (window as any).electron?.openExternal('ms-settings:privacy-microphone');
+
+    // Show a small "Try Again" toast — settings window is already open
+    const existing = document.getElementById('mic-blocked-toast');
+    if (existing) existing.remove();
     const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:80px;right:24px;background:#141414;border:1px solid rgba(248,81,73,0.5);border-radius:10px;padding:14px 18px;z-index:9999;max-width:300px;font-family:inherit;box-shadow:0 8px 32px rgba(0,0,0,0.7);';
+    toast.id = 'mic-blocked-toast';
+    toast.style.cssText = 'position:fixed;bottom:80px;right:24px;background:#141414;border:1px solid rgba(248,81,73,0.5);border-radius:10px;padding:14px 18px;z-index:9999;max-width:280px;font-family:inherit;box-shadow:0 8px 32px rgba(0,0,0,0.7);';
     toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:6px;">🎙 Microphone blocked</div>
-      <div style="color:#aaaaaa;font-size:12px;line-height:1.5;margin-bottom:10px;">Windows is blocking microphone access.<br>Go to <strong style="color:#ffffff;">Windows Settings → Privacy → Microphone</strong> and enable it for desktop apps.</div>
+      <div style="color:#aaaaaa;font-size:12px;line-height:1.5;margin-bottom:10px;">Windows Settings opened — enable mic access for desktop apps, then click <strong style="color:#ffffff;">Try Again</strong>.</div>
       <div style="display:flex;gap:8px;">
-        <button id="mic-open-settings" style="flex:1;padding:6px;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.4);border-radius:6px;color:#ffffff;font-size:12px;cursor:pointer;font-weight:600;">Open Settings</button>
-        <button id="mic-dismiss" style="padding:6px 12px;background:none;border:1px solid #2a2a2a;border-radius:6px;color:#777777;font-size:12px;cursor:pointer;">✕</button>
+        <button id="mic-retry" style="flex:1;padding:7px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:6px;color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">Try Again</button>
+        <button id="mic-dismiss" style="padding:7px 12px;background:none;border:1px solid #2a2a2a;border-radius:6px;color:#777777;font-size:12px;cursor:pointer;">✕</button>
       </div>`;
     document.body.appendChild(toast);
-    toast.querySelector('#mic-open-settings')!.addEventListener('click', () => {
-      (window as any).electron?.openExternal('ms-settings:privacy-microphone');
-    });
-    const dismiss = () => toast.remove();
-    toast.querySelector('#mic-dismiss')!.addEventListener('click', dismiss);
-    setTimeout(dismiss, 15000);
+    toast.querySelector('#mic-retry')!.addEventListener('click', () => { toast.remove(); joinVoiceChannel(); });
+    toast.querySelector('#mic-dismiss')!.addEventListener('click', () => toast.remove());
     return;
   }
 
