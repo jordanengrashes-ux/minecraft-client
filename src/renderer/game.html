@@ -224,11 +224,20 @@
     /* Chat */
     #chat-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
     #chat-call-bar { display: none; background: #0d2a1a; border-bottom: 1px solid #1a4a2a; padding: 8px 24px; align-items: center; gap: 12px; flex-shrink: 0; }
+    #chat-admin-bar { display: none; background: #1a0a00; border-bottom: 1px solid rgba(245,100,35,0.35); padding: 7px 24px; align-items: center; gap: 10px; flex-shrink: 0; }
     #chat-incoming-call { display: none; position: fixed; bottom: 80px; right: 24px; background: #141414; border: 1px solid rgba(245,166,35,0.4); border-radius: 10px; padding: 16px 20px; z-index: 500; box-shadow: 0 8px 32px rgba(0,0,0,0.7); min-width: 240px; }
+    #chat-announce-modal, #chat-timeout-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 700; align-items: center; justify-content: center; }
+    .chat-modal-box { background: #141414; border: 1px solid #2a2a2a; border-radius: 12px; padding: 24px; min-width: 340px; max-width: 480px; width: 90%; }
+    .chat-admin-badge { display: inline-block; background: rgba(245,100,35,0.18); border: 1px solid rgba(245,100,35,0.45); color: #f56423; font-size: 9px; font-weight: 800; border-radius: 4px; padding: 0 5px; line-height: 15px; letter-spacing: 0.5px; vertical-align: middle; margin-left: 4px; }
     .chat-user-row { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; cursor: default; }
     .chat-user-row:hover { background: #141414; }
     .chat-call-btn { background: none; border: none; color: #484f58; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 4px; flex-shrink: 0; line-height: 1; }
     .chat-call-btn:hover { color: #f5a623; }
+    .chat-timeout-btn { background: none; border: none; color: #484f58; cursor: pointer; font-size: 13px; padding: 2px 4px; border-radius: 4px; flex-shrink: 0; line-height: 1; }
+    .chat-timeout-btn:hover { color: #f85149; }
+    .chat-announcement { background: rgba(245,100,35,0.1); border: 1px solid rgba(245,100,35,0.35); border-radius: 8px; padding: 10px 14px; width: 100%; box-sizing: border-box; }
+    .timeout-dur-btn { background: #1e1e1e; border: 1px solid #2a2a2a; border-radius: 6px; padding: 5px 14px; color: #ffffff; font-size: 12px; cursor: pointer; }
+    .timeout-dur-btn:hover, .timeout-dur-btn.active { border-color: #f5a623; color: #f5a623; }
     .friend-card { display: flex; align-items: center; gap: 12px; background: #111111; border: 1px solid #1e1e1e; border-radius: 7px; padding: 10px 13px; transition: border-color 0.1s; }
     .friend-card.online { border-color: rgba(245,166,35,0.28); }
     .friend-avatar { width: 32px; height: 32px; border-radius: 5px; background: #1e1e1e; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
@@ -1089,12 +1098,19 @@
           <h2 style="font-size:20px;font-weight:700;">Global Chat</h2>
           <p style="font-size:11px;color:#484f58;margin-top:2px;"><span id="chat-online-count">1</span> online with Voxel Client</p>
         </div>
-        <button id="chat-notif-btn" style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:7px;padding:6px 13px;color:#ffffff;font-size:12px;cursor:pointer;">🔔 On</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="chat-voice-join-btn" style="background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:7px;padding:6px 13px;color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">🔊 Join Voice</button>
+          <button id="chat-notif-btn" style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:7px;padding:6px 13px;color:#ffffff;font-size:12px;cursor:pointer;">🔔 On</button>
+        </div>
       </div>
-      <div id="chat-call-bar">
-        <span style="color:#3fb950;font-weight:600;font-size:13px;">🔴 In call with <span id="chat-call-with">…</span></span>
-        <button id="chat-mute-btn" style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:6px;padding:4px 12px;color:#ffffff;font-size:12px;cursor:pointer;margin-left:8px;">🎙 Mute</button>
+      <div id="chat-call-bar" style="background:#0d1a0d;border-bottom:1px solid #1a3a1a;">
+        <span style="color:#3fb950;font-weight:600;font-size:12px;flex:1;">🔊 Voice Channel &nbsp;·&nbsp; <span id="chat-voice-members" style="color:#aaaaaa;font-weight:400;">…</span></span>
+        <button id="chat-mute-btn" style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:6px;padding:4px 12px;color:#ffffff;font-size:12px;cursor:pointer;">🎙 Mute</button>
         <button id="chat-hangup-btn" style="background:#c11e1e;border:1px solid #f85149;border-radius:6px;padding:4px 12px;color:#ffffff;font-size:12px;cursor:pointer;margin-left:6px;">✕ Leave</button>
+      </div>
+      <div id="chat-admin-bar">
+        <span style="font-size:10px;color:#f56423;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;">⚡ Admin</span>
+        <button id="chat-announce-btn" style="background:rgba(245,100,35,0.2);border:1px solid rgba(245,100,35,0.5);border-radius:6px;padding:4px 14px;color:#f56423;font-size:12px;cursor:pointer;font-weight:700;">📢 Announce</button>
       </div>
       <div style="display:flex;flex:1;overflow:hidden;">
         <!-- Online users -->
@@ -1107,6 +1123,7 @@
           <div id="chat-messages" style="flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:6px;scrollbar-width:thin;scrollbar-color:#2a2a2a transparent;">
             <div style="color:#2a2a2a;font-size:12px;text-align:center;margin:auto;">Loading messages…</div>
           </div>
+          <div id="chat-timeout-notice" style="display:none;padding:6px 18px;background:rgba(248,81,73,0.1);border-top:1px solid rgba(248,81,73,0.25);font-size:11px;color:#f85149;flex-shrink:0;"></div>
           <div style="padding:10px 14px;border-top:1px solid #1e1e1e;display:flex;gap:8px;flex-shrink:0;background:#080808;">
             <input id="chat-input" type="text" maxlength="200" placeholder="Message everyone…"
               style="flex:1;background:#111111;border:1px solid #2a2a2a;border-radius:7px;padding:8px 12px;color:#ffffff;font-size:13px;outline:none;font-family:inherit;"
@@ -1142,6 +1159,42 @@
 
   <!-- Saves dropdown — fixed so it escapes overflow:hidden panels -->
   <div id="srv-saves-menu" style="display:none;position:fixed;background:#141414;border:1px solid #2a2a2a;border-radius:8px;min-width:200px;max-height:200px;overflow-y:auto;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);"></div>
+
+  <!-- Admin: Announce modal -->
+  <div id="chat-announce-modal">
+    <div class="chat-modal-box">
+      <div style="font-size:16px;font-weight:700;color:#f56423;margin-bottom:14px;">📢 Send Announcement</div>
+      <textarea id="chat-announce-text" maxlength="400" placeholder="Type your announcement…"
+        style="width:100%;min-height:80px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;color:#ffffff;padding:10px 12px;font-size:13px;outline:none;font-family:inherit;resize:vertical;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#f56423'" onblur="this.style.borderColor='#2a2a2a'"></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+        <button id="chat-announce-cancel" style="padding:7px 18px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:7px;color:#aaaaaa;font-size:13px;cursor:pointer;">Cancel</button>
+        <button id="chat-announce-send" style="padding:7px 20px;background:rgba(245,100,35,0.2);border:1px solid rgba(245,100,35,0.5);border-radius:7px;color:#f56423;font-size:13px;cursor:pointer;font-weight:700;">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin: Timeout modal -->
+  <div id="chat-timeout-modal">
+    <div class="chat-modal-box">
+      <div style="font-size:16px;font-weight:700;color:#f85149;margin-bottom:14px;">⏱ Timeout <span id="timeout-target-name" style="color:#ffffff;">User</span></div>
+      <div style="font-size:12px;color:#aaaaaa;margin-bottom:10px;">Duration</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;" id="timeout-dur-row">
+        <button class="timeout-dur-btn" data-mins="5">5 min</button>
+        <button class="timeout-dur-btn" data-mins="10">10 min</button>
+        <button class="timeout-dur-btn" data-mins="30">30 min</button>
+        <button class="timeout-dur-btn" data-mins="60">1 hour</button>
+        <button class="timeout-dur-btn" data-mins="1440">24 hours</button>
+      </div>
+      <input id="timeout-reason" type="text" maxlength="120" placeholder="Reason (optional)"
+        style="width:100%;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:7px;color:#ffffff;padding:8px 12px;font-size:13px;outline:none;font-family:inherit;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#f85149'" onblur="this.style.borderColor='#2a2a2a'" />
+      <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
+        <button id="timeout-cancel" style="padding:7px 18px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:7px;color:#aaaaaa;font-size:13px;cursor:pointer;">Cancel</button>
+        <button id="timeout-confirm" style="padding:7px 20px;background:rgba(248,81,73,0.15);border:1px solid rgba(248,81,73,0.4);border-radius:7px;color:#f85149;font-size:13px;cursor:pointer;font-weight:700;">Timeout</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="./game.ts"></script>
 </body>

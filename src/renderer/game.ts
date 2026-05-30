@@ -3147,11 +3147,13 @@ const STUN_CONFIG: RTCConfiguration = {
   ],
 };
 
-let localStream: MediaStream | null = null;
-let peerConn: RTCPeerConnection | null = null;
-let remoteAudioEl: HTMLAudioElement | null = null;
-let activeCallId: string | null = null;
-let isMuted = false;
+// ── Group voice channel state ─────────────────────────────────────────────────
+const GROOM = 'voxel_voice/groom';
+let groomPeers: Map<string, RTCPeerConnection> = new Map();
+let groomAudios: Map<string, HTMLAudioElement> = new Map();
+let groomStream: MediaStream | null = null;
+let inGroom = false;
+let groomMuted = false;
 let chatUnread = 0;
 let chatNotifEnabled = localStorage.getItem('voxel_chat_notif') !== 'false';
 let chatStartedAt = 0;
@@ -3244,12 +3246,7 @@ function renderChatUsers(val: Record<string, any>, container: HTMLElement) {
     row.innerHTML =
       `<span style="width:7px;height:7px;background:#3fb950;border-radius:50%;flex-shrink:0;"></span>` +
       `<span style="font-size:12px;color:#ffffff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(v.name)}${adminBadge}</span>` +
-      `<button class="chat-call-btn" title="Voice call ${escHtml(v.name)}">📞</button>` +
       timeoutBtn;
-    row.querySelector('.chat-call-btn')!.addEventListener('click', (e) => {
-      e.stopPropagation();
-      startVoiceCall(v.name);
-    });
     if (amIAdmin && !isThisAdmin) {
       row.querySelector<HTMLButtonElement>('.chat-timeout-btn')!.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -3271,114 +3268,131 @@ function openTimeoutModal(username: string) {
   (document.getElementById('chat-timeout-modal') as HTMLElement).style.display = 'flex';
 }
 
-function showCallBar(withName: string) {
-  const bar = document.getElementById('chat-call-bar')!;
-  bar.style.display = 'flex';
-  document.getElementById('chat-call-with')!.textContent = withName;
-}
+// ── Group Voice Channel ────────────────────────────────────────────────────────
 
-function hideCallBar() {
-  document.getElementById('chat-call-bar')!.style.display = 'none';
-}
-
-function showIncomingCall(callId: string, callerName: string) {
-  const overlay = document.getElementById('chat-incoming-call')!;
-  document.getElementById('chat-caller-name')!.textContent = callerName;
-  overlay.style.display = 'block';
-  document.getElementById('chat-answer-btn')!.onclick = () => answerVoiceCall(callId, callerName);
-  document.getElementById('chat-decline-btn')!.onclick = async () => {
-    await update(ref(rtdb, `voxel_voice/calls/${callId}`), { status: 'ended' }).catch(() => {});
-    await remove(ref(rtdb, `voxel_voice/incoming/${getChatUsername()}`)).catch(() => {});
-    overlay.style.display = 'none';
-  };
-  if (Notification.permission === 'granted') {
-    new Notification('📞 Incoming Voice Call', { body: `${callerName} is calling you in Voxel Client` });
+function updateVoiceBar() {
+  const bar     = document.getElementById('chat-call-bar')!;
+  const joinBtn = document.getElementById('chat-voice-join-btn')!;
+  const membEl  = document.getElementById('chat-voice-members')!;
+  bar.style.display    = inGroom ? 'flex' : 'none';
+  joinBtn.style.display = inGroom ? 'none' : 'inline-block';
+  if (inGroom) {
+    get(ref(rtdb, `${GROOM}/members`)).then(s => {
+      const names = Object.values((s.val() || {}) as Record<string, { name: string }>).map(v => v.name);
+      membEl.textContent = names.join(', ') || '…';
+    }).catch(() => {});
   }
 }
 
-async function startVoiceCall(targetName: string) {
-  if (activeCallId) { return; }
+function groomAddPeer(peerId: string): RTCPeerConnection {
+  const pc = new RTCPeerConnection(STUN_CONFIG);
+  groomPeers.set(peerId, pc);
+  groomStream!.getTracks().forEach(t => pc.addTrack(t, groomStream!));
+  const remote = new MediaStream();
+  const audio = new Audio();
+  groomAudios.set(peerId, audio);
+  pc.ontrack = e => {
+    e.streams[0].getTracks().forEach(t => remote.addTrack(t));
+    audio.srcObject = remote;
+    audio.play().catch(() => {});
+  };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      groomPeers.get(peerId)?.close();
+      groomPeers.delete(peerId);
+      const a = groomAudios.get(peerId);
+      if (a) { a.srcObject = null; groomAudios.delete(peerId); }
+      updateVoiceBar();
+    }
+  };
+  return pc;
+}
+
+async function joinVoiceChannel() {
+  if (inGroom) return;
+  try { groomStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
+  catch { alert('Microphone access denied — allow it in settings to use voice calls.'); return; }
+
+  inGroom = true;
+  const myId   = getChatClientId();
   const myName = getChatUsername();
-  if (!localStream) {
-    try { localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
-    catch { alert('Microphone access denied — allow it in settings to use voice calls.'); return; }
+
+  const myRef = ref(rtdb, `${GROOM}/members/${myId}`);
+  set(myRef, { name: myName, ts: Date.now() }).catch(() => {});
+  onDisconnect(myRef).remove().catch(() => {});
+  updateVoiceBar();
+
+  // Create offers to anyone already in the channel
+  const snap = await get(ref(rtdb, `${GROOM}/members`)).catch(() => null);
+  if (snap?.exists()) {
+    for (const peerId of Object.keys(snap.val())) {
+      if (peerId === myId || groomPeers.has(peerId)) continue;
+      const pc = groomAddPeer(peerId);
+      pc.onicecandidate = e => {
+        if (e.candidate) push(ref(rtdb, `${GROOM}/ice/${myId}/${peerId}`), e.candidate.toJSON()).catch(() => {});
+      };
+      onChildAdded(ref(rtdb, `${GROOM}/ice/${peerId}/${myId}`), async s => {
+        await pc.addIceCandidate(new RTCIceCandidate(s.val())).catch(() => {});
+      });
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await set(ref(rtdb, `${GROOM}/offers/${peerId}/${myId}`), { type: offer.type, sdp: offer.sdp }).catch(() => {});
+    }
   }
-  const callId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  peerConn = new RTCPeerConnection(STUN_CONFIG);
-  localStream.getTracks().forEach(t => peerConn!.addTrack(t, localStream!));
-  const remoteStream = new MediaStream();
-  remoteAudioEl = new Audio();
-  peerConn.ontrack = e => {
-    e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
-    remoteAudioEl!.srcObject = remoteStream;
-    remoteAudioEl!.play().catch(() => {});
-  };
-  peerConn.onicecandidate = e => {
-    if (e.candidate) push(ref(rtdb, `voxel_voice/calls/${callId}/offerCandidates`), e.candidate.toJSON()).catch(() => {});
-  };
-  const offer = await peerConn.createOffer();
-  await peerConn.setLocalDescription(offer);
-  await set(ref(rtdb, `voxel_voice/calls/${callId}`), {
-    offer: { type: offer.type, sdp: offer.sdp }, caller: myName, callee: targetName, status: 'pending',
-  }).catch(() => {});
-  await set(ref(rtdb, `voxel_voice/incoming/${targetName}`), { callId, caller: myName, ts: Date.now() }).catch(() => {});
-  activeCallId = callId;
-  showCallBar(targetName);
-  onValue(ref(rtdb, `voxel_voice/calls/${callId}/answer`), async snap => {
-    if (!snap.exists() || !peerConn || peerConn.currentRemoteDescription) return;
-    await peerConn.setRemoteDescription(new RTCSessionDescription(snap.val())).catch(() => {});
+
+  // Listen for offers TO me (from new joiners)
+  onValue(ref(rtdb, `${GROOM}/offers/${myId}`), async offSnap => {
+    if (!inGroom || !offSnap.exists()) return;
+    for (const [fromId, offer] of Object.entries(offSnap.val() as Record<string, any>)) {
+      if (groomPeers.has(fromId)) continue;
+      const pc = groomAddPeer(fromId);
+      pc.onicecandidate = e => {
+        if (e.candidate) push(ref(rtdb, `${GROOM}/ice/${myId}/${fromId}`), e.candidate.toJSON()).catch(() => {});
+      };
+      onChildAdded(ref(rtdb, `${GROOM}/ice/${fromId}/${myId}`), async s => {
+        await pc.addIceCandidate(new RTCIceCandidate(s.val())).catch(() => {});
+      });
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await set(ref(rtdb, `${GROOM}/answers/${fromId}/${myId}`), { type: answer.type, sdp: answer.sdp }).catch(() => {});
+      updateVoiceBar();
+    }
   });
-  onChildAdded(ref(rtdb, `voxel_voice/calls/${callId}/answerCandidates`), async snap => {
-    if (peerConn) await peerConn.addIceCandidate(new RTCIceCandidate(snap.val())).catch(() => {});
+
+  // Listen for answers to MY offers
+  onValue(ref(rtdb, `${GROOM}/answers/${myId}`), async ansSnap => {
+    if (!inGroom || !ansSnap.exists()) return;
+    for (const [calleeId, answer] of Object.entries(ansSnap.val() as Record<string, any>)) {
+      const pc = groomPeers.get(calleeId);
+      if (!pc || pc.currentRemoteDescription) continue;
+      await pc.setRemoteDescription(new RTCSessionDescription(answer)).catch(() => {});
+      updateVoiceBar();
+    }
   });
 }
 
-async function answerVoiceCall(callId: string, callerName: string) {
-  const myName = getChatUsername();
-  document.getElementById('chat-incoming-call')!.style.display = 'none';
-  if (!localStream) {
-    try { localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
-    catch { alert('Microphone access denied.'); return; }
-  }
-  peerConn = new RTCPeerConnection(STUN_CONFIG);
-  localStream.getTracks().forEach(t => peerConn!.addTrack(t, localStream!));
-  const remoteStream = new MediaStream();
-  remoteAudioEl = new Audio();
-  peerConn.ontrack = e => {
-    e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
-    remoteAudioEl!.srcObject = remoteStream;
-    remoteAudioEl!.play().catch(() => {});
-  };
-  peerConn.onicecandidate = e => {
-    if (e.candidate) push(ref(rtdb, `voxel_voice/calls/${callId}/answerCandidates`), e.candidate.toJSON()).catch(() => {});
-  };
-  const callSnap = await get(ref(rtdb, `voxel_voice/calls/${callId}`)).catch(() => null);
-  if (!callSnap?.exists()) { hangUpVoiceCall(); return; }
-  await peerConn.setRemoteDescription(new RTCSessionDescription(callSnap.val().offer));
-  const answer = await peerConn.createAnswer();
-  await peerConn.setLocalDescription(answer);
-  await update(ref(rtdb, `voxel_voice/calls/${callId}`), { answer: { type: answer.type, sdp: answer.sdp }, status: 'active' }).catch(() => {});
-  await remove(ref(rtdb, `voxel_voice/incoming/${myName}`)).catch(() => {});
-  onChildAdded(ref(rtdb, `voxel_voice/calls/${callId}/offerCandidates`), async snap => {
-    if (peerConn) await peerConn.addIceCandidate(new RTCIceCandidate(snap.val())).catch(() => {});
+function leaveVoiceChannel() {
+  const myId = getChatClientId();
+  inGroom = false;
+  remove(ref(rtdb, `${GROOM}/members/${myId}`)).catch(() => {});
+  remove(ref(rtdb, `${GROOM}/offers/${myId}`)).catch(() => {});
+  remove(ref(rtdb, `${GROOM}/answers/${myId}`)).catch(() => {});
+  remove(ref(rtdb, `${GROOM}/ice/${myId}`)).catch(() => {});
+  groomPeers.forEach((pc, peerId) => {
+    pc.close();
+    remove(ref(rtdb, `${GROOM}/offers/${peerId}/${myId}`)).catch(() => {});
+    remove(ref(rtdb, `${GROOM}/answers/${peerId}/${myId}`)).catch(() => {});
+    remove(ref(rtdb, `${GROOM}/ice/${peerId}/${myId}`)).catch(() => {});
   });
-  activeCallId = callId;
-  showCallBar(callerName);
-}
-
-function hangUpVoiceCall() {
-  if (activeCallId) {
-    update(ref(rtdb, `voxel_voice/calls/${activeCallId}`), { status: 'ended' }).catch(() => {});
-    activeCallId = null;
-  }
-  localStream?.getTracks().forEach(t => t.stop());
-  localStream = null;
-  peerConn?.close();
-  peerConn = null;
-  if (remoteAudioEl) { remoteAudioEl.srcObject = null; remoteAudioEl = null; }
-  isMuted = false;
-  hideCallBar();
+  groomPeers.clear();
+  groomAudios.forEach(a => { a.srcObject = null; });
+  groomAudios.clear();
+  groomStream?.getTracks().forEach(t => t.stop());
+  groomStream = null;
+  groomMuted = false;
   document.getElementById('chat-mute-btn')!.textContent = '🎙 Mute';
+  updateVoiceBar();
 }
 
 function initChat() {
@@ -3497,23 +3511,16 @@ function initChat() {
   sendBtn.addEventListener('click', send);
   inputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
 
-  // Incoming call listener
-  onValue(ref(rtdb, `voxel_voice/incoming/${myName}`), snap => {
-    if (!snap.exists()) { document.getElementById('chat-incoming-call')!.style.display = 'none'; return; }
-    if (activeCallId) return;
-    const { callId, caller } = snap.val();
-    showIncomingCall(callId, caller);
-  });
-
-  // Mute / hang up buttons
+  // Voice channel buttons
+  document.getElementById('chat-voice-join-btn')!.addEventListener('click', () => joinVoiceChannel());
   document.getElementById('chat-mute-btn')!.addEventListener('click', () => {
-    isMuted = !isMuted;
-    localStream?.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
+    groomMuted = !groomMuted;
+    groomStream?.getAudioTracks().forEach(t => { t.enabled = !groomMuted; });
     const btn = document.getElementById('chat-mute-btn')!;
-    btn.textContent = isMuted ? '🔇 Unmute' : '🎙 Mute';
-    (btn as HTMLElement).style.borderColor = isMuted ? '#f85149' : '#2a2a2a';
+    btn.textContent = groomMuted ? '🔇 Unmute' : '🎙 Mute';
+    btn.style.borderColor = groomMuted ? '#f85149' : '#2a2a2a';
   });
-  document.getElementById('chat-hangup-btn')!.addEventListener('click', hangUpVoiceCall);
+  document.getElementById('chat-hangup-btn')!.addEventListener('click', () => leaveVoiceChannel());
 
   // Announce modal
   const announceModal = document.getElementById('chat-announce-modal')!;
