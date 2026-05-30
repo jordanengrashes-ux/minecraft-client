@@ -3138,13 +3138,13 @@ if (updater) {
     if (updateSub) updateSub.textContent = `Downloading update… ${pct}%`;
   });
   updater.onDownloaded(() => {
-    // Only show the banner once the update is fully downloaded and ready
+    // Update downloaded — installs automatically on next close
     banner.style.display = 'flex';
     progressWrap2.style.display = 'none';
-    updateText.textContent = 'Update ready — restart to apply';
+    updateText.textContent = 'Update ready — will install when you close the app';
     installBtn.style.display = 'inline-block';
     if (checkBtn) { checkBtn.textContent = 'Check for Updates'; checkBtn.disabled = false; }
-    if (updateSub) updateSub.textContent = 'Update downloaded — click Restart & Update to apply';
+    if (updateSub) updateSub.textContent = 'Update downloaded — installs automatically on next close';
     enableRestartButtons();
   });
 

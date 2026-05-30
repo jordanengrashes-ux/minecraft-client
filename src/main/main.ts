@@ -1296,7 +1296,7 @@ function setAckedVersion(v: string) {
 
 function setupAutoUpdater() {
   autoUpdater.autoDownload         = true;
-  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('checking-for-update',  () => gameWin?.webContents.send('update-checking'));
   autoUpdater.on('update-not-available', () => gameWin?.webContents.send('update-not-available'));
