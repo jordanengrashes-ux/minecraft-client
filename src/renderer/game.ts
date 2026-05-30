@@ -3138,13 +3138,19 @@ if (updater) {
     if (updateSub) updateSub.textContent = `Downloading update… ${pct}%`;
   });
   updater.onDownloaded(() => {
-    // Update downloaded — installs automatically on next close
+    // Update downloaded — auto-installs in 10s if Minecraft isn't running
     banner.style.display = 'flex';
     progressWrap2.style.display = 'none';
-    updateText.textContent = 'Update ready — will install when you close the app';
     installBtn.style.display = 'inline-block';
     if (checkBtn) { checkBtn.textContent = 'Check for Updates'; checkBtn.disabled = false; }
-    if (updateSub) updateSub.textContent = 'Update downloaded — installs automatically on next close';
+    if (updateSub) updateSub.textContent = 'Update downloaded — restarting automatically';
+    let secs = 10;
+    updateText.textContent = `Update ready — installing in ${secs}s`;
+    const cd = setInterval(() => {
+      secs--;
+      if (secs <= 0) { clearInterval(cd); updateText.textContent = 'Installing update…'; }
+      else updateText.textContent = `Update ready — installing in ${secs}s`;
+    }, 1000);
     enableRestartButtons();
   });
 

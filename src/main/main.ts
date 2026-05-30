@@ -1303,11 +1303,16 @@ function setupAutoUpdater() {
   autoUpdater.on('update-available',   info => gameWin?.webContents.send('update-available',  info.version));
   autoUpdater.on('download-progress',     p => gameWin?.webContents.send('update-progress',   Math.round(p.percent)));
   autoUpdater.on('update-downloaded',   (info: { version: string }) => {
-    if (info.version === app.getVersion()) { return; }   // already on this version
-    if (getAckedVersion() === info.version) { return; }  // banner already shown for this version
+    if (info.version === app.getVersion()) { return; }
     setAckedVersion(info.version);
     updateReady = true;
     gameWin?.webContents.send('update-downloaded');
+    // Auto-install after 10s if Minecraft isn't running — avoids needing any user action
+    setTimeout(() => {
+      if (updateReady && !mcProcess) {
+        try { autoUpdater.quitAndInstall(true, true); } catch { app.quit(); }
+      }
+    }, 10000);
   });
   autoUpdater.on('error', err => {
     console.error('[updater] error:', err?.message);
