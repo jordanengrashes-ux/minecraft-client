@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electron', {
   minimize:     () => ipcRenderer.send('win-minimize'),
   maximize:     () => ipcRenderer.send('win-maximize'),
   copyText:     (text: string) => clipboard.writeText(text),
+  openExternal: (url: string)  => ipcRenderer.send('open-external', url),
 });
 
 contextBridge.exposeInMainWorld('updater', {

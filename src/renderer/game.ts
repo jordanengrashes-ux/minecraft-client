@@ -1846,20 +1846,17 @@ function initSkins() {
 
   const cosmetics = (window as any).cosmetics;
   cosmetics.getUuid().then((uuid: string | null) => {
-    if (uuid) {
-      previewImg.src = `https://crafatar.com/renders/body/${uuid}?size=200&overlay`;
-      skinNameEl.textContent = 'Current skin';
-    } else {
-      previewImg.src = 'https://crafatar.com/renders/body/MHF_Steve?size=200&overlay';
-      skinNameEl.textContent = 'Not logged in';
-    }
+    const user = uuid || 'MHF_Steve';
+    previewImg.src = `https://minotar.net/body/${user}/100`;
+    previewImg.onerror = () => { previewImg.src = 'https://minotar.net/body/MHF_Steve/100'; previewImg.onerror = null; };
+    skinNameEl.textContent = uuid ? 'Your skin' : 'Not logged in';
   });
 
   // Build preset grid
   WARDROBE_PRESETS.forEach(preset => {
     const card = document.createElement('div');
     card.className = 'wardrobe-card';
-    card.innerHTML = `<img src="https://mc-heads.net/avatar/${preset.user}/48" alt="${escHtml(preset.name)}" onerror="this.src='https://crafatar.com/avatars/MHF_Steve?size=48'"><span>${escHtml(preset.name)}</span>`;
+    card.innerHTML = `<img src="https://minotar.net/avatar/${preset.user}/48" alt="${escHtml(preset.name)}" onerror="this.style.display='none'"><span>${escHtml(preset.name)}</span>`;
     card.addEventListener('click', async () => {
       wardrobeGrid.querySelectorAll('.wardrobe-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
@@ -1869,7 +1866,7 @@ function initSkins() {
       if (b64) {
         selectedBase64 = b64;
         selectedVariant = preset.variant as 'classic' | 'slim';
-        previewImg.src = `https://crafatar.com/renders/body/${preset.user}?size=200&overlay`;
+        previewImg.src = `https://minotar.net/body/${preset.user}/100`;
         skinNameEl.textContent = preset.name;
         applyBtn.style.display = 'inline-block';
         statusEl.textContent = `${preset.name} ready — click Apply`;
@@ -1895,7 +1892,7 @@ function initSkins() {
     if (b64) {
       selectedBase64 = b64;
       selectedVariant = 'classic';
-      previewImg.src = `https://crafatar.com/renders/body/${encodeURIComponent(name)}?size=200&overlay`;
+      previewImg.src = `https://minotar.net/body/${encodeURIComponent(name)}/100`;
       skinNameEl.textContent = name;
       applyBtn.style.display = 'inline-block';
       statusEl.textContent = `${name}'s skin ready — click Apply`; statusEl.style.color = '#aaaaaa';
@@ -1941,7 +1938,7 @@ function initSkins() {
     applyBtn.disabled = false;
     if (res.ok) {
       statusEl.textContent = '✓ Skin applied!'; statusEl.style.color = '#f5a623';
-      if (res.uuid) previewImg.src = `https://crafatar.com/renders/body/${res.uuid}?size=200&overlay`;
+      if (res.uuid) previewImg.src = `https://minotar.net/body/${res.uuid}/100`;
     } else {
       statusEl.textContent = `✗ ${res.error}`; statusEl.style.color = '#e05500';
     }
@@ -3342,8 +3339,7 @@ function appendChatMessage(m: { user: string; text: string; ts: number; type?: s
 
   const avatarColor = usernameColor(m.user);
   const initial = (m.user[0] || '?').toUpperCase();
-  const avatarImg = `<img src="https://mc-heads.net/avatar/${encodeURIComponent(m.user)}/22" style="width:22px;height:22px;border-radius:50%;image-rendering:pixelated;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` +
-    `<span class="chat-msg-avatar" style="display:none;background:${avatarColor};">${initial}</span>`;
+  const avatarImg = `<span class="chat-msg-avatar" style="background:${avatarColor};">${initial}</span>`;
 
   const bubble = document.createElement('div');
   bubble.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};gap:2px;max-width:78%;`;
@@ -3451,7 +3447,24 @@ function groomAddPeer(peerId: string): RTCPeerConnection {
 async function joinVoiceChannel() {
   if (inGroom) return;
   try { groomStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
-  catch { alert('Microphone access denied — allow it in settings to use voice calls.'); return; }
+  catch {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:80px;right:24px;background:#141414;border:1px solid rgba(248,81,73,0.5);border-radius:10px;padding:14px 18px;z-index:9999;max-width:300px;font-family:inherit;box-shadow:0 8px 32px rgba(0,0,0,0.7);';
+    toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:6px;">🎙 Microphone blocked</div>
+      <div style="color:#aaaaaa;font-size:12px;line-height:1.5;margin-bottom:10px;">Windows is blocking microphone access.<br>Go to <strong style="color:#ffffff;">Windows Settings → Privacy → Microphone</strong> and enable it for desktop apps.</div>
+      <div style="display:flex;gap:8px;">
+        <button id="mic-open-settings" style="flex:1;padding:6px;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.4);border-radius:6px;color:#ffffff;font-size:12px;cursor:pointer;font-weight:600;">Open Settings</button>
+        <button id="mic-dismiss" style="padding:6px 12px;background:none;border:1px solid #2a2a2a;border-radius:6px;color:#777777;font-size:12px;cursor:pointer;">✕</button>
+      </div>`;
+    document.body.appendChild(toast);
+    toast.querySelector('#mic-open-settings')!.addEventListener('click', () => {
+      (window as any).electron?.openExternal('ms-settings:privacy-microphone');
+    });
+    const dismiss = () => toast.remove();
+    toast.querySelector('#mic-dismiss')!.addEventListener('click', dismiss);
+    setTimeout(dismiss, 15000);
+    return;
+  }
 
   inGroom = true;
   const myId   = getChatClientId();

@@ -1282,6 +1282,7 @@ ipcMain.handle('mc-open-folder', async (_e, type: string) => {
 ipcMain.on('win-close',    () => BrowserWindow.getFocusedWindow()?.close());
 ipcMain.on('win-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());
 ipcMain.on('win-maximize', () => { const w = BrowserWindow.getFocusedWindow(); if (w?.isMaximized()) w.unmaximize(); else w?.maximize(); });
+ipcMain.on('open-external', (_e, url: string) => { shell.openExternal(url).catch(() => {}); });
 
 // ── Auto-updater ──────────────────────────────────────────────────────────────
 const UPDATE_ACK_FILE = path.join(app.getPath('userData'), 'update-ack.json');
