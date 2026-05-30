@@ -132,6 +132,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Voxel Client ${{ github.ref_name }}
           body: Voxel Client ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             dist/windows/*
             dist/linux/*
