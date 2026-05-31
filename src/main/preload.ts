@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electron', {
   onUserData:   (cb: (data: any) => void) => ipcRenderer.on('user-data', (_e, d) => cb(d)),
   close:        () => ipcRenderer.send('win-close'),
   minimize:     () => ipcRenderer.send('win-minimize'),
+  relaunch:     () => ipcRenderer.send('win-relaunch'),
   maximize:     () => ipcRenderer.send('win-maximize'),
   copyText:     (text: string) => clipboard.writeText(text),
   openExternal: (url: string)  => ipcRenderer.send('open-external', url),

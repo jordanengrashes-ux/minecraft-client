@@ -1281,6 +1281,7 @@ ipcMain.handle('mc-open-folder', async (_e, type: string) => {
 // ── IPC: window controls ──────────────────────────────────────────────────────
 ipcMain.on('win-close',    () => BrowserWindow.getFocusedWindow()?.close());
 ipcMain.on('win-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());
+ipcMain.on('win-relaunch', () => { app.relaunch(); app.quit(); });
 ipcMain.on('win-maximize', () => { const w = BrowserWindow.getFocusedWindow(); if (w?.isMaximized()) w.unmaximize(); else w?.maximize(); });
 ipcMain.on('open-external', (_e, url: string) => { shell.openExternal(url).catch(() => {}); });
 

@@ -3484,13 +3484,16 @@ async function joinVoiceChannel() {
     const toast = document.createElement('div');
     toast.id = 'mic-blocked-toast';
     toast.style.cssText = 'position:fixed;bottom:80px;right:24px;background:#141414;border:1px solid rgba(248,81,73,0.5);border-radius:10px;padding:14px 18px;z-index:9999;max-width:280px;font-family:inherit;box-shadow:0 8px 32px rgba(0,0,0,0.7);';
-    toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:8px;">🎙 Microphone error</div>
-      <div style="color:#f6c356;font-size:11px;font-family:monospace;background:#0d0d0d;border-radius:5px;padding:6px 8px;margin-bottom:10px;">${reason}</div>
+    toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:6px;">🎙 Microphone blocked</div>
+      <div style="color:#f6c356;font-size:11px;font-family:monospace;background:#0d0d0d;border-radius:5px;padding:6px 8px;margin-bottom:8px;">${reason}</div>
+      <div style="color:#aaaaaa;font-size:11px;line-height:1.6;margin-bottom:10px;">If you just enabled it in Windows Settings,<br><strong style="color:#ffffff;">you must restart the app</strong> for it to take effect.</div>
       <div style="display:flex;gap:8px;">
-        <button id="mic-retry" style="flex:1;padding:7px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:6px;color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">✓ Try Again</button>
-        <button id="mic-dismiss" style="padding:7px 12px;background:none;border:1px solid #2a2a2a;border-radius:6px;color:#777777;font-size:12px;cursor:pointer;">✕</button>
+        <button id="mic-restart" style="flex:1;padding:7px;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.4);border-radius:6px;color:#f5a623;font-size:12px;cursor:pointer;font-weight:600;">↺ Restart App</button>
+        <button id="mic-retry" style="flex:1;padding:7px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:6px;color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">Try Again</button>
+        <button id="mic-dismiss" style="padding:7px 10px;background:none;border:1px solid #2a2a2a;border-radius:6px;color:#777777;font-size:12px;cursor:pointer;">✕</button>
       </div>`;
     document.body.appendChild(toast);
+    toast.querySelector('#mic-restart')!.addEventListener('click', () => (window as any).electron?.relaunch());
     toast.querySelector('#mic-retry')!.addEventListener('click', () => { toast.remove(); joinVoiceChannel(); });
     toast.querySelector('#mic-dismiss')!.addEventListener('click', () => toast.remove());
     return;
