@@ -1040,9 +1040,25 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
         statusEl.textContent = '⬇';
         const res = await mc.installMod({ url: file.url, filename: file.filename });
         if (!res.ok) throw new Error(res.error);
-        const installed = loadInstalledMods();
-        installed[mod.project_id] = { filename: file.filename, name: mod.title, mcVersion: ver } as any;
-        saveInstalledMods(installed);
+        // Install required dependencies declared in the Modrinth version metadata
+        const reqDeps = (chosenVer.dependencies || []).filter((d: any) => d.dependency_type === 'required' && d.project_id);
+        const installedNow = loadInstalledMods();
+        for (const dep of reqDeps) {
+          if (installedNow[dep.project_id]) continue;
+          try {
+            statusEl.textContent = '⬇ dep';
+            const dp = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '5' });
+            const dvRes = await fetch(`https://api.modrinth.com/v2/project/${dep.project_id}/version?${dp}`);
+            const dvData: any[] = await dvRes.json();
+            if (!Array.isArray(dvData) || !dvData.length) continue;
+            const df = dvData[0].files.find((f: any) => f.primary) ?? dvData[0].files[0];
+            if (!df) continue;
+            const depRes = await mc.installMod({ url: df.url, filename: df.filename });
+            if (depRes.ok) installedNow[dep.project_id] = { filename: df.filename, name: dep.project_id, mcVersion: ver };
+          } catch {}
+        }
+        installedNow[mod.project_id] = { filename: file.filename, name: mod.title, mcVersion: ver } as any;
+        saveInstalledMods(installedNow);
         enabledMods.add(mod.project_id);
         card.className = 'mod-card enabled';
         statusEl.textContent = '✓';
@@ -1089,16 +1105,44 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
       <div class="mod-desc">${mod.description}</div>
       <div class="mod-tags">${tagHtml}</div>
     </div>
-    <div class="mod-right">
+    <div class="mod-right" style="gap:6px;">
       <div class="mod-version" style="color:${isInstalled ? '#f5a623' : 'transparent'}">${isInstalled ? '✓' : ''}</div>
+      ${isInstalled ? `<button class="modpack-update-btn" style="padding:4px 10px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:11px;cursor:pointer;white-space:nowrap;">↻ Update</button>` : ''}
       <label class="toggle">
         <input type="checkbox" ${isInstalled ? 'checked' : ''} />
         <span class="toggle-slider"></span>
       </label>
     </div>`;
 
-  const input    = card.querySelector('input') as HTMLInputElement;
-  const statusEl = card.querySelector('.mod-version') as HTMLElement;
+  const input     = card.querySelector('input') as HTMLInputElement;
+  const statusEl  = card.querySelector('.mod-version') as HTMLElement;
+  const updateBtn = card.querySelector('.modpack-update-btn') as HTMLButtonElement | null;
+
+  updateBtn?.addEventListener('click', async () => {
+    updateBtn.disabled = true;
+    updateBtn.textContent = '↻ …';
+    statusEl.textContent = '…';
+    statusEl.style.color = '#f6c356';
+    modpackProgressEl = statusEl;
+    try {
+      const result = await mc.installModpack({ projectId: mod.project_id });
+      if (!result.ok) throw new Error(result.error);
+      const updated = loadInstalledModpacks();
+      updated[mod.project_id] = { projectId: mod.project_id, title: mod.title, mcVersion: result.mcVersion, filenames: result.filenames };
+      saveInstalledModpacks(updated);
+      statusEl.textContent = '✓';
+      statusEl.style.color = '#f5a623';
+      updateBtn.textContent = '✓ Done';
+      setTimeout(() => { updateBtn.textContent = '↻ Update'; updateBtn.disabled = false; }, 2000);
+    } catch (err: any) {
+      statusEl.textContent = '✗';
+      statusEl.style.color = '#e05500';
+      updateBtn.textContent = '✗ Failed';
+      updateBtn.disabled = false;
+    } finally {
+      modpackProgressEl = null;
+    }
+  });
 
   input.addEventListener('change', async e => {
     const checked = (e.target as HTMLInputElement).checked;
@@ -1509,11 +1553,25 @@ async function reinstallAllMods(btn: HTMLElement) {
   btn.textContent = `Updating 0/${stale.length}…`;
   btn.setAttribute('disabled', '');
   let done = 0;
-  for (const [slug] of stale) {
-    const mod = PVP_MOD_BY_SLUG.get(slug);
-    if (!mod) continue;
+  for (const [slug, info] of stale) {
+    const pvpMod = PVP_MOD_BY_SLUG.get(slug);
     try {
-      await installOneMod(mod, ver);
+      if (pvpMod) {
+        await installOneMod(pvpMod, ver);
+      } else {
+        // Modrinth search mod — update by project_id directly
+        const p = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '5' });
+        const r = await fetch(`https://api.modrinth.com/v2/project/${encodeURIComponent(slug)}/version?${p}`);
+        const data: any[] = await r.json();
+        if (!Array.isArray(data) || !data.length) continue;
+        const f = data[0].files.find((fi: any) => fi.primary) ?? data[0].files[0];
+        if (!f) continue;
+        const res = await mc.installMod({ url: f.url, filename: f.filename });
+        if (!res.ok) continue;
+        const cur = loadInstalledMods();
+        cur[slug] = { filename: f.filename, name: (info as any).name || slug, mcVersion: ver };
+        saveInstalledMods(cur);
+      }
       done++;
       btn.textContent = `Updating ${done}/${stale.length}…`;
     } catch {}
