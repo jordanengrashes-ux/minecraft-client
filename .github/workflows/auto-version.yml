@@ -1,0 +1,47 @@
+name: Auto Version & Tag
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    # Skip if this commit is itself a version bump (avoids infinite loop)
+    if: "!startsWith(github.event.head_commit.message, 'Bump to')"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Bump patch version & tag
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          old=$(node -p "require('./package.json').version")
+          IFS='.' read -r ma mi pa <<< "$old"
+          new="$ma.$mi.$((pa + 1))"
+
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('package.json','utf8'));
+            p.version = '$new';
+            fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+
+          git add package.json
+          git commit -m "Bump to $new"
+          git tag "v$new"
+          git push
+          git push origin "v$new"
