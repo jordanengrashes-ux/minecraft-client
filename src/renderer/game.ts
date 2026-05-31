@@ -3463,10 +3463,20 @@ function groomAddPeer(peerId: string): RTCPeerConnection {
 
 async function joinVoiceChannel() {
   if (inGroom) return;
-  try { groomStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
-  catch {
-    // Auto-open Windows mic privacy settings immediately
-    (window as any).electron?.openExternal('ms-settings:privacy-microphone');
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('MediaDevices API not available');
+    groomStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  }
+  catch (micErr: any) {
+    const reason = micErr?.name === 'NotFoundError'    ? 'No microphone found — plug one in and try again'
+                 : micErr?.name === 'NotReadableError' ? 'Microphone is in use by another app — close it and try again'
+                 : micErr?.name === 'NotAllowedError'  ? 'Blocked by Windows — open Settings and allow mic access'
+                 : `Error: ${micErr?.message || micErr?.name || 'unknown'}`;
+
+    // Auto-open Windows mic privacy settings if it's a permission issue
+    if (micErr?.name === 'NotAllowedError' || !micErr?.name) {
+      (window as any).electron?.openExternal('ms-settings:privacy-microphone');
+    }
 
     // Show a small "Try Again" toast — settings window is already open
     const existing = document.getElementById('mic-blocked-toast');
@@ -3474,13 +3484,8 @@ async function joinVoiceChannel() {
     const toast = document.createElement('div');
     toast.id = 'mic-blocked-toast';
     toast.style.cssText = 'position:fixed;bottom:80px;right:24px;background:#141414;border:1px solid rgba(248,81,73,0.5);border-radius:10px;padding:14px 18px;z-index:9999;max-width:280px;font-family:inherit;box-shadow:0 8px 32px rgba(0,0,0,0.7);';
-    toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:8px;">🎙 Microphone blocked</div>
-      <div style="color:#aaaaaa;font-size:12px;line-height:1.7;margin-bottom:10px;">
-        Windows Settings just opened. Find and turn <strong style="color:#ffffff;">ON</strong> these two toggles:<br>
-        <span style="color:#f5a623;">①</span> <strong style="color:#ffffff;">Microphone access</strong><br>
-        <span style="color:#f5a623;">②</span> <strong style="color:#ffffff;">Let desktop apps access your microphone</strong><br>
-        Then click Try Again below.
-      </div>
+    toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:8px;">🎙 Microphone error</div>
+      <div style="color:#f6c356;font-size:11px;font-family:monospace;background:#0d0d0d;border-radius:5px;padding:6px 8px;margin-bottom:10px;">${reason}</div>
       <div style="display:flex;gap:8px;">
         <button id="mic-retry" style="flex:1;padding:7px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:6px;color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">✓ Try Again</button>
         <button id="mic-dismiss" style="padding:7px 12px;background:none;border:1px solid #2a2a2a;border-radius:6px;color:#777777;font-size:12px;cursor:pointer;">✕</button>
