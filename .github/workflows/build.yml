@@ -27,6 +27,11 @@ jobs:
       - name: Create resource stubs
         shell: pwsh
         run: New-Item -ItemType Directory -Force -Path resources/java21,resources/mods
+      - name: Inject Gemini API key
+        shell: pwsh
+        run: |
+          $key = "${{ secrets.GEMINI_API_KEY }}"
+          "export const GEMINI_KEY = '$key';" | Out-File -FilePath src/main/ai-key.ts -Encoding utf8NoBOM
       - run: npm ci
       - run: npm run build && npx electron-builder --win --publish never
       - name: Collect artifacts
@@ -57,6 +62,8 @@ jobs:
           key: ${{ runner.os }}-electron-30
       - name: Create resource stubs
         run: mkdir -p resources/java21 resources/mods
+      - name: Inject Gemini API key
+        run: echo "export const GEMINI_KEY = '${{ secrets.GEMINI_API_KEY }}';" > src/main/ai-key.ts
       - run: npm ci
       - run: npm run build && npx electron-builder --linux --publish never
       - name: Collect artifacts

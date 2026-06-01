@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker, dialog, session } from 'electron';
+import { GEMINI_KEY } from './ai-key';
 import { autoUpdater } from 'electron-updater';
 import { execSync, spawnSync, spawn, ChildProcess } from 'child_process';
 import https from 'https';
@@ -1328,15 +1329,34 @@ ipcMain.on('check-for-updates', () => { autoUpdater.checkForUpdates().catch(() =
 
 // ── AI Assistant ───────────────────────────────────────────────────────────────
 
-const AI_PROXY_URL = 'https://voxel-client-ai.YOUR-SUBDOMAIN.workers.dev';
+const AI_SYSTEM = `You are a helpful AI assistant built into Voxel Client, a Minecraft launcher.
+Help with Minecraft gameplay (crafting recipes shown as 3x3 grids, commands, biomes, mobs, farms) and Voxel Client features (mods, servers, voice chat, cosmetics, skins, friends). Keep answers concise and practical. Use bullet points.`;
 
 ipcMain.handle('ai-chat', async (_e, messages: { role: string; content: string }[]) => {
+  if (!GEMINI_KEY) return { ok: false, error: 'AI not available in this build' };
   try {
-    const body = JSON.stringify({ messages });
+    // Convert to Gemini format (alternating user/model turns)
+    const contents: any[] = [];
+    for (const m of messages) {
+      const role = m.role === 'assistant' ? 'model' : 'user';
+      if (contents.length > 0 && contents[contents.length - 1].role === role) {
+        contents[contents.length - 1].parts[0].text += '\n' + m.content;
+      } else {
+        contents.push({ role, parts: [{ text: m.content }] });
+      }
+    }
+    if (contents[0]?.role !== 'user') contents.unshift({ role: 'user', parts: [{ text: '(start)' }] });
+
+    const body = JSON.stringify({
+      systemInstruction: { parts: [{ text: AI_SYSTEM }] },
+      contents,
+      generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
+    });
+
     const resp = await new Promise<string>((resolve, reject) => {
-      const url = new URL(AI_PROXY_URL);
+      const path = `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
       const req = https.request({
-        hostname: url.hostname, path: url.pathname, method: 'POST',
+        hostname: 'generativelanguage.googleapis.com', path, method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
       }, res => {
         let data = '';
@@ -1347,8 +1367,11 @@ ipcMain.handle('ai-chat', async (_e, messages: { role: string; content: string }
       req.write(body);
       req.end();
     });
+
     const json = JSON.parse(resp);
-    return json;
+    if (json.error) return { ok: false, error: json.error.message };
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    return text ? { ok: true, text } : { ok: false, error: 'No response from AI' };
   } catch (err: any) {
     return { ok: false, error: err.message };
   }
