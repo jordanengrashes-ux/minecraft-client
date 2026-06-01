@@ -1326,6 +1326,65 @@ function setupAutoUpdater() {
 ipcMain.on('install-update',    () => autoUpdater.quitAndInstall(true, true));
 ipcMain.on('check-for-updates', () => { autoUpdater.checkForUpdates().catch(() => {}); });
 
+// ── AI Assistant ───────────────────────────────────────────────────────────────
+const AI_KEY_FILE = path.join(app.getPath('userData'), 'ai-key.json');
+function getAiKey(): string {
+  try { return JSON.parse(fs.readFileSync(AI_KEY_FILE, 'utf-8')).key ?? ''; } catch { return ''; }
+}
+function setAiKey(key: string) {
+  try { fs.writeFileSync(AI_KEY_FILE, JSON.stringify({ key })); } catch {}
+}
+
+const AI_SYSTEM = `You are a helpful AI assistant built into Voxel Client, a Minecraft launcher.
+You help users with:
+- Minecraft gameplay: crafting recipes (show the 3x3 grid pattern), commands, biomes, mobs, mechanics, seeds, farms
+- Voxel Client features: launching games, installing mods/modpacks, hosting servers, voice chat, cosmetics, skins, friends, global chat
+- Troubleshooting: crashes, Java errors, server connection issues, mod conflicts
+Keep answers concise and practical. Use bullet points. For crafting recipes use a grid like:
+[Wood][Wood][Wood]
+[   ][Stick][   ]
+[   ][Stick][   ]
+Never make up features that don't exist.`;
+
+ipcMain.handle('ai-set-key', (_e, key: string) => { setAiKey(key); return { ok: true }; });
+ipcMain.handle('ai-get-key', () => { const k = getAiKey(); return k ? '••••' + k.slice(-4) : ''; });
+
+ipcMain.handle('ai-chat', async (_e, messages: { role: string; content: string }[]) => {
+  const apiKey = getAiKey();
+  if (!apiKey) return { ok: false, error: 'No API key — add your Anthropic key in Settings → AI Assistant' };
+  try {
+    const body = JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system: AI_SYSTEM,
+      messages,
+    });
+    const resp = await new Promise<string>((resolve, reject) => {
+      const req = https.request({
+        hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      }, res => {
+        let data = '';
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => resolve(data));
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+    const json = JSON.parse(resp);
+    if (json.error) return { ok: false, error: json.error.message };
+    return { ok: true, text: json.content?.[0]?.text ?? '' };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
 // ── IPC: overlay mod state (reads/writes game window's localStorage) ──────────
 ipcMain.handle('overlay-get-mods', async () => {
   if (!gameWin) return {};

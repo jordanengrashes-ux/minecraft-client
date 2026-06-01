@@ -504,8 +504,10 @@ const cosmeticsPanelEl  = document.getElementById('cosmetics-panel')!;
 const friendsPanelEl    = document.getElementById('friends-panel')!;
 const chatPanelEl = document.getElementById('chat-panel')!;
 const navChat     = document.getElementById('nav-chat')!;
-const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl, chatPanelEl];
-const allNavs   = [navPlay, navBedrock, navMods, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navServer, navCosmetics, navFriends, navCustomize, navSettings, navChat];
+const aiPanelEl   = document.getElementById('ai-panel')!;
+const navAi       = document.getElementById('nav-ai')!;
+const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl, chatPanelEl, aiPanelEl];
+const allNavs   = [navPlay, navBedrock, navMods, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navServer, navCosmetics, navFriends, navCustomize, navSettings, navChat, navAi];
 
 function showPanel(panel: HTMLElement, nav: HTMLElement) {
   allPanels.forEach(p => p.style.display = 'none');
@@ -706,6 +708,27 @@ document.getElementById('repair-btn')?.addEventListener('click', async () => {
     setStatus(`Repair failed: ${res.error}`, 'red');
   }
 });
+
+// ── AI key settings ───────────────────────────────────────────────────────────
+{
+  const ai = (window as any).ai;
+  const keyInput  = document.getElementById('ai-key-input') as HTMLInputElement | null;
+  const keySave   = document.getElementById('ai-key-save') as HTMLButtonElement | null;
+  const keyStatus = document.getElementById('ai-key-status');
+  if (ai && keyInput && keySave) {
+    ai.getKey().then((masked: string) => {
+      if (masked) { keyInput.placeholder = masked; if (keyStatus) keyStatus.textContent = 'Key saved'; }
+    });
+    keySave.addEventListener('click', async () => {
+      const key = keyInput.value.trim();
+      if (!key) return;
+      await ai.setKey(key);
+      keyInput.value = '';
+      keyInput.placeholder = '••••' + key.slice(-4);
+      if (keyStatus) { keyStatus.textContent = '✓ Saved'; keyStatus.style.color = '#f5a623'; }
+    });
+  }
+}
 
 // ── Reauth button ──────────────────────────────────────────────────────────────
 document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => {
@@ -3816,4 +3839,96 @@ navChat.addEventListener('click', () => {
     initChat();
   }
 });
+
+navAi.addEventListener('click', () => {
+  showPanel(aiPanelEl, navAi);
+  if (!aiPanelEl.dataset.loaded) {
+    aiPanelEl.dataset.loaded = '1';
+    initAI();
+  }
+});
+
+// ── AI Assistant ───────────────────────────────────────────────────────────────
+function initAI() {
+  const ai = (window as any).ai;
+  const msgsEl   = document.getElementById('ai-messages')!;
+  const inputEl  = document.getElementById('ai-input') as HTMLInputElement;
+  const sendBtn  = document.getElementById('ai-send') as HTMLButtonElement;
+  const suggestions = document.getElementById('ai-suggestions')!;
+
+  const history: { role: string; content: string }[] = [];
+  let busy = false;
+
+  function addBubble(text: string, isUser: boolean): HTMLElement {
+    const div = document.createElement('div');
+    div.className = isUser ? 'ai-msg-user' : 'ai-msg-ai';
+    if (isUser) {
+      div.textContent = text;
+    } else {
+      // Render basic markdown: **bold**, `code`, ```blocks```, bullet lists
+      div.innerHTML = text
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+        .replace(/\n/g, '<br>');
+    }
+    msgsEl.appendChild(div);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+    return div;
+  }
+
+  async function ask(question: string) {
+    if (busy || !question.trim()) return;
+    busy = true;
+    sendBtn.disabled = true;
+    suggestions.style.display = 'none';
+
+    addBubble(question, true);
+    history.push({ role: 'user', content: question });
+
+    const typing = document.createElement('div');
+    typing.className = 'ai-typing';
+    typing.textContent = 'Thinking…';
+    msgsEl.appendChild(typing);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+
+    const res = await ai.chat(history);
+    typing.remove();
+
+    if (res.ok) {
+      addBubble(res.text, false);
+      history.push({ role: 'assistant', content: res.text });
+      // Keep history to last 20 messages to avoid token limits
+      if (history.length > 20) history.splice(0, 2);
+    } else {
+      const err = document.createElement('div');
+      err.style.cssText = 'color:#f85149;font-size:12px;align-self:flex-start;padding:4px 0;';
+      err.textContent = `Error: ${res.error}`;
+      msgsEl.appendChild(err);
+    }
+
+    busy = false;
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+
+  // Suggested question chips
+  suggestions.querySelectorAll<HTMLButtonElement>('.ai-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const q = btn.dataset.q || btn.textContent || '';
+      ask(q);
+    });
+  });
+
+  sendBtn.addEventListener('click', () => { ask(inputEl.value.trim()); inputEl.value = ''; });
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(inputEl.value.trim()); inputEl.value = ''; }
+  });
+
+  // Welcome message
+  addBubble('Hi! I\'m your Voxel Client AI assistant powered by Claude.\n\nAsk me anything about **Minecraft** (crafting, commands, mechanics, biomes) or **Voxel Client** (mods, servers, voice chat, cosmetics).\n\nTry one of the quick questions above, or type your own!', false);
+}
 

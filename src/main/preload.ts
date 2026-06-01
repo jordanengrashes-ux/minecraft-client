@@ -52,6 +52,12 @@ contextBridge.exposeInMainWorld('files', {
   openFolder:       (type: string) => ipcRenderer.invoke('mc-open-folder', type),
 });
 
+contextBridge.exposeInMainWorld('ai', {
+  chat:   (messages: { role: string; content: string }[]) => ipcRenderer.invoke('ai-chat', messages),
+  setKey: (key: string) => ipcRenderer.invoke('ai-set-key', key),
+  getKey: ()            => ipcRenderer.invoke('ai-get-key'),
+});
+
 contextBridge.exposeInMainWorld('cosmetics', {
   installMod: () => ipcRenderer.invoke('cosmetics-install-mod'),
   getUuid:    () => ipcRenderer.invoke('mc-get-uuid'),
