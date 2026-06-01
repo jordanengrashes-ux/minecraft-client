@@ -30,7 +30,7 @@ jobs:
       - name: Inject Gemini API key
         shell: pwsh
         run: |
-          $key = "${{ secrets.GEMINI_API_KEY }}"
+          $key = "${{ secrets.GROQ_API_KEY }}"
           "export const GEMINI_KEY = '$key';" | Out-File -FilePath src/main/ai-key.ts -Encoding utf8NoBOM
       - run: npm ci
       - run: npm run build && npx electron-builder --win --publish never
@@ -63,7 +63,7 @@ jobs:
       - name: Create resource stubs
         run: mkdir -p resources/java21 resources/mods
       - name: Inject Gemini API key
-        run: echo "export const GEMINI_KEY = '${{ secrets.GEMINI_API_KEY }}';" > src/main/ai-key.ts
+        run: echo "export const GEMINI_KEY = '${{ secrets.GROQ_API_KEY }}';" > src/main/ai-key.ts
       - run: npm ci
       - run: npm run build && npx electron-builder --linux --publish never
       - name: Collect artifacts
