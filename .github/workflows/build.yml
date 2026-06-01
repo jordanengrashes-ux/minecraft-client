@@ -27,11 +27,11 @@ jobs:
       - name: Create resource stubs
         shell: pwsh
         run: New-Item -ItemType Directory -Force -Path resources/java21,resources/mods
-      - name: Inject Gemini API key
+      - name: Inject Groq API key
         shell: pwsh
         run: |
           $key = "${{ secrets.GROQ_API_KEY }}"
-          "export const GEMINI_KEY = '$key';" | Out-File -FilePath src/main/ai-key.ts -Encoding utf8NoBOM
+          [System.IO.File]::WriteAllText("src/main/ai-key.ts", "export const GEMINI_KEY = '$key';", [System.Text.Encoding]::UTF8)
       - run: npm ci
       - run: npm run build && npx electron-builder --win --publish never
       - name: Collect artifacts
