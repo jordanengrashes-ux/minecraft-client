@@ -611,10 +611,25 @@ ipcMain.handle('mc-kill', () => {
 });
 
 // ── IPC: cosmetics ────────────────────────────────────────────────────────────
-ipcMain.handle('mc-get-uuid', () => {
-  // Return the Minecraft UUID (no dashes) from the cached auth token
-  if (!mcAuthToken?.uuid) return null;
-  return (mcAuthToken.uuid as string).replace(/-/g, '');
+ipcMain.handle('mc-get-uuid', async () => {
+  if (!mcAuthToken) return null;
+  // UUID stored directly in token
+  if (mcAuthToken.uuid) return (mcAuthToken.uuid as string).replace(/-/g, '');
+  // Fallback: fetch profile using access_token and cache the uuid
+  if (mcAuthToken.access_token) {
+    try {
+      const profile = await fetchJson('https://api.minecraftservices.com/minecraft/profile', {
+        headers: { Authorization: `Bearer ${mcAuthToken.access_token}` },
+      });
+      if (profile?.id) {
+        mcAuthToken.uuid = profile.id;
+        mcAuthToken.name = mcAuthToken.name || profile.name;
+        saveCachedAuth(mcAuthToken);
+        return (profile.id as string).replace(/-/g, '');
+      }
+    } catch {}
+  }
+  return null;
 });
 
 ipcMain.handle('cosmetics-install-mod', async () => {

@@ -2128,7 +2128,7 @@ function initSkins() {
     if (res.ok) {
       statusEl.textContent = '✓ Skin applied!'; statusEl.style.color = '#f5a623';
     } else if (res.error?.includes('401') || res.error?.includes('Unauthorized') || res.error?.includes('Not authenticated')) {
-      statusEl.textContent = '✗ Not logged in — sign in with Microsoft first to apply a skin';
+      statusEl.textContent = '✗ Session expired — go to Settings and click Re-authenticate';
       statusEl.style.color = '#e05500';
     } else {
       statusEl.textContent = `✗ ${res.error}`; statusEl.style.color = '#e05500';
