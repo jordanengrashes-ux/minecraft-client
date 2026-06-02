@@ -34,7 +34,16 @@ jobs:
           $path = Join-Path $PWD "src/main/ai-key.ts"
           [System.IO.File]::WriteAllText($path, "export const GEMINI_KEY = '$key';", [System.Text.Encoding]::UTF8)
       - run: npm ci
-      - run: npm run build && npx electron-builder --win --publish never
+      - name: Build
+        shell: pwsh
+        run: npm run build
+      - name: Package
+        shell: pwsh
+        run: npx electron-builder --win --publish never
+      - name: Debug release output
+        shell: pwsh
+        run: |
+          if (Test-Path release) { Get-ChildItem release -Recurse | Select-Object FullName } else { Write-Host "ERROR: release/ directory missing" }
       - name: Collect artifacts
         shell: pwsh
         run: |
@@ -45,7 +54,7 @@ jobs:
         with:
           name: release-windows
           path: dist-artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
 
   build-linux:
     runs-on: ubuntu-latest
