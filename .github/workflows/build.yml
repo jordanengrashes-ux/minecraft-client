@@ -31,7 +31,8 @@ jobs:
         shell: pwsh
         run: |
           $key = "${{ secrets.GROQ_API_KEY }}"
-          [System.IO.File]::WriteAllText("src/main/ai-key.ts", "export const GEMINI_KEY = '$key';", [System.Text.Encoding]::UTF8)
+          $path = Join-Path $PWD "src/main/ai-key.ts"
+          [System.IO.File]::WriteAllText($path, "export const GEMINI_KEY = '$key';", [System.Text.Encoding]::UTF8)
       - run: npm ci
       - run: npm run build && npx electron-builder --win --publish never
       - name: Collect artifacts
@@ -118,30 +119,25 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: release-windows
-          path: dist/windows
+          path: release-files
       - uses: actions/download-artifact@v4
         with:
           name: release-linux
-          path: dist/linux
+          path: release-files
       - name: Download Mac artifacts (optional)
         uses: actions/download-artifact@v4
         if: needs.build-mac.result == 'success'
         with:
           name: release-mac
-          path: dist/mac
-      - name: Delete existing release
-        run: gh release delete "${{ github.ref_name }}" --yes 2>/dev/null || true
+          path: release-files
+      - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Voxel Client ${{ github.ref_name }}
-          body: Voxel Client ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            dist/windows/*
-            dist/linux/*
-            dist/mac/*
-          fail_on_unmatched_files: false
+        run: |
+          echo "Files to release:"
+          ls release-files/
+          gh release delete "${{ github.ref_name }}" --yes 2>/dev/null || true
+          gh release create "${{ github.ref_name }}" \
+            --title "Voxel Client ${{ github.ref_name }}" \
+            --notes "Voxel Client ${{ github.ref_name }}" \
+            release-files/*
