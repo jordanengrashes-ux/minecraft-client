@@ -617,9 +617,13 @@
         <!-- Preview + controls row -->
         <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
           <!-- Body preview -->
-          <div style="background:#0d0d0d;border:1px solid #1e1e1e;border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;min-width:120px;flex-shrink:0;">
-            <img id="skin-preview" src="" alt="Skin" style="width:100px;image-rendering:pixelated;border-radius:4px;" />
-            <div style="color:#444444;font-size:10px;">Preview</div>
+          <div style="background:#0d0d0d;border:1px solid #1e1e1e;border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:120px;flex-shrink:0;">
+            <canvas id="skin-preview-canvas" width="92" height="148" style="image-rendering:pixelated;width:92px;height:148px;"></canvas>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
+              <button id="skin-view-prev" style="background:none;border:1px solid #2a2a2a;border-radius:5px;color:#777777;font-size:14px;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">◀</button>
+              <span id="skin-view-label" style="font-size:10px;color:#484f58;width:32px;text-align:center;">Front</span>
+              <button id="skin-view-next" style="background:none;border:1px solid #2a2a2a;border-radius:5px;color:#777777;font-size:14px;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">▶</button>
+            </div>
           </div>
 
           <!-- Controls -->
@@ -1034,8 +1038,8 @@
           <div class="section-label" style="margin-top:0">In-Game Background</div>
           <div class="control-card" style="display:flex;align-items:center;gap:16px;">
             <div style="flex:1;">
-              <div style="font-size:14px;font-weight:600;color:#ffffff;">Voxel Client Panorama</div>
-              <div style="font-size:12px;color:#aaaaaa;margin-top:3px;">Replaces the Minecraft main menu background — then enable "VoxelClient" in Options › Resource Packs</div>
+              <div style="font-size:14px;font-weight:600;color:#ffffff;">Title Screen Background</div>
+              <div style="font-size:12px;color:#aaaaaa;margin-top:3px;">Changes the rotating panorama on Minecraft's <strong style="color:#ffffff;">title screen</strong> (not in-game sky). After installing: launch Minecraft → Options → Resource Packs → enable <strong style="color:#f5a623;">VoxelClient</strong></div>
               <div id="install-bg-status" style="font-size:11px;margin-top:5px;color:#444444;"></div>
             </div>
             <label class="toggle" style="flex-shrink:0;cursor:pointer;">

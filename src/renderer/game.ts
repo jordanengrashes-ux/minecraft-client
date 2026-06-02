@@ -1911,9 +1911,84 @@ async function fetchSkinBase64(username: string): Promise<string | null> {
   } catch { return null; }
 }
 
+const VIEWS = ['Front', 'Back', 'Left', 'Right'] as const;
+type SkinView = typeof VIEWS[number];
+
+function drawSkinOnCanvas(canvas: HTMLCanvasElement, img: HTMLImageElement, view: SkinView, slim: boolean) {
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = false;
+  const s = 4;
+  const aw = slim ? 3 : 4; // arm width
+
+  // Helper: draw a skin region to canvas coords
+  const d = (sx: number, sy: number, sw: number, sh: number, dx: number, dy: number) =>
+    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, sw * s, sh * s);
+
+  if (view === 'Front') {
+    // Base layers
+    d(8, 8, 8, 8, 14, 2);              // Head
+    d(20, 20, 8, 12, 14, 36);          // Body
+    d(44, 20, aw, 12, 14 - aw * s, 36); // R arm
+    d(36, 52, aw, 12, 14 + 8 * s, 36); // L arm
+    d(4, 20, 4, 12, 14, 84);           // R leg
+    d(20, 52, 4, 12, 30, 84);          // L leg
+    // Overlay layers (hat, jacket, sleeves, pants)
+    d(40, 8, 8, 8, 13, 1);             // Hat
+    d(20, 36, 8, 12, 14, 36);          // Jacket
+    d(44, 36, aw, 12, 14 - aw * s, 36); // R sleeve
+    d(52, 52, aw, 12, 14 + 8 * s, 36); // L sleeve
+    d(4, 36, 4, 12, 14, 84);           // R leg overlay
+    d(4, 52, 4, 12, 30, 84);           // L leg overlay
+  } else if (view === 'Back') {
+    d(24, 8, 8, 8, 14, 2);             // Head back
+    d(32, 20, 8, 12, 14, 36);          // Body back
+    d(52, 20, aw, 12, 14 + 8 * s, 36); // R arm back (screen right from behind)
+    d(44, 52, aw, 12, 14 - aw * s, 36); // L arm back
+    d(12, 20, 4, 12, 30, 84);          // R leg back
+    d(28, 52, 4, 12, 14, 84);          // L leg back
+    d(56, 8, 8, 8, 13, 1);             // Hat back
+    d(32, 36, 8, 12, 14, 36);          // Jacket back
+    d(52, 36, aw, 12, 14 + 8 * s, 36); // R sleeve back
+    d(60, 52, aw, 12, 14 - aw * s, 36); // L sleeve back
+    d(12, 36, 4, 12, 30, 84);          // R leg back overlay
+    d(12, 52, 4, 12, 14, 84);          // L leg back overlay
+  } else if (view === 'Left') {
+    d(16, 8, 8, 8, 14, 2);             // Head left
+    d(28, 20, 4, 12, 14, 36);          // Body left side
+    d(40, 20, 4, 12, 14 - 4 * s, 36);  // R arm left side
+    d(32, 52, 4, 12, 14 + 8 * s, 36);  // L arm left side
+    d(8, 20, 4, 12, 14, 84);           // R leg left
+    d(24, 52, 4, 12, 30, 84);          // L leg left
+    d(48, 8, 8, 8, 13, 1);             // Hat left
+    d(28, 36, 4, 12, 14, 36);          // Jacket left
+  } else {
+    d(0, 8, 8, 8, 14, 2);              // Head right
+    d(16, 20, 4, 12, 14, 36);          // Body right side
+    d(48, 20, 4, 12, 14 - 4 * s, 36);  // R arm right side
+    d(40, 52, 4, 12, 14 + 8 * s, 36);  // L arm right side
+    d(0, 20, 4, 12, 14, 84);           // R leg right
+    d(20, 52, 4, 12, 30, 84);          // wait...
+    d(32, 8, 8, 8, 13, 1);             // Hat right
+    d(16, 36, 4, 12, 14, 36);          // Jacket right
+  }
+}
+
+function loadSkinImage(b64: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = `data:image/png;base64,${b64}`;
+  });
+}
+
 function initSkins() {
-  const previewImg   = document.getElementById('skin-preview') as HTMLImageElement;
+  const skinCanvas   = document.getElementById('skin-preview-canvas') as HTMLCanvasElement;
   const skinNameEl   = document.getElementById('skin-name')!;
+  const viewLabel    = document.getElementById('skin-view-label')!;
+  const prevBtn      = document.getElementById('skin-view-prev') as HTMLButtonElement;
+  const nextBtn      = document.getElementById('skin-view-next') as HTMLButtonElement;
   const fileInput    = document.getElementById('skin-file-input') as HTMLInputElement;
   const uploadBtn    = document.getElementById('skin-upload-btn') as HTMLButtonElement;
   const fileNameEl   = document.getElementById('skin-file-name')!;
@@ -1924,13 +1999,55 @@ function initSkins() {
   const wardrobeGrid = document.getElementById('skin-wardrobe-grid')!;
   let selectedBase64 = '';
   let selectedVariant: 'classic' | 'slim' = 'classic';
+  let currentSkinImg: HTMLImageElement | null = null;
+  let viewIdx = 0;
 
+  function refreshCanvas() {
+    if (!currentSkinImg) return;
+    drawSkinOnCanvas(skinCanvas, currentSkinImg, VIEWS[viewIdx], selectedVariant === 'slim');
+    viewLabel.textContent = VIEWS[viewIdx];
+  }
+
+  prevBtn.addEventListener('click', () => { viewIdx = (viewIdx + VIEWS.length - 1) % VIEWS.length; refreshCanvas(); });
+  nextBtn.addEventListener('click', () => { viewIdx = (viewIdx + 1) % VIEWS.length; refreshCanvas(); });
+
+  // Drag to rotate
+  let dragStartX = 0;
+  skinCanvas.addEventListener('mousedown', e => { dragStartX = e.clientX; });
+  skinCanvas.addEventListener('mouseup', e => {
+    const dx = e.clientX - dragStartX;
+    if (Math.abs(dx) > 20) {
+      viewIdx = dx < 0
+        ? (viewIdx + 1) % VIEWS.length
+        : (viewIdx + VIEWS.length - 1) % VIEWS.length;
+      refreshCanvas();
+    }
+  });
+  skinCanvas.style.cursor = 'ew-resize';
+
+  async function setPreviewSkin(b64: string, name: string, variant: 'classic' | 'slim') {
+    selectedBase64 = b64;
+    selectedVariant = variant;
+    skinNameEl.textContent = name;
+    try {
+      currentSkinImg = await loadSkinImage(b64);
+      viewIdx = 0;
+      refreshCanvas();
+    } catch {}
+  }
+
+  // Load current skin
   const cosmetics = (window as any).cosmetics;
-  cosmetics.getUuid().then((uuid: string | null) => {
-    const user = uuid || 'MHF_Steve';
-    previewImg.src = `https://minotar.net/body/${user}/100`;
-    previewImg.onerror = () => { previewImg.src = 'https://minotar.net/body/MHF_Steve/100'; previewImg.onerror = null; };
-    skinNameEl.textContent = uuid ? 'Your skin' : 'Not logged in';
+  cosmetics.getUuid().then(async (uuid: string | null) => {
+    if (uuid) {
+      skinNameEl.textContent = 'Your skin';
+      const b64 = await fetchSkinBase64(uuid).catch(() => null);
+      if (b64) { currentSkinImg = await loadSkinImage(b64).catch(() => null); refreshCanvas(); }
+    } else {
+      skinNameEl.textContent = 'Not logged in';
+      const b64 = await fetchSkinBase64('MHF_Steve').catch(() => null);
+      if (b64) { currentSkinImg = await loadSkinImage(b64).catch(() => null); refreshCanvas(); }
+    }
   });
 
   // Build preset grid
@@ -1945,13 +2062,9 @@ function initSkins() {
       applyBtn.style.display = 'none';
       const b64 = await fetchSkinBase64(preset.user);
       if (b64) {
-        selectedBase64 = b64;
-        selectedVariant = preset.variant as 'classic' | 'slim';
-        previewImg.src = `https://minotar.net/body/${preset.user}/100`;
-        skinNameEl.textContent = preset.name;
+        await setPreviewSkin(b64, preset.name, preset.variant as 'classic' | 'slim');
         applyBtn.style.display = 'inline-block';
-        statusEl.textContent = `${preset.name} ready — click Apply`;
-        statusEl.style.color = '#aaaaaa';
+        statusEl.textContent = `${preset.name} ready — click Apply`; statusEl.style.color = '#aaaaaa';
       } else {
         statusEl.textContent = `Could not load ${preset.name} skin`; statusEl.style.color = '#e05500';
       }
@@ -1963,18 +2076,14 @@ function initSkins() {
   const doLookup = async () => {
     const name = lookupInput.value.trim();
     if (!name) return;
-    lookupBtn.disabled = true;
-    lookupBtn.textContent = '…';
+    lookupBtn.disabled = true; lookupBtn.textContent = '…';
     statusEl.textContent = `Loading ${name}…`; statusEl.style.color = '#f6c356';
     applyBtn.style.display = 'none';
     wardrobeGrid.querySelectorAll('.wardrobe-card').forEach(c => c.classList.remove('selected'));
     const b64 = await fetchSkinBase64(name);
     lookupBtn.disabled = false; lookupBtn.textContent = 'Load';
     if (b64) {
-      selectedBase64 = b64;
-      selectedVariant = 'classic';
-      previewImg.src = `https://minotar.net/body/${encodeURIComponent(name)}/100`;
-      skinNameEl.textContent = name;
+      await setPreviewSkin(b64, name, 'classic');
       applyBtn.style.display = 'inline-block';
       statusEl.textContent = `${name}'s skin ready — click Apply`; statusEl.style.color = '#aaaaaa';
     } else {
@@ -1991,12 +2100,11 @@ function initSkins() {
     if (!file) return;
     fileNameEl.textContent = file.name;
     const reader = new FileReader();
-    reader.onload = e => {
+    reader.onload = async e => {
       const dataUrl = e.target?.result as string;
-      selectedBase64 = dataUrl.split(',')[1];
-      selectedVariant = (document.querySelector('input[name="skin-variant"]:checked') as HTMLInputElement)?.value as 'classic' | 'slim' || 'classic';
-      previewImg.src = dataUrl;
-      skinNameEl.textContent = file.name;
+      const b64 = dataUrl.split(',')[1];
+      const variant = (document.querySelector('input[name="skin-variant"]:checked') as HTMLInputElement)?.value as 'classic' | 'slim' || 'classic';
+      await setPreviewSkin(b64, file.name, variant);
       wardrobeGrid.querySelectorAll('.wardrobe-card').forEach(c => c.classList.remove('selected'));
       applyBtn.style.display = 'inline-block';
       statusEl.textContent = 'Custom skin loaded — click Apply'; statusEl.style.color = '#aaaaaa';
@@ -2007,19 +2115,21 @@ function initSkins() {
   document.querySelectorAll('input[name="skin-variant"]').forEach(r => {
     r.addEventListener('change', () => {
       selectedVariant = (r as HTMLInputElement).value as 'classic' | 'slim';
+      refreshCanvas();
     });
   });
 
   applyBtn.addEventListener('click', async () => {
     if (!selectedBase64) return;
-    const variant = selectedVariant;
     applyBtn.disabled = true;
     statusEl.textContent = 'Uploading…'; statusEl.style.color = '#f6c356';
-    const res = await mc.uploadSkin({ base64: selectedBase64, variant });
+    const res = await mc.uploadSkin({ base64: selectedBase64, variant: selectedVariant });
     applyBtn.disabled = false;
     if (res.ok) {
       statusEl.textContent = '✓ Skin applied!'; statusEl.style.color = '#f5a623';
-      if (res.uuid) previewImg.src = `https://minotar.net/body/${res.uuid}/100`;
+    } else if (res.error?.includes('401') || res.error?.includes('Unauthorized') || res.error?.includes('Not authenticated')) {
+      statusEl.textContent = '✗ Not logged in — sign in with Microsoft first to apply a skin';
+      statusEl.style.color = '#e05500';
     } else {
       statusEl.textContent = `✗ ${res.error}`; statusEl.style.color = '#e05500';
     }

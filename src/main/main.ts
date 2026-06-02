@@ -1096,7 +1096,7 @@ ipcMain.handle('mc-install-bg', async (_e, opts: { images: string[] }) => {
     const texDir  = path.join(packDir, 'assets', 'minecraft', 'textures', 'gui', 'title', 'background');
     fs.mkdirSync(texDir, { recursive: true });
     fs.writeFileSync(path.join(packDir, 'pack.mcmeta'), JSON.stringify({
-      pack: { pack_format: 46, supported_formats: { min_inclusive: 1, max_inclusive: 9999 }, description: 'Voxel Client Theme' }
+      pack: { pack_format: 15, supported_formats: { min_inclusive: 1, max_inclusive: 9999 }, description: 'Voxel Client Theme' }
     }));
     for (let i = 0; i < 6 && i < opts.images.length; i++) {
       fs.writeFileSync(path.join(texDir, `panorama_${i}.png`), Buffer.from(opts.images[i], 'base64'));
