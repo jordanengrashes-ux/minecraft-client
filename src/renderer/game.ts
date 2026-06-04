@@ -3952,93 +3952,444 @@ navChat.addEventListener('click', () => {
 
 navAi.addEventListener('click', () => {
   showPanel(aiPanelEl, navAi);
-  if (!aiPanelEl.dataset.loaded) {
-    aiPanelEl.dataset.loaded = '1';
-    initAI();
-  }
+  if (!aiPanelEl.dataset.loaded) { aiPanelEl.dataset.loaded = '1'; initGuide(); }
 });
 
-// ── AI Assistant ───────────────────────────────────────────────────────────────
-function initAI() {
-  const ai = (window as any).ai;
-  const msgsEl   = document.getElementById('ai-messages')!;
-  const inputEl  = document.getElementById('ai-input') as HTMLInputElement;
-  const sendBtn  = document.getElementById('ai-send') as HTMLButtonElement;
-  const suggestions = document.getElementById('ai-suggestions')!;
+// ── Minecraft Guide ────────────────────────────────────────────────────────────
 
-  const history: { role: string; content: string }[] = [];
-  let busy = false;
+const WIKI = (n: string) => `https://minecraft.wiki/w/Special:FilePath/Invicon_${n}.png`;
+const MWIKI = (n: string) => `https://minecraft.wiki/w/Special:FilePath/${n}`;
 
-  function addBubble(text: string, isUser: boolean): HTMLElement {
+// Language translations
+const LANGS: Record<string, Record<string, string>> = {
+  en: { crafting:'Crafting', mobs:'Mobs', tips:'Tips', chat:'AI Chat', search:'Search…', cat_all:'All', cat_combat:'Combat', cat_mine:'Mining', cat_farm:'Farming', cat_build:'Building', cat_surv:'Survival', cat_red:'Redstone', hp:'HP', atk:'Attack', armor:'Armor', xp:'XP', drops:'Drops', spawn:'Spawns', type_pass:'Passive', type_neut:'Neutral', type_host:'Hostile', type_boss:'Boss', recipe_for:'Recipe for', ingredients:'Ingredients', result:'Result' },
+  es: { crafting:'Crafteo', mobs:'Mobs', tips:'Consejos', chat:'Chat IA', search:'Buscar…', cat_all:'Todo', cat_combat:'Combate', cat_mine:'Minería', cat_farm:'Agricultura', cat_build:'Construcción', cat_surv:'Supervivencia', cat_red:'Redstone', hp:'Vida', atk:'Ataque', armor:'Armadura', xp:'XP', drops:'Botín', spawn:'Aparece', type_pass:'Pasivo', type_neut:'Neutral', type_host:'Hostil', type_boss:'Jefe', recipe_for:'Receta de', ingredients:'Ingredientes', result:'Resultado' },
+  fr: { crafting:'Fabrication', mobs:'Créatures', tips:'Conseils', chat:'Chat IA', search:'Rechercher…', cat_all:'Tout', cat_combat:'Combat', cat_mine:'Minage', cat_farm:'Agriculture', cat_build:'Construction', cat_surv:'Survie', cat_red:'Redstone', hp:'Vie', atk:'Attaque', armor:'Armure', xp:'XP', drops:'Butin', spawn:'Apparaît', type_pass:'Passif', type_neut:'Neutre', type_host:'Hostile', type_boss:'Boss', recipe_for:'Recette de', ingredients:'Ingrédients', result:'Résultat' },
+  pt: { crafting:'Artesanato', mobs:'Mobs', tips:'Dicas', chat:'Chat IA', search:'Pesquisar…', cat_all:'Tudo', cat_combat:'Combate', cat_mine:'Mineração', cat_farm:'Fazenda', cat_build:'Construção', cat_surv:'Sobrevivência', cat_red:'Redstone', hp:'Vida', atk:'Ataque', armor:'Armadura', xp:'XP', drops:'Itens', spawn:'Aparece', type_pass:'Passivo', type_neut:'Neutro', type_host:'Hostil', type_boss:'Chefe', recipe_for:'Receita de', ingredients:'Ingredientes', result:'Resultado' },
+  de: { crafting:'Craften', mobs:'Kreaturen', tips:'Tipps', chat:'KI-Chat', search:'Suchen…', cat_all:'Alle', cat_combat:'Kampf', cat_mine:'Bergbau', cat_farm:'Landwirtschaft', cat_build:'Bauen', cat_surv:'Überleben', cat_red:'Redstone', hp:'Leben', atk:'Angriff', armor:'Rüstung', xp:'XP', drops:'Beute', spawn:'Erscheint', type_pass:'Passiv', type_neut:'Neutral', type_host:'Feindlich', type_boss:'Boss', recipe_for:'Rezept für', ingredients:'Zutaten', result:'Ergebnis' },
+  zh: { crafting:'合成', mobs:'生物', tips:'技巧', chat:'AI对话', search:'搜索…', cat_all:'全部', cat_combat:'战斗', cat_mine:'采矿', cat_farm:'农业', cat_build:'建筑', cat_surv:'生存', cat_red:'红石', hp:'生命值', atk:'攻击', armor:'护甲', xp:'经验', drops:'掉落', spawn:'刷新', type_pass:'被动', type_neut:'中立', type_host:'敌对', type_boss:'首领', recipe_for:'合成方法', ingredients:'材料', result:'结果' },
+  ja: { crafting:'クラフト', mobs:'モブ', tips:'ヒント', chat:'AIチャット', search:'検索…', cat_all:'全て', cat_combat:'戦闘', cat_mine:'採掘', cat_farm:'農業', cat_build:'建築', cat_surv:'サバイバル', cat_red:'レッドストーン', hp:'体力', atk:'攻撃', armor:'防御', xp:'経験値', drops:'ドロップ', spawn:'出現', type_pass:'中立', type_neut:'ニュートラル', type_host:'敵対', type_boss:'ボス', recipe_for:'レシピ', ingredients:'材料', result:'結果' },
+  ru: { crafting:'Крафт', mobs:'Мобы', tips:'Советы', chat:'ИИ Чат', search:'Поиск…', cat_all:'Все', cat_combat:'Бой', cat_mine:'Добыча', cat_farm:'Фермерство', cat_build:'Строительство', cat_surv:'Выживание', cat_red:'Красный камень', hp:'Здоровье', atk:'Атака', armor:'Броня', xp:'Опыт', drops:'Дроп', spawn:'Спавн', type_pass:'Мирный', type_neut:'Нейтральный', type_host:'Враждебный', type_boss:'Босс', recipe_for:'Рецепт', ingredients:'Ингредиенты', result:'Результат' },
+};
+
+let guideLang = localStorage.getItem('guide_lang') || 'en';
+const t = (k: string) => (LANGS[guideLang] || LANGS.en)[k] || k;
+
+// ── Crafting database ────
+interface MCRecipe { name: string; img: string; grid: (string|null)[]; count?: number; cat: string; tags?: string; }
+const RECIPES: MCRecipe[] = [
+  // Tools
+  {name:'Wooden Pickaxe',img:'Wooden_Pickaxe',grid:[WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),null,WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Stone Pickaxe',img:'Stone_Pickaxe',grid:[WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),null,WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Iron Pickaxe',img:'Iron_Pickaxe',grid:[WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),null,WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Diamond Pickaxe',img:'Diamond_Pickaxe',grid:[WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),null,WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Netherite Pickaxe',img:'Netherite_Pickaxe',grid:[null,null,null,null,null,null,WIKI('Diamond_Pickaxe'),WIKI('Netherite_Ingot'),null],cat:'tool',tags:'upgrade smithing'},
+  {name:'Wooden Axe',img:'Wooden_Axe',grid:[WIKI('Oak_Planks'),WIKI('Oak_Planks'),null,WIKI('Oak_Planks'),WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Iron Axe',img:'Iron_Axe',grid:[WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Diamond Axe',img:'Diamond_Axe',grid:[WIKI('Diamond'),WIKI('Diamond'),null,WIKI('Diamond'),WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Wooden Shovel',img:'Wooden_Shovel',grid:[null,WIKI('Oak_Planks'),null,null,WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Iron Shovel',img:'Iron_Shovel',grid:[null,WIKI('Iron_Ingot'),null,null,WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Wooden Hoe',img:'Wooden_Hoe',grid:[WIKI('Oak_Planks'),WIKI('Oak_Planks'),null,null,WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Iron Hoe',img:'Iron_Hoe',grid:[WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),null,null,WIKI('Stick'),null,null,WIKI('Stick'),null],cat:'tool'},
+  {name:'Flint and Steel',img:'Flint_and_Steel',grid:[WIKI('Iron_Ingot'),null,null,null,WIKI('Flint'),null,null,null,null],cat:'tool'},
+  {name:'Shears',img:'Shears',grid:[null,WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),null,null,null,null,null],cat:'tool'},
+  {name:'Fishing Rod',img:'Fishing_Rod',grid:[null,null,WIKI('Stick'),null,WIKI('Stick'),WIKI('String'),WIKI('Stick'),null,WIKI('String')],cat:'tool'},
+  {name:'Compass',img:'Compass',grid:[null,WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Redstone_Dust'),WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),null],cat:'tool'},
+  {name:'Clock',img:'Clock',grid:[null,WIKI('Gold_Ingot'),null,WIKI('Gold_Ingot'),WIKI('Redstone_Dust'),WIKI('Gold_Ingot'),null,WIKI('Gold_Ingot'),null],cat:'tool'},
+  // Weapons
+  {name:'Wooden Sword',img:'Wooden_Sword',grid:[null,WIKI('Oak_Planks'),null,null,WIKI('Oak_Planks'),null,null,WIKI('Stick'),null],cat:'weapon'},
+  {name:'Stone Sword',img:'Stone_Sword',grid:[null,WIKI('Cobblestone'),null,null,WIKI('Cobblestone'),null,null,WIKI('Stick'),null],cat:'weapon'},
+  {name:'Iron Sword',img:'Iron_Sword',grid:[null,WIKI('Iron_Ingot'),null,null,WIKI('Iron_Ingot'),null,null,WIKI('Stick'),null],cat:'weapon'},
+  {name:'Diamond Sword',img:'Diamond_Sword',grid:[null,WIKI('Diamond'),null,null,WIKI('Diamond'),null,null,WIKI('Stick'),null],cat:'weapon'},
+  {name:'Netherite Sword',img:'Netherite_Sword',grid:[null,null,null,null,null,null,WIKI('Diamond_Sword'),WIKI('Netherite_Ingot'),null],cat:'weapon',tags:'upgrade smithing'},
+  {name:'Bow',img:'Bow',grid:[null,WIKI('Stick'),WIKI('String'),WIKI('Stick'),null,WIKI('String'),null,WIKI('Stick'),WIKI('String')],cat:'weapon'},
+  {name:'Arrow',img:'Arrow',grid:[null,WIKI('Flint'),null,null,WIKI('Stick'),null,null,WIKI('Feather'),null],count:4,cat:'weapon'},
+  {name:'Crossbow',img:'Crossbow',grid:[WIKI('Stick'),WIKI('Iron_Ingot'),WIKI('Stick'),null,WIKI('String'),null,WIKI('Stick'),WIKI('Tripwire_Hook'),WIKI('Stick')],cat:'weapon'},
+  {name:'Shield',img:'Shield',grid:[WIKI('Oak_Planks'),WIKI('Iron_Ingot'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),null,WIKI('Oak_Planks'),null],cat:'weapon'},
+  {name:'Trident',img:'Trident',grid:[null,null,null,null,null,null,null,null,null],cat:'weapon',tags:'drowned drop cannot craft'},
+  // Armor
+  {name:'Iron Helmet',img:'Iron_Helmet',grid:[WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),null,null,null],cat:'armor'},
+  {name:'Iron Chestplate',img:'Iron_Chestplate',grid:[WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot')],cat:'armor'},
+  {name:'Iron Leggings',img:'Iron_Leggings',grid:[WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot')],cat:'armor'},
+  {name:'Iron Boots',img:'Iron_Boots',grid:[null,null,null,WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot')],cat:'armor'},
+  {name:'Diamond Helmet',img:'Diamond_Helmet',grid:[WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),null,WIKI('Diamond'),null,null,null],cat:'armor'},
+  {name:'Diamond Chestplate',img:'Diamond_Chestplate',grid:[WIKI('Diamond'),null,WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond')],cat:'armor'},
+  {name:'Diamond Leggings',img:'Diamond_Leggings',grid:[WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),null,WIKI('Diamond'),WIKI('Diamond'),null,WIKI('Diamond')],cat:'armor'},
+  {name:'Diamond Boots',img:'Diamond_Boots',grid:[null,null,null,WIKI('Diamond'),null,WIKI('Diamond'),WIKI('Diamond'),null,WIKI('Diamond')],cat:'armor'},
+  {name:'Leather Helmet',img:'Leather_Cap',grid:[WIKI('Leather'),WIKI('Leather'),WIKI('Leather'),WIKI('Leather'),null,WIKI('Leather'),null,null,null],cat:'armor'},
+  {name:'Leather Chestplate',img:'Leather_Tunic',grid:[WIKI('Leather'),null,WIKI('Leather'),WIKI('Leather'),WIKI('Leather'),WIKI('Leather'),WIKI('Leather'),WIKI('Leather'),WIKI('Leather')],cat:'armor'},
+  // Building
+  {name:'Crafting Table',img:'Crafting_Table',grid:[WIKI('Oak_Planks'),WIKI('Oak_Planks'),null,WIKI('Oak_Planks'),WIKI('Oak_Planks'),null,null,null,null],cat:'build'},
+  {name:'Furnace',img:'Furnace',grid:[WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),null,WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone')],cat:'build'},
+  {name:'Blast Furnace',img:'Blast_Furnace',grid:[WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Furnace'),WIKI('Iron_Ingot'),WIKI('Smooth_Stone'),WIKI('Smooth_Stone'),WIKI('Smooth_Stone')],cat:'build'},
+  {name:'Smoker',img:'Smoker',grid:[null,WIKI('Oak_Log'),null,WIKI('Oak_Log'),WIKI('Furnace'),WIKI('Oak_Log'),null,WIKI('Oak_Log'),null],cat:'build'},
+  {name:'Chest',img:'Chest',grid:[WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),null,WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks')],cat:'build'},
+  {name:'Barrel',img:'Barrel',grid:[WIKI('Oak_Planks'),WIKI('Oak_Slab'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),null,WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Slab'),WIKI('Oak_Planks')],cat:'build'},
+  {name:'Hopper',img:'Hopper',grid:[WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Chest'),WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),null],cat:'build'},
+  {name:'Dropper',img:'Dropper',grid:[WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),null,WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Redstone_Dust'),WIKI('Cobblestone')],cat:'build'},
+  {name:'Dispenser',img:'Dispenser',grid:[WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Bow'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Redstone_Dust'),WIKI('Cobblestone')],cat:'build'},
+  {name:'Enchanting Table',img:'Enchanting_Table',grid:[null,WIKI('Book'),null,WIKI('Diamond'),WIKI('Obsidian'),WIKI('Diamond'),WIKI('Obsidian'),WIKI('Obsidian'),WIKI('Obsidian')],cat:'build'},
+  {name:'Anvil',img:'Anvil',grid:[WIKI('Iron_Block'),WIKI('Iron_Block'),WIKI('Iron_Block'),null,WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot')],cat:'build'},
+  {name:'Beacon',img:'Beacon',grid:[WIKI('Glass'),WIKI('Glass'),WIKI('Glass'),WIKI('Glass'),WIKI('Nether_Star'),WIKI('Glass'),WIKI('Obsidian'),WIKI('Obsidian'),WIKI('Obsidian')],cat:'build'},
+  {name:'Bookshelf',img:'Bookshelf',grid:[WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Book'),WIKI('Book'),WIKI('Book'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks')],cat:'build'},
+  {name:'TNT',img:'TNT',grid:[WIKI('Gunpowder'),WIKI('Sand'),WIKI('Gunpowder'),WIKI('Sand'),WIKI('Gunpowder'),WIKI('Sand'),WIKI('Gunpowder'),WIKI('Sand'),WIKI('Gunpowder')],cat:'build'},
+  {name:'Piston',img:'Piston',grid:[WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Cobblestone'),WIKI('Iron_Ingot'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Redstone_Dust'),WIKI('Cobblestone')],cat:'build'},
+  {name:'Sticky Piston',img:'Sticky_Piston',grid:[null,null,null,null,null,null,WIKI('Slimeball'),WIKI('Piston'),null],cat:'build'},
+  {name:'Observer',img:'Observer',grid:[WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Redstone_Dust'),WIKI('Quartz'),WIKI('Redstone_Dust'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone')],cat:'build'},
+  // Redstone
+  {name:'Redstone Torch',img:'Redstone_Torch',grid:[null,WIKI('Redstone_Dust'),null,null,WIKI('Stick'),null,null,null,null],cat:'redstone'},
+  {name:'Lever',img:'Lever',grid:[null,WIKI('Stick'),null,null,WIKI('Cobblestone'),null,null,null,null],cat:'redstone'},
+  {name:'Redstone Repeater',img:'Redstone_Repeater',grid:[WIKI('Redstone_Torch'),WIKI('Redstone_Dust'),WIKI('Redstone_Torch'),WIKI('Stone'),WIKI('Stone'),WIKI('Stone'),null,null,null],cat:'redstone'},
+  {name:'Redstone Comparator',img:'Redstone_Comparator',grid:[null,WIKI('Redstone_Torch'),null,WIKI('Redstone_Torch'),WIKI('Nether_Quartz'),WIKI('Redstone_Torch'),WIKI('Stone'),WIKI('Stone'),WIKI('Stone')],cat:'redstone'},
+  {name:'Redstone Lamp',img:'Redstone_Lamp',grid:[null,WIKI('Redstone_Dust'),null,WIKI('Redstone_Dust'),WIKI('Glowstone'),WIKI('Redstone_Dust'),null,WIKI('Redstone_Dust'),null],cat:'redstone'},
+  {name:'Daylight Detector',img:'Daylight_Detector',grid:[WIKI('Glass'),WIKI('Glass'),WIKI('Glass'),WIKI('Nether_Quartz'),WIKI('Nether_Quartz'),WIKI('Nether_Quartz'),WIKI('Oak_Slab'),WIKI('Oak_Slab'),WIKI('Oak_Slab')],cat:'redstone'},
+  {name:'Tripwire Hook',img:'Tripwire_Hook',grid:[null,WIKI('Iron_Ingot'),null,null,WIKI('Stick'),null,null,WIKI('Oak_Planks'),null],count:2,cat:'redstone'},
+  // Food
+  {name:'Bread',img:'Bread',grid:[null,null,null,WIKI('Wheat'),WIKI('Wheat'),WIKI('Wheat'),null,null,null],cat:'food'},
+  {name:'Cookie',img:'Cookie',grid:[null,null,null,WIKI('Wheat'),WIKI('Cocoa_Beans'),WIKI('Wheat'),null,null,null],count:8,cat:'food'},
+  {name:'Cake',img:'Cake',grid:[WIKI('Milk_Bucket'),WIKI('Milk_Bucket'),WIKI('Milk_Bucket'),WIKI('Sugar'),WIKI('Egg'),WIKI('Sugar'),WIKI('Wheat'),WIKI('Wheat'),WIKI('Wheat')],cat:'food'},
+  {name:'Golden Apple',img:'Golden_Apple',grid:[WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Apple'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot')],cat:'food'},
+  {name:'Pumpkin Pie',img:'Pumpkin_Pie',grid:[null,null,null,WIKI('Pumpkin'),WIKI('Sugar'),WIKI('Egg'),null,null,null],cat:'food'},
+  {name:'Mushroom Stew',img:'Mushroom_Stew',grid:[null,null,null,WIKI('Red_Mushroom'),WIKI('Brown_Mushroom'),null,null,WIKI('Bowl'),null],cat:'food'},
+  // Misc
+  {name:'Book',img:'Book',grid:[null,null,null,WIKI('Paper'),WIKI('Paper'),WIKI('Paper'),WIKI('Leather'),null,null],cat:'misc'},
+  {name:'Bookshelf',img:'Bookshelf',grid:[WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Book'),WIKI('Book'),WIKI('Book'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks')],cat:'misc'},
+  {name:'Map',img:'Map',grid:[WIKI('Paper'),WIKI('Paper'),WIKI('Paper'),WIKI('Paper'),WIKI('Compass'),WIKI('Paper'),WIKI('Paper'),WIKI('Paper'),WIKI('Paper')],cat:'misc'},
+  {name:'Bucket',img:'Bucket',grid:[null,null,null,WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),null],cat:'misc'},
+  {name:'Minecart',img:'Minecart',grid:[null,null,null,WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot')],cat:'misc'},
+  {name:'Rails',img:'Rail',grid:[WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Stick'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot')],count:16,cat:'misc'},
+  {name:'Torch',img:'Torch',grid:[null,WIKI('Coal'),null,null,WIKI('Stick'),null,null,null,null],count:4,cat:'misc'},
+  {name:'Ladder',img:'Ladder',grid:[WIKI('Stick'),null,WIKI('Stick'),WIKI('Stick'),WIKI('Stick'),WIKI('Stick'),WIKI('Stick'),null,WIKI('Stick')],count:3,cat:'misc'},
+  {name:'Glass Pane',img:'Glass_Pane',grid:[null,null,null,WIKI('Glass'),WIKI('Glass'),WIKI('Glass'),WIKI('Glass'),WIKI('Glass'),WIKI('Glass')],count:16,cat:'misc'},
+  {name:'Iron Block',img:'Iron_Block',grid:[WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot')],cat:'misc'},
+  {name:'Gold Block',img:'Gold_Block',grid:[WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot'),WIKI('Gold_Ingot')],cat:'misc'},
+  {name:'Diamond Block',img:'Diamond_Block',grid:[WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond'),WIKI('Diamond')],cat:'misc'},
+];
+
+// ── Mob database ────
+interface MCMob { name: string; img: string; hp: number; atk: number; armor: number; xp: number; spawn: string; drops: string[]; tips: string[]; type: string; }
+const MOBS: MCMob[] = [
+  {name:'Zombie',img:MWIKI('Zombie.png'),hp:20,atk:3,armor:2,xp:5,spawn:'Overworld, dark (light<0)',drops:['Rotten Flesh','Iron Ingot (rare)','Carrot/Potato (rare)'],tips:['Burns in sunlight','Weak to fire and smite enchantment','Can break down doors on Hard'],type:'hostile'},
+  {name:'Skeleton',img:MWIKI('Skeleton.png'),hp:20,atk:2,armor:0,xp:5,spawn:'Overworld, dark',drops:['Bone','Arrow','Bow (rare)'],tips:['Use a shield to block arrows','Melee attack while circling','Burns in sunlight','Spiders can spawn as jockeys'],type:'hostile'},
+  {name:'Creeper',img:MWIKI('Creeper.png'),hp:20,atk:49,armor:0,xp:5,spawn:'Overworld, dark',drops:['Gunpowder','Music Disc (if killed by skeleton)'],tips:['Flint & Steel ignites without triggering','Kill before it starts hissing (1.5s fuse)','Knockback resets fuse','Cats scare creepers'],type:'hostile'},
+  {name:'Spider',img:MWIKI('Spider.png'),hp:16,atk:2,armor:0,xp:5,spawn:'Overworld (neutral in daylight)',drops:['String','Spider Eye'],tips:['Neutral in daylight if not provoked','Cannot walk through 1-block gaps','Climb walls — keep ceiling above you'],type:'neutral'},
+  {name:'Enderman',img:MWIKI('Enderman.png'),hp:40,atk:7,armor:0,xp:5,spawn:'All dimensions',drops:['Ender Pearl (0–1)'],tips:['Do not look at face — neutral otherwise','Water damages them','Pumpkin helmet prevents aggro','Teleports to avoid arrows'],type:'neutral'},
+  {name:'Witch',img:MWIKI('Witch.png'),hp:26,atk:0,armor:0,xp:5,spawn:'Swamp Hut, anywhere at night',drops:['Potion','Sugar','Spider Eye','Glowstone'],tips:['Throws harmful potions','Drinks milk/health potions to recover','Use bow from distance','Fire resistant'],type:'hostile'},
+  {name:'Blaze',img:MWIKI('Blaze.png'),hp:20,atk:6,armor:2,xp:10,spawn:'Nether Fortress',drops:['Blaze Rod (0–2)'],tips:['Snowballs deal 3 damage each','Immune to fire','Shoots 3 fireballs per burst','Blaze rods needed for Eyes of Ender'],type:'hostile'},
+  {name:'Warden',img:MWIKI('Warden.png'),hp:500,atk:30,armor:0,xp:5,spawn:'Deep Dark biome, sculk shrieker',drops:['Sculk Catalyst'],tips:['Strongest hostile mob in the game','Blind — uses sound and vibration','Sneak to reduce vibrations','Best strategy: avoid completely'],type:'hostile'},
+  {name:'Ender Dragon',img:MWIKI('Ender_Dragon.png'),hp:200,atk:6,armor:0,xp:12000,spawn:'The End',drops:['Dragon Egg','Elytra (end city)','12,000 XP'],tips:['Destroy End Crystals on pillars first','Attacks from perched position deal most damage','Dragon Breath can be bottled','Can only be hit when perched or without crystal healing'],type:'boss'},
+  {name:'Wither',img:MWIKI('Wither.png'),hp:300,atk:8,armor:4,xp:50,spawn:'Spawned by player (3 soul sand + 3 wither skeleton skulls)',drops:['Nether Star'],tips:['Immune to fire and lava','Explosive skulls can break blocks','Summon in the Nether or underground to contain blast','Healing is halved on Hard mode'],type:'boss'},
+  {name:'Pig',img:MWIKI('Pig.png'),hp:10,atk:0,armor:0,xp:1,spawn:'Overworld, grassy areas',drops:['Porkchop (1–3)'],tips:['Breed with carrots, beetroot, potatoes','Saddle + carrot on a stick to ride','Lightning strike turns pig into Zombified Piglin'],type:'passive'},
+  {name:'Cow',img:MWIKI('Cow.png'),hp:10,atk:0,armor:0,xp:1,spawn:'Overworld, grassy areas',drops:['Beef (1–3)','Leather (0–2)'],tips:['Right-click with bucket to get milk','Breed with wheat','Milk removes potion effects'],type:'passive'},
+  {name:'Sheep',img:MWIKI('Sheep.png'),hp:8,atk:0,armor:0,xp:1,spawn:'Overworld, grassy areas',drops:['Mutton','Wool'],tips:['Shear for wool without killing','Breed with wheat','Dye sheep before shearing for colored wool'],type:'passive'},
+  {name:'Wolf',img:MWIKI('Wolf.png'),hp:8,atk:4,armor:0,xp:1,spawn:'Forest, Taiga',drops:['—'],tips:['Tame with bones (33% chance each)','Tamed wolf: 20 HP, attacks your targets','Neutral to players — hostile if attacked'],type:'neutral'},
+  {name:'Iron Golem',img:MWIKI('Iron_Golem.png'),hp:100,atk:21,armor:0,xp:0,spawn:'Villages, spawned by player',drops:['Iron Ingot (3–5)','Poppy'],tips:['Craft: 4 iron blocks + pumpkin (T-shape)','Protects villagers from hostile mobs','Rose toss indicates friendship','Player-created golems are always neutral'],type:'neutral'},
+  {name:'Pillager',img:MWIKI('Pillager.png'),hp:24,atk:4,armor:0,xp:5,spawn:'Pillager Outpost, Raids',drops:['Arrow','Crossbow (rare)'],tips:['Killing captain gives Bad Omen effect','Bad Omen triggers raid when entering village','Use shield to block crossbow bolts','Illager Banner from captain'],type:'hostile'},
+  {name:'Phantom',img:MWIKI('Phantom.png'),hp:20,atk:6,armor:0,xp:5,spawn:'Overworld, when player hasnt slept 3+ days',drops:['Phantom Membrane (0–1)'],tips:['Sleep to prevent spawning','Cats scare phantoms away','Attacks from above in swooping dive','Membrane used to repair Elytra'],type:'hostile'},
+  {name:'Elder Guardian',img:MWIKI('Elder_Guardian.png'),hp:80,atk:8,armor:8,xp:10,spawn:'Ocean Monument',drops:['Wet Sponge','Prismarine Shard','Fish'],tips:['Inflicts Mining Fatigue III — drink milk to clear','Only 3 per monument','Use turtle shell helmet for water breathing','Drops sponge needed to drain monuments'],type:'boss'},
+  {name:'Ghast',img:MWIKI('Ghast.png'),hp:10,atk:17,armor:0,xp:5,spawn:'Nether',drops:['Gunpowder','Ghast Tear'],tips:['Deflect fireballs with any melee hit','Only 10 HP — one deflected fireball kills it','Flying mobs — hard to reach in melee','Cry sounds can be heard from far away'],type:'hostile'},
+  {name:'Magma Cube',img:MWIKI('Magma_Cube.png'),hp:16,atk:6,armor:6,xp:4,spawn:'Nether',drops:['Magma Cream (0–1)'],tips:['Splits into smaller cubes when killed','Immune to fire and lava','Jumps to move — time your hits','Large ones have high armor'],type:'hostile'},
+];
+
+// ── Tips database ────
+interface MCTip { text: string; cat: string; }
+const TIPS: MCTip[] = [
+  // Mining
+  {cat:'mine',text:'<strong>Best Y-level for Diamonds:</strong> Y = -58 (1.18+). Strip mine at this level for maximum diamond ore exposure.'},
+  {cat:'mine',text:'<strong>Ancient Debris:</strong> Found at Y = 8–22 in the Nether. Use beds to blow it up safely (beds explode in Nether). Immune to normal explosions.'},
+  {cat:'mine',text:'<strong>Branch Mining:</strong> Dig a main tunnel, then branch off every 3 blocks to maximize ore coverage while minimizing blocks mined.'},
+  {cat:'mine',text:'<strong>Fortune III vs Silk Touch:</strong> Use Fortune III on diamond/emerald/gold ore for up to 4× drops. Use Silk Touch to collect the ore block itself.'},
+  {cat:'mine',text:'<strong>Lava Lakes:</strong> Common at Y = -55 in 1.18+. Carry a Fire Resistance potion or water bucket when deep mining.'},
+  {cat:'mine',text:'<strong>Emeralds:</strong> Only spawn in Mountain biomes. Trade with villagers for renewable emeralds without mining.'},
+  {cat:'mine',text:'<strong>Copper Ore:</strong> Most abundant at Y = 48. Smelt or use Fortune for more ingots.'},
+  {cat:'mine',text:'<strong>Deepslate:</strong> Generates below Y = 0. Deepslate ores give the same drops but are harder to break — use Efficiency V pickaxe.'},
+  // Combat
+  {cat:'combat',text:'<strong>Critical Hits:</strong> Jump and attack at the apex of your jump to deal 150% damage. Look for the star particles.'},
+  {cat:'combat',text:'<strong>Shield Blocking:</strong> Right-click to raise shield. Blocks most projectiles and 100% of melee for 5 seconds. Axes disable shields for 5 seconds on hit.'},
+  {cat:'combat',text:'<strong>Sweeping Edge:</strong> Enchantment that adds area damage to sweeping attacks (left-click while grounded). Great for crowds.'},
+  {cat:'combat',text:'<strong>Potions:</strong> Strength II + Sharpness V sword one-shots most mobs. Speed II lets you chase or escape.'},
+  {cat:'combat',text:'<strong>Lava against Endermen:</strong> Water damages Endermen. They teleport away from it, so place water sources to cut off teleport paths.'},
+  {cat:'combat',text:'<strong>Looting III:</strong> Increases rare mob drops (wither skulls, ender pearls, blaze rods) significantly. Priority enchantment for grinding.'},
+  {cat:'combat',text:'<strong>Respiration + Aqua Affinity:</strong> For underwater combat — full-speed mining and extended breathing.'},
+  {cat:'combat',text:'<strong>Wither Strategy:</strong> Spawn the Wither underground or in the End void area. It cannot fly through 1-block gaps. Beacon + Smite V sword makes it easy.'},
+  // Farming
+  {cat:'farm',text:'<strong>Crop Growth:</strong> Crops grow faster with more light (need ≥9), hydrated farmland (within 4 blocks of water), and random tick speed.'},
+  {cat:'farm',text:'<strong>Bone Meal:</strong> Instantly grows crops and certain plants. Composters turn most plant items into bone meal (7 uses).'},
+  {cat:'farm',text:'<strong>Automatic Farms:</strong> Chickens lay eggs automatically. Use a hopper minecart under a farmland row for auto-harvesting.'},
+  {cat:'farm',text:'<strong>Villager Trading:</strong> Lock favorable trades by curing a Zombie Villager with Weakness + Golden Apple. They become permanent master traders.'},
+  {cat:'farm',text:'<strong>Iron Golem Farm:</strong> Needs 10 villagers, beds, and a job site. Generates 30+ iron per hour on Java.'},
+  {cat:'farm',text:'<strong>Mob Spawning:</strong> Mobs only spawn on opaque blocks in darkness (light ≤0 in 1.18+). Build spawners at Y = 80+ for more surface area.'},
+  {cat:'farm',text:'<strong>Bamboo/Kelp:</strong> Fastest growing plants — good for fuel (bamboo) or XP smelting (kelp → dried kelp). Kelp fully smelts with 1 kelp block.'},
+  {cat:'farm',text:'<strong>Sweet Berries:</strong> Grow in Taiga biomes. Foxes carry them — breed foxes then lead babies away for tamed foxes that pick up items.'},
+  // Building
+  {cat:'build',text:'<strong>Odd vs Even:</strong> Odd-width structures look more natural. 7×7 rooms feel bigger than 6×6 due to a center block.'},
+  {cat:'build',text:'<strong>Depth:</strong> Vary wall depth — add pillars, indent windows, use slabs/stairs for detail. Flat walls look plain.'},
+  {cat:'build',text:'<strong>Terraforming:</strong> Blend builds with landscape — extend hills, add rivers, clear forest patches for clearings.'},
+  {cat:'build',text:'<strong>Lighting:</strong> Use lanterns, sea lanterns, or glowstone under trapdoors/carpet to hide light sources while keeping areas bright.'},
+  {cat:'build',text:'<strong>Color Palettes:</strong> Limit to 3-4 block types per build. Contrast primary material with trim (e.g., Oak + Stone + Dark Oak).'},
+  {cat:'build',text:'<strong>Roofs:</strong> Add stairs on the roof ridge for detail. Dutch gable and mansard roofs add character to larger structures.'},
+  // Survival
+  {cat:'surv',text:'<strong>First Night:</strong> Punch a tree, craft a crafting table, make wood pickaxe, mine stone, make stone tools + furnace. Sleep in a bed ASAP.'},
+  {cat:'surv',text:'<strong>Food Priority:</strong> Cooked meat restores saturation best. Bread from wheat is easiest early. Avoid raw food.'},
+  {cat:'surv',text:'<strong>Nether Portal:</strong> Mine obsidian or use lava + water mold method. Portal can be 4×5 minimum (inside 2×3).'},
+  {cat:'surv',text:'<strong>Ender Eye Route:</strong> Blaze Rods (Nether fortress) → Blaze Powder → Eyes of Ender (with Ender Pearls) → find stronghold → End Portal.'},
+  {cat:'surv',text:'<strong>Elytra:</strong> Found in End City chests after killing Dragon. Use Rockets for horizontal flight. Enchant with Unbreaking III + Mending.'},
+  {cat:'surv',text:'<strong>Beds in The End:</strong> Beds EXPLODE in the End. Use them to destroy End Crystals on towers from a distance.'},
+  {cat:'surv',text:'<strong>Feather Falling IV:</strong> Priority boot enchantment. Reduces fall damage by 48%. Combine with Depth Strider for water movement.'},
+  // Redstone
+  {cat:'red',text:'<strong>Repeater Lock:</strong> Side-powered repeater locks its current output state — great for memory cells and latches.'},
+  {cat:'red',text:'<strong>Comparator Output:</strong> Outputs signal based on container fullness (0-15). Full chest = 15, empty = 0. Use for item sorters.'},
+  {cat:'red',text:'<strong>BUD Switch:</strong> Block Update Detector — triggers when a nearby block updates. Used in complex contraptions.'},
+  {cat:'red',text:'<strong>Observer:</strong> Detects block state changes in front of it. Useful for crop farms, lava/water detectors.'},
+  {cat:'red',text:'<strong>Slime Blocks:</strong> Move adjacent blocks when pushed by a piston. Foundation of flying machines and Elytra launchers.'},
+  {cat:'red',text:'<strong>Item Sorter:</strong> Use hoppers + named items in comparators to sort any item type into chests automatically.'},
+];
+
+// ── Guide rendering ────
+function initGuide() {
+  const contentEl  = document.getElementById('guide-content')!;
+  const searchEl   = document.getElementById('guide-search') as HTMLInputElement;
+  const searchBar  = document.getElementById('guide-search-bar')!;
+  const langSel    = document.getElementById('guide-lang') as HTMLSelectElement;
+  const chatInputEl= document.getElementById('guide-chat-input')!;
+  const aiInputEl  = document.getElementById('ai-input') as HTMLInputElement;
+  const aiSendBtn  = document.getElementById('ai-send') as HTMLButtonElement;
+  let activeTab = 'recipes';
+  let tipCat = 'all';
+
+  langSel.value = guideLang;
+  langSel.addEventListener('change', () => {
+    guideLang = langSel.value;
+    localStorage.setItem('guide_lang', guideLang);
+    updateTabLabels();
+    renderTab();
+  });
+
+  function updateTabLabels() {
+    document.querySelectorAll('.guide-tab').forEach(btn => {
+      const tab = (btn as HTMLElement).dataset.tab || '';
+      const label = btn.querySelector('.gt-label');
+      if (label) label.textContent = t(tab === 'recipes' ? 'crafting' : tab === 'mobs' ? 'mobs' : tab === 'tips' ? 'tips' : 'chat');
+      (btn as HTMLInputElement).placeholder = t('search');
+    });
+    searchEl.placeholder = t('search');
+  }
+
+  // Tab switching
+  document.querySelectorAll<HTMLButtonElement>('.guide-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.guide-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeTab = btn.dataset.tab || 'recipes';
+      searchEl.value = '';
+      searchBar.style.display = activeTab === 'chat' ? 'none' : 'block';
+      chatInputEl.style.display = activeTab === 'chat' ? 'flex' : 'none';
+      renderTab();
+    });
+  });
+
+  searchEl.addEventListener('input', () => renderTab());
+
+  function renderTab() {
+    const q = searchEl.value.toLowerCase().trim();
+    if (activeTab === 'recipes') renderRecipes(q);
+    else if (activeTab === 'mobs') renderMobs(q);
+    else if (activeTab === 'tips') renderTips(q);
+    else renderChat();
+  }
+
+  // ── Recipes tab ────
+  function itemCell(url: string | null, name?: string): string {
+    if (!url) return `<div class="recipe-cell"></div>`;
+    const tip = name ? `<span class="rc-tip">${escHtml(name)}</span>` : '';
+    return `<div class="recipe-cell">${tip}<img src="${url}" alt="" onerror="this.style.display='none'"></div>`;
+  }
+
+  function showRecipeDetail(r: MCRecipe) {
+    const names: Record<string, string> = {};
+    // Map wiki URLs back to readable names
+    r.grid.forEach(url => {
+      if (url) {
+        const n = url.split('Invicon_')[1]?.replace('.png','').replace(/_/g,' ') || '';
+        if (n) names[url] = n;
+      }
+    });
+    const cells = r.grid.map(url => itemCell(url || null, url ? names[url] : undefined)).join('');
+    const ingredients = [...new Set(r.grid.filter(Boolean))].map(url => {
+      const n = url!.split('Invicon_')[1]?.replace('.png','').replace(/_/g,' ') || url;
+      return `<span style="display:inline-flex;align-items:center;gap:4px;background:#1a1a1a;border:1px solid #222;border-radius:5px;padding:2px 7px;font-size:11px;"><img src="${url}" style="width:16px;height:16px;image-rendering:pixelated;" onerror="this.style.display='none'"> ${escHtml(n!)}</span>`;
+    }).join('');
+    contentEl.innerHTML = `
+      <button id="guide-back" style="background:none;border:none;color:#f5a623;font-size:12px;cursor:pointer;padding:0 0 10px;display:flex;align-items:center;gap:4px;">← ${t('crafting')}</button>
+      <div style="font-size:16px;font-weight:700;color:#ffffff;margin-bottom:14px;">${t('recipe_for')} ${escHtml(r.name)}</div>
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+        <div>
+          <div style="font-size:10px;color:#484f58;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">${t('ingredients')}</div>
+          <div class="recipe-grid">${cells}</div>
+        </div>
+        <div style="font-size:24px;color:#484f58;">→</div>
+        <div>
+          <div style="font-size:10px;color:#484f58;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">${t('result')}</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <div class="recipe-cell"><img src="${WIKI(r.img)}" alt="" onerror="this.style.display='none'"></div>
+            ${r.count && r.count > 1 ? `<span style="font-size:11px;color:#f5a623;">×${r.count}</span>` : ''}
+            <span style="font-size:11px;color:#aaaaaa;">${escHtml(r.name)}</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <div style="font-size:10px;color:#484f58;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">${t('ingredients')}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;">${ingredients}</div>
+      </div>`;
+    document.getElementById('guide-back')!.addEventListener('click', () => renderRecipes(searchEl.value.toLowerCase().trim()));
+  }
+
+  function renderRecipes(q: string) {
+    const filtered = RECIPES.filter(r =>
+      !q || r.name.toLowerCase().includes(q) || (r.tags || '').includes(q) || r.cat.includes(q)
+    );
+    if (!filtered.length) { contentEl.innerHTML = `<div style="color:#484f58;text-align:center;padding:30px 0;font-size:13px;">No recipes found for "${escHtml(q)}"</div>`; return; }
+    const frag = document.createDocumentFragment();
+    filtered.forEach(r => {
+      const card = document.createElement('div');
+      card.className = 'recipe-card';
+      card.style.marginBottom = '6px';
+      card.innerHTML = `<img src="${WIKI(r.img)}" alt="${escHtml(r.name)}" onerror="this.style.display='none'"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#ffffff;">${escHtml(r.name)}</div><div style="font-size:10px;color:#484f58;text-transform:uppercase;letter-spacing:0.5px;">${r.cat}</div></div><span style="font-size:11px;color:#484f58;">▶</span>`;
+      card.addEventListener('click', () => showRecipeDetail(r));
+      frag.appendChild(card);
+    });
+    contentEl.innerHTML = '';
+    contentEl.appendChild(frag);
+  }
+
+  // ── Mobs tab ────
+  function statBar(val: number, max: number, color: string): string {
+    const pct = Math.min(100, Math.round((val / max) * 100));
+    return `<div class="stat-bar"><div class="stat-fill" style="width:${pct}%;background:${color};"></div></div>`;
+  }
+
+  function renderMobs(q: string) {
+    const filtered = MOBS.filter(m => !q || m.name.toLowerCase().includes(q) || m.spawn.toLowerCase().includes(q) || m.type.includes(q));
+    if (!filtered.length) { contentEl.innerHTML = `<div style="color:#484f58;text-align:center;padding:30px 0;font-size:13px;">No mobs found</div>`; return; }
+    const typeColors: Record<string, string> = { passive: '#3fb950', neutral: '#f5a623', hostile: '#f85149', boss: '#d2a8ff' };
+    const frag = document.createDocumentFragment();
+    filtered.forEach(m => {
+      const card = document.createElement('div');
+      card.className = 'mob-card';
+      card.style.marginBottom = '8px';
+      const tc = typeColors[m.type] || '#aaaaaa';
+      card.innerHTML = `
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <img src="${m.img}" alt="${escHtml(m.name)}" style="width:52px;height:52px;image-rendering:pixelated;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <span style="font-size:14px;font-weight:700;color:#ffffff;">${escHtml(m.name)}</span>
+              <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${tc}22;color:${tc};border:1px solid ${tc}44;font-weight:600;">${t('type_'+m.type.slice(0,4))}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;">
+              <div><div style="font-size:10px;color:#484f58;">${t('hp')} ${m.hp}</div>${statBar(m.hp, 500, '#3fb950')}</div>
+              <div><div style="font-size:10px;color:#484f58;">${t('atk')} ${m.atk}</div>${statBar(m.atk, 40, '#f85149')}</div>
+              <div><div style="font-size:10px;color:#484f58;">${t('armor')} ${m.armor}</div>${statBar(m.armor, 20, '#58a6ff')}</div>
+              <div><div style="font-size:10px;color:#484f58;">${t('xp')} ${m.xp}</div>${statBar(m.xp, 50, '#f6c356')}</div>
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:#484f58;">${t('spawn')}: <span style="color:#aaaaaa;">${escHtml(m.spawn)}</span></div>
+            <div style="margin-top:4px;font-size:11px;color:#484f58;">${t('drops')}: <span style="color:#aaaaaa;">${m.drops.map(d => escHtml(d)).join(', ')}</span></div>
+            ${m.tips.length ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">${m.tips.map(tip => `<div style="font-size:11px;color:#888888;padding-left:10px;border-left:2px solid #2a2a2a;">💡 ${escHtml(tip)}</div>`).join('')}</div>` : ''}
+          </div>
+        </div>`;
+      frag.appendChild(card);
+    });
+    contentEl.innerHTML = '';
+    contentEl.appendChild(frag);
+  }
+
+  // ── Tips tab ────
+  function renderTips(q: string) {
+    const cats = ['all','mine','combat','farm','build','surv','red'];
+    const catBar = document.createElement('div');
+    catBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;';
+    cats.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'cat-btn' + (tipCat === c ? ' active' : '');
+      btn.textContent = c === 'all' ? t('cat_all') : t('cat_'+c);
+      btn.addEventListener('click', () => { tipCat = c; renderTips(searchEl.value.toLowerCase().trim()); });
+      catBar.appendChild(btn);
+    });
+    const filtered = TIPS.filter(tip =>
+      (tipCat === 'all' || tip.cat === tipCat) &&
+      (!q || tip.text.toLowerCase().includes(q))
+    );
+    contentEl.innerHTML = '';
+    contentEl.appendChild(catBar);
+    if (!filtered.length) { contentEl.insertAdjacentHTML('beforeend', `<div style="color:#484f58;text-align:center;padding:30px 0;font-size:13px;">No tips found</div>`); return; }
+    const frag = document.createDocumentFragment();
+    filtered.forEach(tip => {
+      const card = document.createElement('div');
+      card.className = 'tip-card';
+      card.style.marginBottom = '7px';
+      card.innerHTML = tip.text;
+      frag.appendChild(card);
+    });
+    contentEl.appendChild(frag);
+  }
+
+  // ── AI Chat tab ────
+  const chatHistory: { role: string; content: string }[] = [];
+  let chatBusy = false;
+
+  function addBubble(text: string, isUser: boolean) {
     const div = document.createElement('div');
     div.className = isUser ? 'ai-msg-user' : 'ai-msg-ai';
-    if (isUser) {
-      div.textContent = text;
-    } else {
-      // Render basic markdown: **bold**, `code`, ```blocks```, bullet lists
+    if (isUser) { div.textContent = text; }
+    else {
       div.innerHTML = text
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
-        .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+        .replace(/(<li>[\s\S]*?<\/li>)+/g, m => `<ul>${m}</ul>`)
         .replace(/\n/g, '<br>');
     }
-    msgsEl.appendChild(div);
-    msgsEl.scrollTop = msgsEl.scrollHeight;
-    return div;
+    contentEl.appendChild(div);
+    contentEl.scrollTop = contentEl.scrollHeight;
   }
 
-  async function ask(question: string) {
-    if (busy || !question.trim()) return;
-    busy = true;
-    sendBtn.disabled = true;
-    suggestions.style.display = 'none';
-
-    addBubble(question, true);
-    history.push({ role: 'user', content: question });
-
+  async function sendChat(q: string) {
+    if (chatBusy || !q.trim()) return;
+    chatBusy = true; aiSendBtn.disabled = true;
+    addBubble(q, true);
+    chatHistory.push({ role: 'user', content: q });
     const typing = document.createElement('div');
-    typing.className = 'ai-typing';
-    typing.textContent = 'Thinking…';
-    msgsEl.appendChild(typing);
-    msgsEl.scrollTop = msgsEl.scrollHeight;
-
-    const res = await ai.chat(history);
+    typing.className = 'ai-typing'; typing.textContent = '…';
+    contentEl.appendChild(typing);
+    contentEl.scrollTop = contentEl.scrollHeight;
+    const res = await (window as any).ai?.chat(chatHistory) || { ok: false, error: 'AI not configured' };
     typing.remove();
-
     if (res.ok) {
       addBubble(res.text, false);
-      history.push({ role: 'assistant', content: res.text });
-      // Keep history to last 20 messages to avoid token limits
-      if (history.length > 20) history.splice(0, 2);
+      chatHistory.push({ role: 'assistant', content: res.text });
+      if (chatHistory.length > 20) chatHistory.splice(0, 2);
     } else {
       const err = document.createElement('div');
-      err.style.cssText = 'color:#f85149;font-size:12px;align-self:flex-start;padding:4px 0;';
+      err.style.cssText = 'color:#f85149;font-size:12px;padding:4px 0;';
       err.textContent = `Error: ${res.error}`;
-      msgsEl.appendChild(err);
+      contentEl.appendChild(err);
     }
-
-    busy = false;
-    sendBtn.disabled = false;
-    inputEl.focus();
+    chatBusy = false; aiSendBtn.disabled = false;
+    aiInputEl.focus();
   }
 
-  // Suggested question chips
-  suggestions.querySelectorAll<HTMLButtonElement>('.ai-chip').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const q = btn.dataset.q || btn.textContent || '';
-      ask(q);
-    });
-  });
+  function renderChat() {
+    if (contentEl.children.length === 0) {
+      addBubble('Ask me anything about Minecraft — crafting, commands, biomes, mobs, strategies, or Voxel Client features!', false);
+    }
+  }
 
-  sendBtn.addEventListener('click', () => { ask(inputEl.value.trim()); inputEl.value = ''; });
-  inputEl.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(inputEl.value.trim()); inputEl.value = ''; }
-  });
+  aiSendBtn.addEventListener('click', () => { const q = aiInputEl.value.trim(); if (q) { aiInputEl.value = ''; sendChat(q); } });
+  aiInputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const q = aiInputEl.value.trim(); if (q) { aiInputEl.value = ''; sendChat(q); } } });
 
-  // Welcome message
-  addBubble('Hi! I\'m your Voxel Client AI assistant powered by Claude.\n\nAsk me anything about **Minecraft** (crafting, commands, mechanics, biomes) or **Voxel Client** (mods, servers, voice chat, cosmetics).\n\nTry one of the quick questions above, or type your own!', false);
+  updateTabLabels();
+  renderRecipes('');
 }
 
