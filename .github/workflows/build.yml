@@ -32,18 +32,10 @@ jobs:
         run: |
           $key = "${{ secrets.GROQ_API_KEY }}"
           $path = Join-Path $PWD "src/main/ai-key.ts"
-          [System.IO.File]::WriteAllText($path, "export const GEMINI_KEY = '$key';", [System.Text.Encoding]::UTF8)
+          $enc = New-Object System.Text.UTF8Encoding $false
+          [System.IO.File]::WriteAllText($path, "export const GEMINI_KEY = '$key';", $enc)
       - run: npm ci
-      - name: Build
-        shell: pwsh
-        run: npm run build
-      - name: Package
-        shell: pwsh
-        run: npx electron-builder --win --publish never
-      - name: Debug release output
-        shell: pwsh
-        run: |
-          if (Test-Path release) { Get-ChildItem release -Recurse | Select-Object FullName } else { Write-Host "ERROR: release/ directory missing" }
+      - run: npm run build && npx electron-builder --win --publish never
       - name: Collect artifacts
         shell: pwsh
         run: |
@@ -54,7 +46,7 @@ jobs:
         with:
           name: release-windows
           path: dist-artifacts/
-          if-no-files-found: warn
+          if-no-files-found: error
 
   build-linux:
     runs-on: ubuntu-latest
