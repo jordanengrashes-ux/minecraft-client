@@ -282,6 +282,31 @@
     .wardrobe-card img { width:48px;height:48px;image-rendering:pixelated;border-radius:4px; }
     .wardrobe-card span { font-size:10px;color:#aaaaaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;padding:0 4px; }
     .chat-msg-avatar { width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;color:#ffffff;overflow:hidden; }
+    /* AI sessions */
+    #ai-session-bar { display:flex;align-items:center;gap:3px;padding:4px 8px;border-bottom:1px solid #1a1a1a;background:#060606;flex-shrink:0;overflow-x:auto;scrollbar-width:none; }
+    #ai-session-bar::-webkit-scrollbar { display:none; }
+    .ai-stab { background:none;border:1px solid transparent;border-radius:5px;color:#484f58;font-size:10px;cursor:pointer;padding:3px 9px;white-space:nowrap;font-family:inherit;display:flex;align-items:center;gap:5px;max-width:110px; }
+    .ai-stab:hover { color:#8b949e;border-color:#1e1e1e; }
+    .ai-stab.active { color:#e6edf3;background:#111111;border-color:#2a2a2a; }
+    .ai-stab .ai-stab-x { color:#484f58;font-size:9px;line-height:1;padding:0 1px;margin-left:1px;flex-shrink:0; }
+    .ai-stab .ai-stab-x:hover { color:#f85149; }
+    .ai-stab-name { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:72px; }
+    #ai-new-session { background:none;border:none;color:#484f58;font-size:14px;cursor:pointer;padding:2px 5px;line-height:1;flex-shrink:0; }
+    #ai-new-session:hover { color:#e6edf3; }
+    #ai-search-web-badge { display:none;align-items:center;gap:4px;font-size:10px;color:#484f58;padding:2px 7px;border:1px solid #1e1e1e;border-radius:10px;flex-shrink:0;margin-left:auto; }
+    #ai-search-web-badge.on { color:#d4810a;border-color:rgba(212,129,10,0.35); }
+    /* Feedback */
+    #feedback-btn { background:none;border:none;color:#484f58;font-size:10px;cursor:pointer;padding:4px 8px;font-family:inherit;letter-spacing:0.5px;text-transform:uppercase;font-weight:600;width:100%;text-align:left; }
+    #feedback-btn:hover { color:#d4810a; }
+    #feedback-modal { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:800;align-items:center;justify-content:center; }
+    #admin-feedback-panel { display:none;flex-direction:column;overflow:hidden;max-height:260px; }
+    .feedback-item { background:#0d0d0d;border:1px solid #1e1e1e;border-radius:6px;padding:9px 12px;margin-bottom:5px;display:flex;gap:8px;align-items:flex-start; }
+    .feedback-item-body { flex:1;min-width:0; }
+    .feedback-item-del { background:none;border:none;color:#484f58;cursor:pointer;font-size:12px;flex-shrink:0;padding:0; }
+    .feedback-item-del:hover { color:#f85149; }
+    .feedback-cat-chip { display:inline-block;background:rgba(212,129,10,0.12);border:1px solid rgba(212,129,10,0.3);color:#d4810a;font-size:9px;font-weight:700;border-radius:3px;padding:0 5px;line-height:14px;margin-right:5px;vertical-align:middle;text-transform:uppercase;letter-spacing:0.5px; }
+    #chat-claim-admin { display:none;background:rgba(212,129,10,0.12);border:1px solid rgba(212,129,10,0.3);border-radius:6px;padding:4px 14px;color:#d4810a;font-size:12px;cursor:pointer;font-family:inherit; }
+    #chat-claim-admin:hover { background:rgba(212,129,10,0.2); }
   </style>
 </head>
 <body>
@@ -333,6 +358,7 @@
       <div class="nav-item" id="nav-settings">Settings</div>
       </div>
       <div id="sidebar-bottom">
+        <button id="feedback-btn">+ Suggest a Feature</button>
         <div id="app-version" style="font-size:11px;color:#444444;text-align:center;margin-bottom:6px;letter-spacing:0.5px;font-family:monospace;"></div>
         <div id="token-badge"><span id="token-count">0</span> Tokens</div>
         <div id="user-chip">
@@ -1185,9 +1211,22 @@
         <button id="chat-mute-btn" style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:6px;padding:4px 12px;color:#ffffff;font-size:12px;cursor:pointer;">Mute</button>
         <button id="chat-hangup-btn" style="background:#c11e1e;border:1px solid #f85149;border-radius:6px;padding:4px 12px;color:#ffffff;font-size:12px;cursor:pointer;margin-left:6px;">✕ Leave</button>
       </div>
+      <div id="chat-claim-admin-bar" style="display:none;padding:6px 24px;background:#0a0a0a;border-bottom:1px solid #1e1e1e;flex-shrink:0;">
+        <button id="chat-claim-admin">Claim Admin (first setup only)</button>
+      </div>
       <div id="chat-admin-bar">
         <span style="font-size:10px;color:#8b949e;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Admin</span>
         <button id="chat-announce-btn" style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:6px;padding:4px 14px;color:#aaaaaa;font-size:12px;cursor:pointer;">Announce</button>
+        <button id="chat-feedback-view-btn" style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:6px;padding:4px 14px;color:#aaaaaa;font-size:12px;cursor:pointer;margin-left:auto;">Feedback <span id="feedback-count-badge" style="display:none;background:rgba(212,129,10,0.2);border:1px solid rgba(212,129,10,0.4);color:#d4810a;font-size:9px;font-weight:700;border-radius:8px;padding:0 5px;line-height:14px;margin-left:4px;vertical-align:middle;"></span></button>
+      </div>
+      <!-- Admin feedback panel (slides in below admin bar) -->
+      <div id="admin-feedback-panel">
+        <div style="display:flex;align-items:center;padding:6px 14px;border-bottom:1px solid #141414;background:#060606;flex-shrink:0;gap:8px;">
+          <span style="font-size:10px;color:#d4810a;font-weight:700;letter-spacing:1px;text-transform:uppercase;flex:1;">User Feedback</span>
+          <button id="admin-feedback-clear-read" style="background:none;border:none;color:#484f58;font-size:10px;cursor:pointer;font-family:inherit;">Clear all</button>
+          <button id="admin-feedback-close" style="background:none;border:none;color:#484f58;font-size:12px;cursor:pointer;font-family:inherit;">✕</button>
+        </div>
+        <div id="admin-feedback-list" style="overflow-y:auto;padding:8px 12px;scrollbar-width:thin;scrollbar-color:#1e1e1e transparent;flex:1;"></div>
       </div>
       <div style="display:flex;flex:1;overflow:hidden;">
         <!-- Online users -->
@@ -1239,12 +1278,18 @@
         <input id="guide-search" type="text" placeholder="Search…"
           style="width:100%;background:#0d0d0d;border:1px solid #222222;border-radius:5px;padding:6px 10px;color:#ffffff;font-size:12px;outline:none;font-family:inherit;" />
       </div>
+      <!-- AI session tab bar (chat tab only) -->
+      <div id="ai-session-bar" style="display:none;">
+        <button id="ai-new-session" title="New chat">+</button>
+      </div>
       <!-- Content -->
       <div id="guide-content" style="flex:1;overflow-y:auto;padding:10px 12px;scrollbar-width:thin;scrollbar-color:#222222 transparent;"></div>
       <!-- Chat input -->
       <div id="guide-chat-input" style="display:none;padding:8px 10px;border-top:1px solid #1e1e1e;background:#080808;flex-shrink:0;display:none;gap:6px;align-items:center;">
         <input id="ai-input" type="text" maxlength="500" placeholder="Ask anything about Minecraft…"
           style="flex:1;background:#0d0d0d;border:1px solid #222222;border-radius:5px;padding:7px 10px;color:#ffffff;font-size:12px;outline:none;font-family:inherit;" />
+        <div id="ai-search-web-badge" title="Web search active">Web</div>
+        <button id="ai-refresh-chat" title="Clear this chat" style="background:none;border:none;color:#484f58;font-size:12px;cursor:pointer;padding:4px 6px;font-family:inherit;">Clear</button>
         <button id="ai-send" style="background:#1e1e1e;border:1px solid #333333;border-radius:5px;padding:7px 14px;color:#ffffff;font-size:12px;cursor:pointer;white-space:nowrap;">Send</button>
       </div>
     </div>
@@ -1257,6 +1302,26 @@
     <div style="display:flex;gap:8px;">
       <button id="chat-answer-btn" style="flex:1;background:#238636;border:1px solid #2ea043;border-radius:6px;padding:7px 0;color:#ffffff;font-size:12px;cursor:pointer;font-weight:600;">Answer</button>
       <button id="chat-decline-btn" style="flex:1;background:#c11e1e;border:1px solid #f85149;border-radius:6px;padding:7px 0;color:#ffffff;font-size:12px;cursor:pointer;">Decline</button>
+    </div>
+  </div>
+
+  <!-- Feedback modal -->
+  <div id="feedback-modal">
+    <div class="chat-modal-box" style="max-width:400px;">
+      <div style="font-size:14px;font-weight:700;color:#ffffff;margin-bottom:4px;">Suggest a Feature</div>
+      <div style="font-size:12px;color:#6e7681;margin-bottom:16px;">Your suggestion goes straight to the developer.</div>
+      <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="feedback-cat" data-cat="feature" style="padding:4px 11px;background:#111111;border:1px solid #2a2a2a;border-radius:4px;color:#8b949e;font-size:11px;cursor:pointer;font-family:inherit;">Feature</button>
+        <button class="feedback-cat" data-cat="bug" style="padding:4px 11px;background:#111111;border:1px solid #2a2a2a;border-radius:4px;color:#8b949e;font-size:11px;cursor:pointer;font-family:inherit;">Bug</button>
+        <button class="feedback-cat" data-cat="ai" style="padding:4px 11px;background:#111111;border:1px solid #2a2a2a;border-radius:4px;color:#8b949e;font-size:11px;cursor:pointer;font-family:inherit;">AI / Guide</button>
+        <button class="feedback-cat" data-cat="other" style="padding:4px 11px;background:#111111;border:1px solid #2a2a2a;border-radius:4px;color:#8b949e;font-size:11px;cursor:pointer;font-family:inherit;">Other</button>
+      </div>
+      <textarea id="feedback-text" maxlength="600" placeholder="Describe your idea or issue…"
+        style="width:100%;height:100px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:7px;color:#ffffff;font-size:12px;padding:9px 11px;outline:none;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+        <button id="feedback-cancel" style="padding:7px 18px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:7px;color:#aaaaaa;font-size:13px;cursor:pointer;">Cancel</button>
+        <button id="feedback-submit" style="padding:7px 20px;background:#d4810a;border:none;border-radius:7px;color:#ffffff;font-size:13px;cursor:pointer;font-weight:600;">Submit</button>
+      </div>
     </div>
   </div>
 

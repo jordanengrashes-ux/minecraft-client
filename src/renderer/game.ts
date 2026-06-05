@@ -3804,12 +3804,68 @@ function initChat() {
   // Track last known online val so admin/user list can re-render on either change
   let lastOnlineVal: Record<string, any> = {};
 
-  // Admin list subscription
+  // Admin list subscription + first-time bootstrap
+  const claimBar  = document.getElementById('chat-claim-admin-bar')!;
+  const claimBtn  = document.getElementById('chat-claim-admin') as HTMLButtonElement;
   onValue(ref(rtdb, 'voxel_admins'), adminSnap => {
     const adminVal = adminSnap.val() || {};
     adminList = new Set(Object.keys(adminVal));
     document.getElementById('chat-admin-bar')!.style.display = adminList.has(myName) ? 'flex' : 'none';
+    // Show bootstrap button only if no admins exist yet and user is logged in
+    const noAdmins = Object.keys(adminVal).length === 0;
+    claimBar.style.display = (noAdmins && myName && !myName.startsWith('Guest_')) ? 'block' : 'none';
     renderChatUsers(lastOnlineVal, usersEl);
+  });
+  claimBtn.addEventListener('click', async () => {
+    if (!myName || myName.startsWith('Guest_')) return;
+    await set(ref(rtdb, `voxel_admins/${myName}`), true).catch(() => {});
+    claimBar.style.display = 'none';
+  });
+
+  // ── Feedback system ────
+  const feedbackViewBtn   = document.getElementById('chat-feedback-view-btn') as HTMLButtonElement;
+  const feedbackPanel     = document.getElementById('admin-feedback-panel')!;
+  const feedbackList      = document.getElementById('admin-feedback-list')!;
+  const feedbackCloseBtn  = document.getElementById('admin-feedback-close') as HTMLButtonElement;
+  const feedbackClearBtn  = document.getElementById('admin-feedback-clear-read') as HTMLButtonElement;
+  const feedbackCountBadge= document.getElementById('feedback-count-badge')!;
+
+  let feedbackOpen = false;
+  feedbackViewBtn.addEventListener('click', () => {
+    feedbackOpen = !feedbackOpen;
+    feedbackPanel.style.display = feedbackOpen ? 'flex' : 'none';
+  });
+  feedbackCloseBtn.addEventListener('click', () => { feedbackOpen = false; feedbackPanel.style.display = 'none'; });
+  feedbackClearBtn.addEventListener('click', async () => {
+    const snap = await get(ref(rtdb, 'voxel_feedback')).catch(() => null);
+    if (!snap?.exists()) return;
+    const updates: Record<string, null> = {};
+    Object.keys(snap.val()).forEach(k => { updates[`voxel_feedback/${k}`] = null; });
+    await update(ref(rtdb, '/'), updates).catch(() => {});
+  });
+
+  // Subscribe to feedback (admin only — panel rendered when admin bar visible)
+  onValue(ref(rtdb, 'voxel_feedback'), snap => {
+    const val = snap.val() || {};
+    const items = Object.entries(val).sort((a: any, b: any) => b[1].ts - a[1].ts);
+    feedbackCountBadge.textContent = String(items.length);
+    feedbackCountBadge.style.display = items.length > 0 ? 'inline' : 'none';
+    feedbackList.innerHTML = '';
+    if (items.length === 0) {
+      feedbackList.innerHTML = '<div style="color:#484f58;font-size:12px;text-align:center;padding:16px 0;">No feedback yet.</div>';
+      return;
+    }
+    items.forEach(([id, fb]: [string, any]) => {
+      const d = document.createElement('div');
+      d.className = 'feedback-item';
+      const ago = Math.round((Date.now() - fb.ts) / 60000);
+      const timeStr = ago < 60 ? `${ago}m ago` : ago < 1440 ? `${Math.round(ago/60)}h ago` : `${Math.round(ago/1440)}d ago`;
+      d.innerHTML = `<div class="feedback-item-body"><span class="feedback-cat-chip">${fb.category || 'other'}</span><span style="color:#e6edf3;font-size:12px;">${fb.text.replace(/</g,'&lt;')}</span><div style="font-size:10px;color:#484f58;margin-top:4px;">${fb.user} · ${timeStr}</div></div><button class="feedback-item-del" title="Delete">✕</button>`;
+      d.querySelector<HTMLButtonElement>('.feedback-item-del')!.addEventListener('click', () => {
+        remove(ref(rtdb, `voxel_feedback/${id}`)).catch(() => {});
+      });
+      feedbackList.appendChild(d);
+    });
   });
 
   // Timeout subscription for myself
@@ -3944,6 +4000,49 @@ function initChat() {
   // Notification permission
   if (Notification.permission === 'default') Notification.requestPermission().catch(() => {});
 }
+
+// ── Global Feedback modal ──────────────────────────────────────────────────────
+(function initFeedback() {
+  const modal       = document.getElementById('feedback-modal')!;
+  const textEl      = document.getElementById('feedback-text') as HTMLTextAreaElement;
+  const submitBtn   = document.getElementById('feedback-submit') as HTMLButtonElement;
+  const cancelBtn   = document.getElementById('feedback-cancel') as HTMLButtonElement;
+  const openBtn     = document.getElementById('feedback-btn') as HTMLButtonElement;
+  let selectedCat   = 'feature';
+
+  document.querySelectorAll<HTMLButtonElement>('.feedback-cat').forEach(btn => {
+    if (btn.dataset.cat === 'feature') btn.style.cssText += ';border-color:#d4810a;color:#d4810a;';
+    btn.addEventListener('click', () => {
+      selectedCat = btn.dataset.cat || 'feature';
+      document.querySelectorAll<HTMLButtonElement>('.feedback-cat').forEach(b => {
+        b.style.borderColor = '#2a2a2a'; b.style.color = '#8b949e';
+      });
+      btn.style.borderColor = '#d4810a'; btn.style.color = '#d4810a';
+    });
+  });
+
+  openBtn.addEventListener('click', () => { textEl.value = ''; modal.style.display = 'flex'; textEl.focus(); });
+  cancelBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+  modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+
+  submitBtn.addEventListener('click', async () => {
+    const text = textEl.value.trim();
+    if (!text) return;
+    submitBtn.disabled = true; submitBtn.textContent = 'Sending…';
+    const user = (document.getElementById('mc-ign') as HTMLElement | null)?.textContent?.trim() ||
+                 (document.getElementById('offline-username') as HTMLInputElement | null)?.value?.trim() ||
+                 localStorage.getItem('voxel_guest_name') || 'Anonymous';
+    await push(ref(rtdb, 'voxel_feedback'), { user, text, category: selectedCat, ts: Date.now() }).catch(() => {});
+    submitBtn.disabled = false; submitBtn.textContent = 'Submit';
+    modal.style.display = 'none';
+    // Brief success toast
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:70px;right:24px;background:#238636;border:1px solid #2ea043;color:#fff;font-size:12px;border-radius:7px;padding:8px 16px;z-index:900;';
+    toast.textContent = 'Feedback sent!';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+  });
+})();
 
 navChat.addEventListener('click', () => {
   chatUnread = 0;
@@ -4392,6 +4491,11 @@ function initGuide() {
   }
 
   // Tab switching
+  const sessionBar  = document.getElementById('ai-session-bar')!;
+  const newSessBtn  = document.getElementById('ai-new-session') as HTMLButtonElement;
+  const refreshBtn  = document.getElementById('ai-refresh-chat') as HTMLButtonElement;
+  const webBadge    = document.getElementById('ai-search-web-badge')!;
+
   document.querySelectorAll<HTMLButtonElement>('.guide-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.guide-tab').forEach(b => b.classList.remove('active'));
@@ -4400,6 +4504,7 @@ function initGuide() {
       searchEl.value = '';
       searchBar.style.display = activeTab === 'chat' ? 'none' : 'block';
       chatInputEl.style.display = activeTab === 'chat' ? 'flex' : 'none';
+      sessionBar.style.display = activeTab === 'chat' ? 'flex' : 'none';
       renderTab();
     });
   });
@@ -4549,9 +4654,69 @@ function initGuide() {
     contentEl.appendChild(frag);
   }
 
-  // ── AI Chat tab ────
-  const chatHistory: { role: string; content: string }[] = [];
+  // ── AI Chat — multi-session ────
+  interface AiSession { id: string; name: string; history: { role: string; content: string }[]; }
+  const sessions: AiSession[] = [{ id: 's1', name: 'Chat 1', history: [] }];
+  let activeSessId = 's1';
   let chatBusy = false;
+  let sessCounter = 1;
+
+  function currentSess(): AiSession { return sessions.find(s => s.id === activeSessId)!; }
+
+  function renderSessionTabs() {
+    // Remove all tab buttons (keep the + button)
+    sessionBar.querySelectorAll('.ai-stab').forEach(el => el.remove());
+    sessions.forEach(sess => {
+      const tab = document.createElement('button');
+      tab.className = 'ai-stab' + (sess.id === activeSessId ? ' active' : '');
+      tab.innerHTML = `<span class="ai-stab-name">${sess.name}</span>` +
+        (sessions.length > 1 ? `<span class="ai-stab-x" data-del="${sess.id}">✕</span>` : '');
+      tab.addEventListener('click', e => {
+        const del = (e.target as HTMLElement).dataset.del;
+        if (del) { deleteSession(del); return; }
+        switchSession(sess.id);
+      });
+      sessionBar.insertBefore(tab, newSessBtn);
+    });
+  }
+
+  function switchSession(id: string) {
+    activeSessId = id;
+    renderSessionTabs();
+    contentEl.innerHTML = '';
+    const sess = currentSess();
+    if (sess.history.length === 0) {
+      addBubble('Ask me anything about Minecraft — crafting, commands, biomes, mobs, strategies, or Voxel Client features!', false);
+    } else {
+      // Replay messages
+      for (let i = 0; i < sess.history.length; i++) {
+        addBubble(sess.history[i].content, sess.history[i].role === 'user');
+      }
+    }
+  }
+
+  function deleteSession(id: string) {
+    const idx = sessions.findIndex(s => s.id === id);
+    if (idx === -1) return;
+    sessions.splice(idx, 1);
+    if (sessions.length === 0) { sessCounter++; sessions.push({ id: `s${sessCounter}`, name: `Chat ${sessCounter}`, history: [] }); }
+    if (activeSessId === id) activeSessId = sessions[Math.min(idx, sessions.length - 1)].id;
+    switchSession(activeSessId);
+  }
+
+  newSessBtn.addEventListener('click', () => {
+    sessCounter++;
+    const id = `s${sessCounter}`;
+    sessions.push({ id, name: `Chat ${sessCounter}`, history: [] });
+    activeSessId = id;
+    switchSession(id);
+  });
+
+  refreshBtn.addEventListener('click', () => {
+    currentSess().history = [];
+    contentEl.innerHTML = '';
+    addBubble('Ask me anything about Minecraft — crafting, commands, biomes, mobs, strategies, or Voxel Client features!', false);
+  });
 
   function addBubble(text: string, isUser: boolean) {
     const div = document.createElement('div');
@@ -4571,21 +4736,45 @@ function initGuide() {
     contentEl.scrollTop = contentEl.scrollHeight;
   }
 
+  async function fetchWebContext(q: string): Promise<string> {
+    try {
+      const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json&no_html=1&skip_disambig=1`;
+      const res = await fetch(url);
+      const json = await res.json();
+      const snippet = json.AbstractText || json.Answer || '';
+      if (snippet && snippet.length > 20) {
+        webBadge.classList.add('on');
+        webBadge.style.display = 'flex';
+        setTimeout(() => { webBadge.classList.remove('on'); webBadge.style.display = 'none'; }, 4000);
+        return `[Web context: ${snippet}]\n\n`;
+      }
+    } catch { /* ignore */ }
+    return '';
+  }
+
   async function sendChat(q: string) {
     if (chatBusy || !q.trim()) return;
     chatBusy = true; aiSendBtn.disabled = true;
     addBubble(q, true);
-    chatHistory.push({ role: 'user', content: q });
+    const sess = currentSess();
+    // Inject web context for factual-looking queries
+    let webCtx = '';
+    if (/what|how|when|where|which|who|latest|new|update/i.test(q)) {
+      webCtx = await fetchWebContext(q);
+    }
+    const msgToSend = webCtx ? `${webCtx}${q}` : q;
+    sess.history.push({ role: 'user', content: msgToSend });
     const typing = document.createElement('div');
     typing.className = 'ai-typing'; typing.textContent = '…';
     contentEl.appendChild(typing);
     contentEl.scrollTop = contentEl.scrollHeight;
-    const res = await (window as any).ai?.chat(chatHistory) || { ok: false, error: 'AI not configured' };
+    const res = await (window as any).ai?.chat(sess.history) || { ok: false, error: 'AI not configured' };
     typing.remove();
     if (res.ok) {
       addBubble(res.text, false);
-      chatHistory.push({ role: 'assistant', content: res.text });
-      if (chatHistory.length > 20) chatHistory.splice(0, 2);
+      sess.history.push({ role: 'assistant', content: res.text });
+      // Keep last 30 messages (15 exchanges) per session
+      if (sess.history.length > 30) sess.history.splice(0, 2);
     } else {
       const err = document.createElement('div');
       err.style.cssText = 'color:#f85149;font-size:12px;padding:4px 0;';
@@ -4597,9 +4786,11 @@ function initGuide() {
   }
 
   function renderChat() {
-    if (contentEl.children.length === 0) {
+    if (sessions.length === 1 && sessions[0].history.length === 0) {
+      contentEl.innerHTML = '';
       addBubble('Ask me anything about Minecraft — crafting, commands, biomes, mobs, strategies, or Voxel Client features!', false);
     }
+    renderSessionTabs();
   }
 
   aiSendBtn.addEventListener('click', () => { const q = aiInputEl.value.trim(); if (q) { aiInputEl.value = ''; sendChat(q); } });
