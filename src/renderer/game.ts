@@ -2337,7 +2337,7 @@ function renderFriendsList(uid: string, data: Record<string, any>) {
     card.className = 'friend-card';
     card.dataset.fuid = fuid;
     card.innerHTML = `
-      <div class="friend-avatar">🧑</div>
+      <div class="friend-avatar"></div>
       <div class="friend-dot" id="fdot-${fuid}"></div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;color:#e6edf3;">${info.name || fuid}</div>
@@ -2389,7 +2389,7 @@ function renderFriendRequests(uid: string, data: Record<string, any>) {
     const card = document.createElement('div');
     card.className = 'req-card';
     card.innerHTML = `
-      <div class="friend-avatar" style="font-size:16px;">🧑</div>
+      <div class="friend-avatar"></div>
       <div style="flex:1;font-size:13px;color:#e6edf3;font-weight:500;">${info.name || fromUid}</div>
       <button class="req-accept" style="padding:5px 12px;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.4);border-radius:6px;color:#f5a623;font-size:12px;cursor:pointer;font-weight:600;">Accept</button>
       <button class="req-decline" style="padding:5px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#484f58;font-size:12px;cursor:pointer;margin-left:6px;">Decline</button>`;
@@ -3522,7 +3522,7 @@ function appendChatMessage(m: { user: string; text: string; ts: number; type?: s
     const div = document.createElement('div');
     div.className = 'chat-announcement';
     div.innerHTML =
-      `<span style="font-size:10px;color:#f56423;font-weight:800;letter-spacing:0.5px;">📢 ANNOUNCEMENT</span>` +
+      `<span style="font-size:10px;color:#8b949e;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Announcement</span>` +
       `<div style="color:#ffffff;font-size:13px;margin-top:5px;word-break:break-word;">${escHtml(m.text)}</div>` +
       `<span style="font-size:10px;color:#484f58;margin-top:4px;display:block;">— ${escHtml(m.user)} · ${time}</span>`;
     container.appendChild(div);
@@ -3675,7 +3675,7 @@ async function joinVoiceChannel() {
     const toast = document.createElement('div');
     toast.id = 'mic-blocked-toast';
     toast.style.cssText = 'position:fixed;bottom:80px;right:24px;background:#141414;border:1px solid rgba(248,81,73,0.5);border-radius:10px;padding:14px 18px;z-index:9999;max-width:280px;font-family:inherit;box-shadow:0 8px 32px rgba(0,0,0,0.7);';
-    toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:6px;">🎙 Microphone blocked</div>
+    toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:6px;">Microphone blocked</div>
       <div style="color:#f6c356;font-size:11px;font-family:monospace;background:#0d0d0d;border-radius:5px;padding:6px 8px;margin-bottom:8px;">${reason}</div>
       <div style="color:#aaaaaa;font-size:11px;line-height:1.6;margin-bottom:10px;">If you just enabled it in Windows Settings,<br><strong style="color:#ffffff;">you must restart the app</strong> for it to take effect.</div>
       <div style="display:flex;gap:8px;">
@@ -3768,7 +3768,7 @@ function leaveVoiceChannel() {
   groomStream?.getTracks().forEach(t => t.stop());
   groomStream = null;
   groomMuted = false;
-  document.getElementById('chat-mute-btn')!.textContent = '🎙 Mute';
+  document.getElementById('chat-mute-btn')!.textContent = 'Mute';
   updateVoiceBar();
 }
 
@@ -3783,7 +3783,7 @@ function initChat() {
   const countEl   = document.getElementById('chat-online-count')!;
 
   // Notification toggle
-  const syncNotifBtn = () => { notifBtn.textContent = chatNotifEnabled ? '🔔 On' : '🔕 Off'; };
+  const syncNotifBtn = () => { notifBtn.textContent = chatNotifEnabled ? 'Notif: On' : 'Notif: Off'; };
   syncNotifBtn();
   notifBtn.addEventListener('click', () => {
     chatNotifEnabled = !chatNotifEnabled;
@@ -3865,7 +3865,7 @@ function initChat() {
         chatUnread++;
         updateChatBadge();
         if (Notification.permission === 'granted') {
-          const title = m.type === 'announcement' ? '📢 Announcement' : m.user;
+          const title = m.type === 'announcement' ? 'Announcement' : m.user;
           new Notification(title, { body: m.text });
         }
       }
@@ -3894,7 +3894,7 @@ function initChat() {
     groomMuted = !groomMuted;
     groomStream?.getAudioTracks().forEach(t => { t.enabled = !groomMuted; });
     const btn = document.getElementById('chat-mute-btn')!;
-    btn.textContent = groomMuted ? '🔇 Unmute' : '🎙 Mute';
+    btn.textContent = groomMuted ? 'Unmute' : 'Mute';
     btn.style.borderColor = groomMuted ? '#f85149' : '#2a2a2a';
   });
   document.getElementById('chat-hangup-btn')!.addEventListener('click', () => leaveVoiceChannel());
@@ -4294,7 +4294,7 @@ function initGuide() {
             </div>
             <div style="margin-top:8px;font-size:11px;color:#484f58;">${t('spawn')}: <span style="color:#aaaaaa;">${escHtml(m.spawn)}</span></div>
             <div style="margin-top:4px;font-size:11px;color:#484f58;">${t('drops')}: <span style="color:#aaaaaa;">${m.drops.map(d => escHtml(d)).join(', ')}</span></div>
-            ${m.tips.length ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">${m.tips.map(tip => `<div style="font-size:11px;color:#888888;padding-left:10px;border-left:2px solid #2a2a2a;">💡 ${escHtml(tip)}</div>`).join('')}</div>` : ''}
+            ${m.tips.length ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">${m.tips.map(tip => `<div style="font-size:11px;color:#8b949e;padding-left:10px;border-left:2px solid #21262d;">${escHtml(tip)}</div>`).join('')}</div>` : ''}
           </div>
         </div>`;
       frag.appendChild(card);
