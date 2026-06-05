@@ -3339,8 +3339,13 @@ if (updater) {
     updateText.textContent = `Update ready — installing in ${secs}s`;
     const cd = setInterval(() => {
       secs--;
-      if (secs <= 0) { clearInterval(cd); updateText.textContent = 'Installing update…'; }
-      else updateText.textContent = `Update ready — installing in ${secs}s`;
+      if (secs <= 0) {
+        clearInterval(cd);
+        updateText.textContent = 'Installing update…';
+        updater.install();
+      } else {
+        updateText.textContent = `Update ready — installing in ${secs}s`;
+      }
     }, 1000);
     enableRestartButtons();
   });

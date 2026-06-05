@@ -416,6 +416,7 @@ function createGameWindow() {
   gameWin.on('closed', () => {
     gameWin = null;
     if (updateReady) {
+      updateReady = false;
       try { autoUpdater.quitAndInstall(true, true); } catch { app.quit(); }
     } else {
       app.quit();
@@ -1324,9 +1325,13 @@ function setupAutoUpdater() {
     setAckedVersion(info.version);
     updateReady = true;
     gameWin?.webContents.send('update-downloaded');
-    // Auto-install after 10s if Minecraft isn't running — avoids needing any user action
+    // Auto-install after 10s if Minecraft isn't running.
+    // Reset updateReady BEFORE calling quitAndInstall so the gameWin 'closed'
+    // handler doesn't trigger a second quitAndInstall call (which would throw and
+    // fall through to app.quit() without installing).
     setTimeout(() => {
       if (updateReady && !mcProcess) {
+        updateReady = false;
         try { autoUpdater.quitAndInstall(true, true); } catch { app.quit(); }
       }
     }, 10000);
