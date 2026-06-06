@@ -3804,22 +3804,12 @@ function initChat() {
   // Track last known online val so admin/user list can re-render on either change
   let lastOnlineVal: Record<string, any> = {};
 
-  // Admin list subscription + first-time bootstrap
-  const claimBar  = document.getElementById('chat-claim-admin-bar')!;
-  const claimBtn  = document.getElementById('chat-claim-admin') as HTMLButtonElement;
+  // Admin list subscription (voxel_admins is read-only — manage via Firebase console)
   onValue(ref(rtdb, 'voxel_admins'), adminSnap => {
     const adminVal = adminSnap.val() || {};
     adminList = new Set(Object.keys(adminVal));
     document.getElementById('chat-admin-bar')!.style.display = adminList.has(myName) ? 'flex' : 'none';
-    // Show bootstrap button only if no admins exist yet and user is logged in
-    const noAdmins = Object.keys(adminVal).length === 0;
-    claimBar.style.display = (noAdmins && myName && !myName.startsWith('Guest_')) ? 'block' : 'none';
     renderChatUsers(lastOnlineVal, usersEl);
-  });
-  claimBtn.addEventListener('click', async () => {
-    if (!myName || myName.startsWith('Guest_')) return;
-    await set(ref(rtdb, `voxel_admins/${myName}`), true).catch(() => {});
-    claimBar.style.display = 'none';
   });
 
   // ── Feedback system ────
@@ -4522,8 +4512,10 @@ function initGuide() {
   // ── Recipes tab ────
   function itemCell(url: string | null, name?: string): string {
     if (!url) return `<div class="recipe-cell"></div>`;
-    const tip = name ? `<span class="rc-tip">${escHtml(name)}</span>` : '';
-    return `<div class="recipe-cell">${tip}<img src="${url}" alt="" onerror="this.style.display='none'"></div>`;
+    const label = name || url.split('Invicon_')[1]?.replace('.png','').replace(/_/g,' ') || '';
+    const short = label.split(' ').map((w: string) => w[0]).join('').slice(0,3).toUpperCase();
+    const tip = label ? `<span class="rc-tip">${escHtml(label)}</span>` : '';
+    return `<div class="recipe-cell">${tip}<img src="${url}" alt="${escHtml(label)}" onerror="this.style.display='none';(this.nextElementSibling as HTMLElement).style.display='flex'"><span class="rc-fallback" title="${escHtml(label)}">${escHtml(short)}</span></div>`;
   }
 
   function showRecipeDetail(r: MCRecipe) {
@@ -4552,7 +4544,7 @@ function initGuide() {
         <div>
           <div style="font-size:10px;color:#484f58;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">${t('result')}</div>
           <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
-            <div class="recipe-cell"><img src="${WIKI(r.img)}" alt="" onerror="this.style.display='none'"></div>
+            <div class="recipe-cell" style="width:52px;height:52px;">${itemCell(WIKI(r.img), r.name)}</div>
             ${r.count && r.count > 1 ? `<span style="font-size:11px;color:#f5a623;">×${r.count}</span>` : ''}
             <span style="font-size:11px;color:#aaaaaa;">${escHtml(r.name)}</span>
           </div>
@@ -4575,7 +4567,8 @@ function initGuide() {
       const card = document.createElement('div');
       card.className = 'recipe-card';
       card.style.marginBottom = '6px';
-      card.innerHTML = `<img src="${WIKI(r.img)}" alt="${escHtml(r.name)}" onerror="this.style.display='none'"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#ffffff;">${escHtml(r.name)}</div><div style="font-size:10px;color:#484f58;text-transform:uppercase;letter-spacing:0.5px;">${r.cat}</div></div><span style="font-size:11px;color:#484f58;">▶</span>`;
+      const initials = r.name.split(' ').map((w:string)=>w[0]).join('').slice(0,3).toUpperCase();
+      card.innerHTML = `<div class="recipe-card-icon"><img src="${WIKI(r.img)}" alt="${escHtml(r.name)}" style="width:30px;height:30px;image-rendering:pixelated;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:8px;font-weight:700;color:#8b949e;\\'>${initials}</span>'"></div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#ffffff;">${escHtml(r.name)}</div><div style="font-size:10px;color:#484f58;text-transform:uppercase;letter-spacing:0.5px;">${r.cat}</div></div><span style="font-size:11px;color:#484f58;">▶</span>`;
       card.addEventListener('click', () => showRecipeDetail(r));
       frag.appendChild(card);
     });

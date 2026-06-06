@@ -249,14 +249,16 @@
     .guide-tab { flex:1;padding:8px 4px;background:none;border:none;border-bottom:2px solid transparent;color:#484f58;font-size:11px;cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap; }
     .guide-tab:hover { color:#8b949e; }
     .guide-tab.active { color:#e6edf3;border-bottom-color:#e6edf3; }
-    .recipe-card { display:flex;align-items:center;gap:10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:7px 10px;cursor:pointer; }
+    .recipe-card { display:flex;align-items:center;gap:10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px 11px;cursor:pointer; }
     .recipe-card:hover { border-color:#30363d; }
-    .recipe-card img { width:24px;height:24px;image-rendering:pixelated;flex-shrink:0; }
-    .recipe-grid { display:grid;grid-template-columns:repeat(3,34px);gap:2px; }
-    .recipe-cell { width:34px;height:34px;background:#161b22;border:1px solid #21262d;border-radius:3px;display:flex;align-items:center;justify-content:center;position:relative; }
-    .recipe-cell img { width:26px;height:26px;image-rendering:pixelated; }
+    .recipe-card img { width:30px;height:30px;image-rendering:pixelated;flex-shrink:0; }
+    .recipe-card-icon { width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
+    .recipe-grid { display:grid;grid-template-columns:repeat(3,42px);gap:3px; }
+    .recipe-cell { width:42px;height:42px;background:#161b22;border:1px solid #21262d;border-radius:4px;display:flex;align-items:center;justify-content:center;position:relative; }
+    .recipe-cell img { width:32px;height:32px;image-rendering:pixelated; }
     .recipe-cell:hover .rc-tip { display:block; }
     .rc-tip { display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#161b22;border:1px solid #30363d;border-radius:4px;padding:3px 7px;font-size:10px;color:#e6edf3;white-space:nowrap;z-index:10;pointer-events:none; }
+    .rc-fallback { display:none;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#8b949e;text-align:center;width:34px;height:34px;word-break:break-all;line-height:1.1;letter-spacing:0.3px; }
     .mob-card { background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px 12px;margin-bottom:6px; }
     .mob-card:hover { border-color:#30363d; }
     .stat-bar { height:4px;border-radius:2px;background:#21262d;overflow:hidden;margin-top:2px; }
@@ -1210,9 +1212,6 @@
         <span style="color:#3fb950;font-weight:600;font-size:12px;flex:1;">Voice Channel &nbsp;·&nbsp; <span id="chat-voice-members" style="color:#aaaaaa;font-weight:400;">…</span></span>
         <button id="chat-mute-btn" style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:6px;padding:4px 12px;color:#ffffff;font-size:12px;cursor:pointer;">Mute</button>
         <button id="chat-hangup-btn" style="background:#c11e1e;border:1px solid #f85149;border-radius:6px;padding:4px 12px;color:#ffffff;font-size:12px;cursor:pointer;margin-left:6px;">✕ Leave</button>
-      </div>
-      <div id="chat-claim-admin-bar" style="display:none;padding:6px 24px;background:#0a0a0a;border-bottom:1px solid #1e1e1e;flex-shrink:0;">
-        <button id="chat-claim-admin">Claim Admin (first setup only)</button>
       </div>
       <div id="chat-admin-bar">
         <span style="font-size:10px;color:#8b949e;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Admin</span>

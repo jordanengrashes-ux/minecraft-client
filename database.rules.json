@@ -1,0 +1,36 @@
+{
+  "rules": {
+    "voxel_admins": {
+      ".read": true,
+      ".write": false
+    },
+    "voxel_timeouts": {
+      ".read": true,
+      ".write": true
+    },
+    "voxel_chat": {
+      ".read": true,
+      ".write": true
+    },
+    "voxel_chat_online": {
+      ".read": true,
+      ".write": true
+    },
+    "voxel_voice": {
+      ".read": true,
+      ".write": true
+    },
+    "mc_servers": {
+      ".read": true,
+      ".write": true
+    },
+    "voxel_feedback": {
+      ".read": true,
+      ".write": true
+    },
+    "voxel_users": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
