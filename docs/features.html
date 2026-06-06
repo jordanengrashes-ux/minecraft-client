@@ -6,13 +6,7 @@
   <title>Features — Voxel Client</title>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    :root {
-      --orange: #f5a623;
-      --orange-dim: rgba(245,166,35,0.08);
-      --orange-border: rgba(245,166,35,0.2);
-      --bg: #0d0d0d; --surface: #111; --border: #1e1e1e;
-      --text: #e6e6e6; --muted: #666;
-    }
+    :root { --orange:#f5a623; --orange-dim:rgba(245,166,35,0.08); --orange-border:rgba(245,166,35,0.2); --bg:#0d0d0d; --surface:#111; --border:#1e1e1e; --text:#e6e6e6; --muted:#555; }
     body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; overflow-x:hidden; }
     .bg-glow { position:fixed; top:-160px; left:50%; transform:translateX(-50%); width:900px; height:700px; background:radial-gradient(ellipse at center,rgba(245,166,35,0.11) 0%,transparent 65%); pointer-events:none; z-index:0; }
 
@@ -23,91 +17,58 @@
     .nav-links a:hover { color:var(--text); }
     .nav-links a.active { color:var(--orange); }
 
-    .hero { position:relative; z-index:1; text-align:center; padding:80px 24px 56px; }
-    .hero-label { display:inline-block; font-size:10px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--orange); border:1px solid var(--orange-border); background:var(--orange-dim); padding:5px 14px; border-radius:20px; margin-bottom:22px; }
-    .hero h1 { font-size:clamp(30px,5vw,52px); font-weight:800; letter-spacing:-1.5px; margin-bottom:12px; }
-    .hero p { font-size:15px; color:var(--muted); max-width:380px; margin:0 auto; }
+    .hero { position:relative; z-index:1; text-align:center; padding:72px 24px 48px; }
+    .hero-label { display:inline-block; font-size:10px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--orange); border:1px solid var(--orange-border); background:var(--orange-dim); padding:5px 14px; border-radius:20px; margin-bottom:20px; }
+    .hero h1 { font-size:clamp(28px,4vw,48px); font-weight:800; letter-spacing:-1px; margin-bottom:10px; }
+    .hero p { font-size:14px; color:var(--muted); }
 
-    /* Feature cards */
-    .cards { position:relative; z-index:1; max-width:960px; margin:0 auto; padding:0 24px 96px; display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+    /* Feature grid */
+    .page { position:relative; z-index:1; max-width:960px; margin:0 auto; padding:0 24px 96px; }
 
-    .card {
-      background:var(--surface);
-      border:1px solid var(--border);
-      border-radius:14px;
-      padding:32px 28px;
-      cursor:pointer;
-      transition:border-color 0.2s, transform 0.2s, background 0.2s;
-      user-select:none;
+    .group { margin-bottom:48px; }
+    .group-label { font-size:10px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color:var(--orange); margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+
+    .tile-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }
+    .tile {
+      background:var(--surface); border:1px solid var(--border); border-radius:10px;
+      padding:18px 16px; cursor:pointer; position:relative; overflow:hidden;
+      transition:border-color 0.22s, background 0.22s, transform 0.16s, box-shadow 0.22s;
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
     }
-    .card:hover { border-color:var(--orange-border); background:rgba(245,166,35,0.03); transform:translateY(-3px); }
-    .card-num { font-size:11px; font-weight:700; letter-spacing:2px; color:var(--orange); text-transform:uppercase; margin-bottom:18px; }
-    .card-title { font-size:22px; font-weight:800; letter-spacing:-0.5px; margin-bottom:12px; line-height:1.2; }
-    .card-desc { font-size:14px; color:var(--muted); line-height:1.65; }
-    .card-cta { margin-top:24px; font-size:12px; font-weight:600; color:var(--orange); display:flex; align-items:center; gap:6px; }
-    .card-cta svg { transition:transform 0.2s; }
-    .card:hover .card-cta svg { transform:translateX(3px); }
+    .tile::before { content:''; position:absolute; inset:0; border-radius:10px; background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(245,166,35,0.09) 0%,transparent 65%); opacity:0; transition:opacity 0.25s; }
+    .tile:hover { border-color:rgba(245,166,35,0.35); background:#141414; transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.4); }
+    .tile:hover::before { opacity:1; }
+    .tile:active { transform:scale(0.97); }
+    .tile-name { font-size:13px; font-weight:600; position:relative; }
+    .tile-icon { font-size:16px; flex-shrink:0; opacity:0; transform:translateX(-4px); transition:opacity 0.18s, transform 0.18s; position:relative; color:var(--orange); }
+    .tile:hover .tile-icon { opacity:1; transform:translateX(0); }
+    .ripple { position:absolute; border-radius:50%; background:rgba(245,166,35,0.15); transform:scale(0); animation:rip 0.45s linear; pointer-events:none; }
+    @keyframes rip { to{transform:scale(4);opacity:0;} }
 
     /* Modal */
-    .modal-overlay {
-      position:fixed; inset:0; background:rgba(0,0,0,0.82);
-      z-index:100; display:none; align-items:center; justify-content:center;
-      padding:24px;
-      backdrop-filter:blur(6px);
-    }
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.84); z-index:200; display:none; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(8px); }
     .modal-overlay.open { display:flex; }
-    .modal {
-      background:#111;
-      border:1px solid #2a2a2a;
-      border-radius:16px;
-      width:100%; max-width:720px;
-      max-height:88vh;
-      overflow-y:auto;
-      animation:modalIn 0.28s ease;
-    }
-    @keyframes modalIn { from { opacity:0; transform:translateY(20px) scale(0.97); } to { opacity:1; transform:none; } }
-
-    .modal-img {
-      width:100%; aspect-ratio:16/9;
-      background:#0a0a0a;
-      border-bottom:1px solid #1e1e1e;
-      border-radius:15px 15px 0 0;
-      display:flex; align-items:center; justify-content:center;
-      overflow:hidden;
-    }
+    .modal { background:#111; border:1px solid #252525; border-radius:16px; width:100%; max-width:700px; max-height:90vh; overflow-y:auto; animation:mIn 0.24s ease; }
+    @keyframes mIn { from{opacity:0;transform:translateY(14px) scale(0.97)} to{opacity:1;transform:none} }
+    .modal-img { width:100%; aspect-ratio:16/9; background:#0a0a0a; border-radius:15px 15px 0 0; border-bottom:1px solid #1e1e1e; overflow:hidden; display:flex; align-items:center; justify-content:center; }
     .modal-img img { width:100%; height:100%; object-fit:cover; border-radius:15px 15px 0 0; }
-    .modal-img-placeholder {
-      display:flex; flex-direction:column; align-items:center; gap:12px;
-      color:#333; font-size:13px; font-weight:500;
-    }
-    .modal-img-placeholder svg { opacity:0.3; }
-
-    .modal-body { padding:32px; }
-    .modal-tag { font-size:10px; font-weight:700; letter-spacing:2.5px; color:var(--orange); text-transform:uppercase; margin-bottom:12px; }
-    .modal-title { font-size:26px; font-weight:800; letter-spacing:-0.5px; margin-bottom:16px; }
+    .modal-placeholder { color:#252525; font-size:12px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+    .modal-body { padding:28px 30px 32px; }
+    .modal-close { float:right; margin:-2px -6px 0 0; width:28px; height:28px; border-radius:50%; background:#1a1a1a; border:1px solid #2a2a2a; color:var(--muted); font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s,color 0.15s; }
+    .modal-close:hover { background:#252525; color:var(--text); }
+    .modal-tag { font-size:10px; font-weight:700; letter-spacing:2.5px; color:var(--orange); text-transform:uppercase; margin-bottom:8px; }
+    .modal-title { font-size:22px; font-weight:800; letter-spacing:-0.5px; margin-bottom:14px; }
     .modal-desc { font-size:14px; color:#999; line-height:1.75; }
-    .modal-desc p { margin-bottom:12px; }
-    .modal-desc p:last-child { margin-bottom:0; }
-    .modal-close {
-      position:sticky; top:16px; float:right;
-      width:32px; height:32px; border-radius:50%;
-      background:#1e1e1e; border:1px solid #2a2a2a;
-      color:var(--muted); font-size:16px; line-height:1;
-      cursor:pointer; display:flex; align-items:center; justify-content:center;
-      margin:-8px -8px 0 0;
-      transition:background 0.15s, color 0.15s;
-    }
-    .modal-close:hover { background:#2a2a2a; color:var(--text); }
+    .modal-desc p { margin-bottom:10px; }
+    .modal-desc p:last-child { margin:0; }
 
-    /* Reveal */
-    .reveal { opacity:0; transform:translateY(28px); filter:blur(4px); transition:opacity 0.6s ease,transform 0.6s ease,filter 0.6s ease; }
+    .reveal { opacity:0; transform:translateY(22px); filter:blur(3px); transition:opacity 0.55s ease,transform 0.55s ease,filter 0.55s ease; }
     .reveal.visible { opacity:1; transform:translateY(0); filter:blur(0); }
 
     footer { text-align:center; padding:24px; border-top:1px solid var(--border); font-size:12px; color:var(--muted); position:relative; z-index:1; }
     footer a { color:var(--orange); text-decoration:none; }
     .foot-links { display:flex; gap:20px; justify-content:center; flex-wrap:wrap; margin-bottom:8px; }
-
-    @media(max-width:700px){ .cards{ grid-template-columns:1fr; } nav{ padding:16px 20px; } }
+    @media(max-width:600px){ nav{padding:16px 20px;} }
   </style>
 </head>
 <body>
@@ -123,48 +84,59 @@
   </nav>
 
   <section class="hero reveal">
-    <div class="hero-label">What makes it different</div>
-    <h1>Three things that matter</h1>
-    <p>Click any feature to see what it looks like and how it works.</p>
+    <div class="hero-label">Everything included</div>
+    <h1>All Features</h1>
+    <p>Click any feature to see what it does.</p>
   </section>
 
-  <div class="cards">
-    <div class="card reveal" onclick="openModal('mods')">
-      <div class="card-num">01</div>
-      <div class="card-title">Instant Mod Install</div>
-      <div class="card-desc">Search Modrinth and enable any mod with one toggle. Dependencies install automatically — no JAR files, no manual setup.</div>
-      <div class="card-cta">See how it works <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
-    </div>
-    <div class="card reveal" onclick="openModal('server')">
-      <div class="card-num">02</div>
-      <div class="card-title">Dedicated Server</div>
-      <div class="card-desc">Host a 24/7 server right from the launcher. Auto-restart on crash, player join alerts, and boot-on-startup — no command line needed.</div>
-      <div class="card-cta">See how it works <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
-    </div>
-    <div class="card reveal" onclick="openModal('updates')">
-      <div class="card-num">03</div>
-      <div class="card-title">Silent Auto Updates</div>
-      <div class="card-desc">The launcher updates itself in the background while you play. When Minecraft closes it installs and restarts — you never do anything manually.</div>
-      <div class="card-cta">See how it works <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
-    </div>
-  </div>
+  <div class="page">
 
-  <!-- Modal -->
-  <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
-    <div class="modal" id="modal">
-      <div class="modal-img" id="modal-img">
-        <div class="modal-img-placeholder">
-          <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.5"/><path stroke-width="1.5" d="M3 9h18"/><circle cx="6.5" cy="6" r="1" fill="currentColor"/><circle cx="9.5" cy="6" r="1" fill="currentColor"/></svg>
-          <span id="modal-img-label">Screenshot coming soon</span>
-        </div>
-      </div>
-      <div class="modal-body">
-        <button class="modal-close" onclick="closeModal()">✕</button>
-        <div class="modal-tag" id="modal-tag"></div>
-        <div class="modal-title" id="modal-title"></div>
-        <div class="modal-desc" id="modal-desc"></div>
+    <div class="group reveal">
+      <div class="group-label">Play</div>
+      <div class="tile-grid">
+        <div class="tile" id="tile-java"         onclick="open('java')">        <span class="tile-name">Java Edition</span>         <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-bedrock"      onclick="open('bedrock')">     <span class="tile-name">Bedrock Edition</span>      <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-offline"      onclick="open('offline')">     <span class="tile-name">Offline Mode</span>         <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-repair"       onclick="open('repair')">      <span class="tile-name">Game Repair</span>          <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-crash"        onclick="open('crash')">       <span class="tile-name">Crash Reports</span>        <span class="tile-icon">→</span></div>
       </div>
     </div>
+
+    <div class="group reveal">
+      <div class="group-label">Mods</div>
+      <div class="tile-grid">
+        <div class="tile" id="tile-mods"         onclick="open('mods')">        <span class="tile-name">Mod Browser</span>          <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-curseforge"   onclick="open('curseforge')">  <span class="tile-name">CurseForge</span>           <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-modpacks"     onclick="open('modpacks')">    <span class="tile-name">Modpacks</span>             <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-pvp"          onclick="open('pvp')">         <span class="tile-name">PvP Mods</span>             <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-resourcepacks"onclick="open('resourcepacks')"><span class="tile-name">Resource Packs</span>      <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-profiles"     onclick="open('profiles')">    <span class="tile-name">Mod Profiles</span>         <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-ai"           onclick="open('ai')">          <span class="tile-name">Minecraft Guide (AI)</span> <span class="tile-icon">→</span></div>
+      </div>
+    </div>
+
+    <div class="group reveal">
+      <div class="group-label">Social &amp; Server</div>
+      <div class="tile-grid">
+        <div class="tile" id="tile-server"       onclick="open('server')">      <span class="tile-name">Dedicated Server</span>     <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-skins"        onclick="open('skins')">       <span class="tile-name">Skin Manager</span>          <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-cosmetics"    onclick="open('cosmetics')">   <span class="tile-name">Cosmetics</span>            <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-friends"      onclick="open('friends')">     <span class="tile-name">Friends &amp; Chat</span>   <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-files"        onclick="open('files')">       <span class="tile-name">Files Manager</span>        <span class="tile-icon">→</span></div>
+      </div>
+    </div>
+
+    <div class="group reveal">
+      <div class="group-label">Config &amp; Auto</div>
+      <div class="tile-grid">
+        <div class="tile" id="tile-updates"      onclick="open('updates')">     <span class="tile-name">Auto Updates</span>         <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-screenshots"  onclick="open('screenshots')"> <span class="tile-name">Screenshots</span>          <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-accounts"     onclick="open('accounts')">    <span class="tile-name">Accounts</span>             <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-boot"         onclick="open('boot')">        <span class="tile-name">Start with Windows</span>  <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-customize"    onclick="open('customize')">   <span class="tile-name">Customize</span>            <span class="tile-icon">→</span></div>
+      </div>
+    </div>
+
   </div>
 
   <footer>
@@ -179,77 +151,91 @@
     Not affiliated with Mojang or Microsoft.
   </footer>
 
+  <!-- Modal -->
+  <div class="modal-overlay" id="overlay" onclick="handleClose(event)">
+    <div class="modal">
+      <div class="modal-img" id="m-img">
+        <div class="modal-placeholder">
+          <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><circle cx="6.5" cy="6" r="0.7" fill="currentColor"/><circle cx="9.5" cy="6" r="0.7" fill="currentColor"/></svg>
+          Screenshot coming soon
+        </div>
+      </div>
+      <div class="modal-body">
+        <button class="modal-close" onclick="closeModal()">✕</button>
+        <div class="modal-tag" id="m-tag"></div>
+        <div class="modal-title" id="m-title"></div>
+        <div class="modal-desc" id="m-desc"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
-    const data = {
-      mods: {
-        tag: 'Feature 01',
-        title: 'Instant Mod Install',
-        img: 'img/mods.png',
-        desc: `
-          <p>The mod browser connects directly to Modrinth — the largest open-source Minecraft mod repository. Search by name, filter by category, and toggle any mod on with a single click.</p>
-          <p>When a mod has required dependencies (like Fabric API or Sodium), the launcher downloads and installs them automatically. You never need to know what a dependency is.</p>
-          <p>Mods are always installed for the correct Minecraft version you have selected. Switching versions? Hit the update button and every mod reinstalls for the new version in one go.</p>
-          <p>You can also disable mods individually without deleting them, save mod loadouts as profiles, and install full modpacks from Modrinth with one click.</p>
-        `
-      },
-      server: {
-        tag: 'Feature 02',
-        title: 'Dedicated Server',
-        img: 'img/server.png',
-        desc: `
-          <p>The Host Server panel lets you run a Minecraft Java server directly from the launcher — no command line, no batch files, no port forwarding guides needed (you still need to forward the port in your router).</p>
-          <p>Configure the server version, RAM allocation, port, max players, and MOTD from a simple form. Start and stop with one button.</p>
-          <p>Enable Dedicated Mode and the server automatically restarts if it crashes. Enable "Start with Windows" and the server comes up every time the PC boots — even if nobody logs in.</p>
-          <p>When a player joins, the launcher window restores from the taskbar and shows a toast notification with the player's name so you always know who is online.</p>
-        `
-      },
-      updates: {
-        tag: 'Feature 03',
-        title: 'Silent Auto Updates',
-        img: 'img/updates.png',
-        desc: `
-          <p>Every time Voxel Client opens, it checks GitHub Releases for a newer version. If one is found, it downloads silently in the background while you use the launcher normally.</p>
-          <p>When Minecraft is not running, the update installs and the launcher restarts automatically — you never see a download prompt or an installer window.</p>
-          <p>A small indicator in the title bar appears when an update is ready, and you can also trigger it manually from the Settings panel if you want to update immediately.</p>
-          <p>This means every user always has the latest features and bug fixes without doing anything. No "please download the new version" messages.</p>
-        `
-      }
+    const F = {
+      java:         {tag:'Play',   title:'Java Edition',         img:'img/java.png',         desc:'<p>Launch any Minecraft Java version with Microsoft or offline login. Set RAM allocation, switch between Java 17 and Java 21, and enable Fabric Loader for mods — all from one panel.</p><p>Crash reports are shown inside the launcher when Minecraft closes unexpectedly so you can see exactly what went wrong.</p>'},
+      bedrock:      {tag:'Play',   title:'Bedrock Edition',      img:'img/bedrock.png',       desc:'<p>Launch Minecraft Bedrock Edition from the same launcher as Java. Switch between both editions without opening another app.</p>'},
+      offline:      {tag:'Play',   title:'Offline Mode',         img:'img/offline.png',       desc:'<p>No Microsoft account needed. Enter any username and launch Minecraft in offline mode to play single-player worlds, practice builds, or join LAN servers.</p>'},
+      repair:       {tag:'Play',   title:'Game Repair',          img:'img/repair.png',        desc:'<p>One click reinstalls Minecraft files from Mojang\'s servers. Your worlds and settings are not touched — only broken game files are replaced.</p>'},
+      crash:        {tag:'Play',   title:'Crash Reports',        img:'img/crash.png',         desc:'<p>When Minecraft crashes, the latest crash report is shown directly inside the launcher so you can read the error without hunting through AppData folders.</p>'},
+      mods:         {tag:'Mods',   title:'Mod Browser',          img:'img/mods.png',          desc:'<p>Search the full Modrinth mod library and toggle any Fabric mod on with one click. The launcher picks the correct build for your Minecraft version automatically.</p><p>Required dependencies like Fabric API are downloaded automatically. Disable mods without deleting them, or update all mods to a new MC version in one click.</p>'},
+      curseforge:   {tag:'Mods',   title:'CurseForge',           img:'img/curseforge.png',    desc:'<p>Browse and install CurseForge mods directly inside the launcher using the same one-toggle experience as the Modrinth browser. No browser tab needed.</p>'},
+      modpacks:     {tag:'Mods',   title:'Modpacks',             img:'img/modpacks.png',      desc:'<p>Install any Modrinth modpack in one click. The launcher downloads the .mrpack, extracts every mod JAR, and sets the correct Minecraft and Fabric versions. Update installed modpacks to the latest release with one button.</p>'},
+      pvp:          {tag:'Mods',   title:'PvP Mods',             img:'img/pvp.png',           desc:'<p>A curated list of performance and PvP mods — Sodium, Lithium, Iris Shaders, Entity Culling, ImmediatelyFast and more. Toggle any combination in seconds. Conflicting mods are automatically disabled.</p>'},
+      resourcepacks:{tag:'Mods',   title:'Resource Packs',       img:'img/resourcepacks.png', desc:'<p>Search the Modrinth resource pack library and install packs into your Minecraft folder. Update packs when you change Minecraft version.</p>'},
+      profiles:     {tag:'Mods',   title:'Mod Profiles',         img:'img/profiles.png',      desc:'<p>Save your current mod selection as a named profile and restore it in one click. Useful for switching between PvP, survival, and modpack setups.</p>'},
+      ai:           {tag:'Mods',   title:'Minecraft Guide (AI)', img:'img/ai.png',            desc:'<p>A built-in AI assistant for Minecraft. Ask for crafting recipes, biome info, farm designs, commands, or Voxel Client help. Conversations are saved in sessions. Powered by Gemini.</p>'},
+      server:       {tag:'Server', title:'Dedicated Server',     img:'img/server.png',        desc:'<p>Run a 24/7 Minecraft Java server from inside the launcher. Configure version, RAM, port, MOTD, and max players — no command line. Enable Auto-restart to recover from crashes. Enable Start with Windows so the server launches at boot even without logging in.</p><p>When a player joins, the launcher restores from the taskbar and shows a notification with the player\'s name.</p>'},
+      skins:        {tag:'Social', title:'Skin Manager',         img:'img/skins.png',         desc:'<p>Upload a skin PNG directly from the launcher and apply it to your Microsoft account. Supports classic and slim skin variants with no browser required.</p>'},
+      cosmetics:    {tag:'Social', title:'Cosmetics',            img:'img/cosmetics.png',     desc:'<p>Equip a custom cape visible to other Voxel Client users while playing Minecraft, via a built-in Fabric mod that loads automatically when Fabric is enabled.</p>'},
+      friends:      {tag:'Social', title:'Friends & Chat',       img:'img/friends.png',       desc:'<p>Add other Voxel Client users as friends, send direct messages, and see when they are online. A global chat channel lets you talk with all online Voxel Client players across any server.</p>'},
+      files:        {tag:'Social', title:'Files Manager',        img:'img/files.png',         desc:'<p>Drag-and-drop world or schematic ZIP files to install them. Quick-open buttons take you directly to your mods, saves, resource packs, or screenshots folder in Explorer.</p>'},
+      updates:      {tag:'Auto',   title:'Auto Updates',         img:'img/updates.png',       desc:'<p>Every time Voxel Client opens it checks GitHub for a newer version. If found, it downloads silently while you use the app. When Minecraft is not running, the update installs and the launcher restarts — you never see a download prompt or installer window.</p>'},
+      screenshots:  {tag:'Auto',   title:'Screenshots',          img:'img/screenshots.png',   desc:'<p>Browse your entire Minecraft screenshots folder inside the launcher. Click any screenshot to open it in your default image viewer.</p>'},
+      accounts:     {tag:'Auto',   title:'Accounts',             img:'img/accounts.png',      desc:'<p>Log into multiple Microsoft accounts and switch between them without re-authenticating every time. Useful for managing multiple Minecraft profiles.</p>'},
+      boot:         {tag:'Auto',   title:'Start with Windows',   img:'img/boot.png',          desc:'<p>Set Voxel Client to open automatically when Windows starts. Combined with Dedicated Mode, your server runs 24/7 even after a PC reboot with no manual action.</p>'},
+      customize:    {tag:'Auto',   title:'Customize',            img:'img/customize.png',     desc:'<p>Personalize the launcher with custom backgrounds and UI settings to match your style.</p>'},
     };
 
-    function openModal(key) {
-      const d = data[key];
-      document.getElementById('modal-tag').textContent   = d.tag;
-      document.getElementById('modal-title').textContent = d.title;
-      document.getElementById('modal-desc').innerHTML    = d.desc;
-      const imgEl = document.getElementById('modal-img');
-      // Try to load an actual screenshot; fall back to placeholder
+    function open(key) {
+      const d = F[key]; if (!d) return;
+      document.getElementById('m-tag').textContent   = d.tag;
+      document.getElementById('m-title').textContent = d.title;
+      document.getElementById('m-desc').innerHTML    = d.desc;
+      const imgEl = document.getElementById('m-img');
       const img = new Image();
-      img.onload = () => {
-        imgEl.innerHTML = `<img src="${d.img}" alt="${d.title}">`;
-      };
-      img.onerror = () => {
-        imgEl.innerHTML = `<div class="modal-img-placeholder"><svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.5"/><path stroke-width="1.5" d="M3 9h18"/><circle cx="6.5" cy="6" r="1" fill="currentColor"/><circle cx="9.5" cy="6" r="1" fill="currentColor"/></svg><span>Add a screenshot at docs/img/${key}.png</span></div>`;
-      };
+      img.onload  = () => { imgEl.innerHTML = `<img src="${d.img}" alt="${d.title}">`; };
+      img.onerror = () => { imgEl.innerHTML = `<div class="modal-placeholder"><svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>Screenshot coming soon</div>`; };
       img.src = d.img;
-      document.getElementById('modal-overlay').classList.add('open');
+      document.getElementById('overlay').classList.add('open');
       document.body.style.overflow = 'hidden';
     }
+    function closeModal() { document.getElementById('overlay').classList.remove('open'); document.body.style.overflow=''; }
+    function handleClose(e) { if (e.target===document.getElementById('overlay')) closeModal(); }
+    document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
 
-    function closeModal(e) {
-      if (e && e.target !== document.getElementById('modal-overlay') && !e.target.classList.contains('modal-close')) return;
-      document.getElementById('modal-overlay').classList.remove('open');
-      document.body.style.overflow = '';
-    }
+    // Jump to section from anchor
+    const hash = location.hash.replace('#','');
+    if (hash && document.getElementById('tile-'+hash)) setTimeout(()=>open(hash), 300);
 
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('modal-overlay').classList.remove('open'); document.body.style.overflow = ''; } });
-
-    const obs = new IntersectionObserver(entries => {
-      entries.forEach((e, i) => {
-        if (e.isIntersecting) { setTimeout(() => e.target.classList.add('visible'), i * 80); }
-        else { e.target.classList.remove('visible'); }
+    // Interactive tiles
+    document.querySelectorAll('.tile').forEach(t => {
+      t.addEventListener('mousemove', e => {
+        const r=t.getBoundingClientRect();
+        t.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');
+        t.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');
       });
-    }, { threshold: 0.08 });
-    document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+      t.addEventListener('click', e => {
+        const r=t.getBoundingClientRect();
+        const rip=document.createElement('span'); const sz=Math.max(r.width,r.height);
+        rip.className='ripple';
+        rip.style.cssText=`width:${sz}px;height:${sz}px;left:${e.clientX-r.left-sz/2}px;top:${e.clientY-r.top-sz/2}px`;
+        t.appendChild(rip); setTimeout(()=>rip.remove(),480);
+      });
+    });
+
+    const obs = new IntersectionObserver(entries=>{
+      entries.forEach((e,i)=>{ if(e.isIntersecting){setTimeout(()=>e.target.classList.add('visible'),i*80);} else{e.target.classList.remove('visible');} });
+    },{threshold:0.08});
+    document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
   </script>
 </body>
 </html>
