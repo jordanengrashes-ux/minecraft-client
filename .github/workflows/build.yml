@@ -122,7 +122,9 @@ jobs:
         with:
           name: release-windows
           path: release-files
-      - uses: actions/download-artifact@v4
+      - name: Download Linux artifacts (optional)
+        uses: actions/download-artifact@v4
+        if: needs.build-linux.result == 'success'
         with:
           name: release-linux
           path: release-files
