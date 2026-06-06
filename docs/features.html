@@ -11,10 +11,9 @@
       --orange-dim: rgba(245,166,35,0.08);
       --orange-border: rgba(245,166,35,0.2);
       --bg: #0d0d0d; --surface: #111; --border: #1e1e1e;
-      --text: #e6e6e6; --muted: #555;
+      --text: #e6e6e6; --muted: #666;
     }
     body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; overflow-x:hidden; }
-
     .bg-glow { position:fixed; top:-160px; left:50%; transform:translateX(-50%); width:900px; height:700px; background:radial-gradient(ellipse at center,rgba(245,166,35,0.11) 0%,transparent 65%); pointer-events:none; z-index:0; }
 
     nav { position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:18px 48px; border-bottom:1px solid var(--border); }
@@ -27,22 +26,88 @@
     .hero { position:relative; z-index:1; text-align:center; padding:80px 24px 56px; }
     .hero-label { display:inline-block; font-size:10px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--orange); border:1px solid var(--orange-border); background:var(--orange-dim); padding:5px 14px; border-radius:20px; margin-bottom:22px; }
     .hero h1 { font-size:clamp(30px,5vw,52px); font-weight:800; letter-spacing:-1.5px; margin-bottom:12px; }
-    .hero p { font-size:15px; color:var(--muted); max-width:400px; margin:0 auto; }
+    .hero p { font-size:15px; color:var(--muted); max-width:380px; margin:0 auto; }
 
-    .grid { position:relative; z-index:1; max-width:860px; margin:0 auto; padding:0 24px 96px; display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }
+    /* Feature cards */
+    .cards { position:relative; z-index:1; max-width:960px; margin:0 auto; padding:0 24px 96px; display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
 
-    .feat { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:26px; transition:border-color 0.2s, background 0.2s; }
-    .feat:hover { border-color:var(--orange-border); background:rgba(245,166,35,0.03); }
-    .feat-title { font-size:14px; font-weight:600; margin-bottom:8px; }
-    .feat-desc { font-size:13px; color:var(--muted); line-height:1.6; }
+    .card {
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:32px 28px;
+      cursor:pointer;
+      transition:border-color 0.2s, transform 0.2s, background 0.2s;
+      user-select:none;
+    }
+    .card:hover { border-color:var(--orange-border); background:rgba(245,166,35,0.03); transform:translateY(-3px); }
+    .card-num { font-size:11px; font-weight:700; letter-spacing:2px; color:var(--orange); text-transform:uppercase; margin-bottom:18px; }
+    .card-title { font-size:22px; font-weight:800; letter-spacing:-0.5px; margin-bottom:12px; line-height:1.2; }
+    .card-desc { font-size:14px; color:var(--muted); line-height:1.65; }
+    .card-cta { margin-top:24px; font-size:12px; font-weight:600; color:var(--orange); display:flex; align-items:center; gap:6px; }
+    .card-cta svg { transition:transform 0.2s; }
+    .card:hover .card-cta svg { transform:translateX(3px); }
 
+    /* Modal */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,0.82);
+      z-index:100; display:none; align-items:center; justify-content:center;
+      padding:24px;
+      backdrop-filter:blur(6px);
+    }
+    .modal-overlay.open { display:flex; }
+    .modal {
+      background:#111;
+      border:1px solid #2a2a2a;
+      border-radius:16px;
+      width:100%; max-width:720px;
+      max-height:88vh;
+      overflow-y:auto;
+      animation:modalIn 0.28s ease;
+    }
+    @keyframes modalIn { from { opacity:0; transform:translateY(20px) scale(0.97); } to { opacity:1; transform:none; } }
+
+    .modal-img {
+      width:100%; aspect-ratio:16/9;
+      background:#0a0a0a;
+      border-bottom:1px solid #1e1e1e;
+      border-radius:15px 15px 0 0;
+      display:flex; align-items:center; justify-content:center;
+      overflow:hidden;
+    }
+    .modal-img img { width:100%; height:100%; object-fit:cover; border-radius:15px 15px 0 0; }
+    .modal-img-placeholder {
+      display:flex; flex-direction:column; align-items:center; gap:12px;
+      color:#333; font-size:13px; font-weight:500;
+    }
+    .modal-img-placeholder svg { opacity:0.3; }
+
+    .modal-body { padding:32px; }
+    .modal-tag { font-size:10px; font-weight:700; letter-spacing:2.5px; color:var(--orange); text-transform:uppercase; margin-bottom:12px; }
+    .modal-title { font-size:26px; font-weight:800; letter-spacing:-0.5px; margin-bottom:16px; }
+    .modal-desc { font-size:14px; color:#999; line-height:1.75; }
+    .modal-desc p { margin-bottom:12px; }
+    .modal-desc p:last-child { margin-bottom:0; }
+    .modal-close {
+      position:sticky; top:16px; float:right;
+      width:32px; height:32px; border-radius:50%;
+      background:#1e1e1e; border:1px solid #2a2a2a;
+      color:var(--muted); font-size:16px; line-height:1;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      margin:-8px -8px 0 0;
+      transition:background 0.15s, color 0.15s;
+    }
+    .modal-close:hover { background:#2a2a2a; color:var(--text); }
+
+    /* Reveal */
     .reveal { opacity:0; transform:translateY(28px); filter:blur(4px); transition:opacity 0.6s ease,transform 0.6s ease,filter 0.6s ease; }
     .reveal.visible { opacity:1; transform:translateY(0); filter:blur(0); }
 
     footer { text-align:center; padding:24px; border-top:1px solid var(--border); font-size:12px; color:var(--muted); position:relative; z-index:1; }
     footer a { color:var(--orange); text-decoration:none; }
     .foot-links { display:flex; gap:20px; justify-content:center; flex-wrap:wrap; margin-bottom:8px; }
-    @media(max-width:600px){ nav{ padding:16px 20px; } }
+
+    @media(max-width:700px){ .cards{ grid-template-columns:1fr; } nav{ padding:16px 20px; } }
   </style>
 </head>
 <body>
@@ -58,43 +123,47 @@
   </nav>
 
   <section class="hero reveal">
-    <div class="hero-label">What you get</div>
-    <h1>Everything included</h1>
-    <p>No paywalls. No subscriptions. Every feature ships free.</p>
+    <div class="hero-label">What makes it different</div>
+    <h1>Three things that matter</h1>
+    <p>Click any feature to see what it looks like and how it works.</p>
   </section>
 
-  <div class="grid">
-    <div class="feat reveal">
-      <div class="feat-title">Java &amp; Bedrock</div>
-      <div class="feat-desc">Launch Java or Bedrock from the same app. Microsoft and offline login supported. Set RAM and Java version per launch.</div>
+  <div class="cards">
+    <div class="card reveal" onclick="openModal('mods')">
+      <div class="card-num">01</div>
+      <div class="card-title">Instant Mod Install</div>
+      <div class="card-desc">Search Modrinth and enable any mod with one toggle. Dependencies install automatically — no JAR files, no manual setup.</div>
+      <div class="card-cta">See how it works <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
     </div>
-    <div class="feat reveal">
-      <div class="feat-title">Mod Browser</div>
-      <div class="feat-desc">Search Modrinth and install any Fabric mod with one toggle. Required dependencies are downloaded automatically — no manual JAR copying.</div>
+    <div class="card reveal" onclick="openModal('server')">
+      <div class="card-num">02</div>
+      <div class="card-title">Dedicated Server</div>
+      <div class="card-desc">Host a 24/7 server right from the launcher. Auto-restart on crash, player join alerts, and boot-on-startup — no command line needed.</div>
+      <div class="card-cta">See how it works <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
     </div>
-    <div class="feat reveal">
-      <div class="feat-title">Modpack Support</div>
-      <div class="feat-desc">Install full Modrinth modpacks in one click. The launcher auto-sets the correct Minecraft and Fabric versions and keeps modpacks updated.</div>
+    <div class="card reveal" onclick="openModal('updates')">
+      <div class="card-num">03</div>
+      <div class="card-title">Silent Auto Updates</div>
+      <div class="card-desc">The launcher updates itself in the background while you play. When Minecraft closes it installs and restarts — you never do anything manually.</div>
+      <div class="card-cta">See how it works <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
     </div>
-    <div class="feat reveal">
-      <div class="feat-title">Performance Mods</div>
-      <div class="feat-desc">Curated one-click mod sets — Sodium, Lithium, Iris, Entity Culling and more — to boost FPS without any manual setup.</div>
-    </div>
-    <div class="feat reveal">
-      <div class="feat-title">Dedicated Server</div>
-      <div class="feat-desc">Run a 24/7 server from inside the app. Configure RAM, port, MOTD, and max players. Auto-restart on crash. Starts with Windows at boot.</div>
-    </div>
-    <div class="feat reveal">
-      <div class="feat-title">Auto Updates</div>
-      <div class="feat-desc">The launcher updates itself silently in the background. You always have the latest version without downloading anything manually.</div>
-    </div>
-    <div class="feat reveal">
-      <div class="feat-title">Friends &amp; Global Chat</div>
-      <div class="feat-desc">Add friends, send direct messages, and join a global chat with other Voxel Client players — all inside the launcher.</div>
-    </div>
-    <div class="feat reveal">
-      <div class="feat-title">Skins, Cosmetics &amp; Files</div>
-      <div class="feat-desc">Upload skins, equip custom capes, install worlds and schematics by drag-and-drop, and browse your screenshots — without leaving the launcher.</div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+    <div class="modal" id="modal">
+      <div class="modal-img" id="modal-img">
+        <div class="modal-img-placeholder">
+          <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.5"/><path stroke-width="1.5" d="M3 9h18"/><circle cx="6.5" cy="6" r="1" fill="currentColor"/><circle cx="9.5" cy="6" r="1" fill="currentColor"/></svg>
+          <span id="modal-img-label">Screenshot coming soon</span>
+        </div>
+      </div>
+      <div class="modal-body">
+        <button class="modal-close" onclick="closeModal()">✕</button>
+        <div class="modal-tag" id="modal-tag"></div>
+        <div class="modal-title" id="modal-title"></div>
+        <div class="modal-desc" id="modal-desc"></div>
+      </div>
     </div>
   </div>
 
@@ -111,9 +180,72 @@
   </footer>
 
   <script>
+    const data = {
+      mods: {
+        tag: 'Feature 01',
+        title: 'Instant Mod Install',
+        img: 'img/mods.png',
+        desc: `
+          <p>The mod browser connects directly to Modrinth — the largest open-source Minecraft mod repository. Search by name, filter by category, and toggle any mod on with a single click.</p>
+          <p>When a mod has required dependencies (like Fabric API or Sodium), the launcher downloads and installs them automatically. You never need to know what a dependency is.</p>
+          <p>Mods are always installed for the correct Minecraft version you have selected. Switching versions? Hit the update button and every mod reinstalls for the new version in one go.</p>
+          <p>You can also disable mods individually without deleting them, save mod loadouts as profiles, and install full modpacks from Modrinth with one click.</p>
+        `
+      },
+      server: {
+        tag: 'Feature 02',
+        title: 'Dedicated Server',
+        img: 'img/server.png',
+        desc: `
+          <p>The Host Server panel lets you run a Minecraft Java server directly from the launcher — no command line, no batch files, no port forwarding guides needed (you still need to forward the port in your router).</p>
+          <p>Configure the server version, RAM allocation, port, max players, and MOTD from a simple form. Start and stop with one button.</p>
+          <p>Enable Dedicated Mode and the server automatically restarts if it crashes. Enable "Start with Windows" and the server comes up every time the PC boots — even if nobody logs in.</p>
+          <p>When a player joins, the launcher window restores from the taskbar and shows a toast notification with the player's name so you always know who is online.</p>
+        `
+      },
+      updates: {
+        tag: 'Feature 03',
+        title: 'Silent Auto Updates',
+        img: 'img/updates.png',
+        desc: `
+          <p>Every time Voxel Client opens, it checks GitHub Releases for a newer version. If one is found, it downloads silently in the background while you use the launcher normally.</p>
+          <p>When Minecraft is not running, the update installs and the launcher restarts automatically — you never see a download prompt or an installer window.</p>
+          <p>A small indicator in the title bar appears when an update is ready, and you can also trigger it manually from the Settings panel if you want to update immediately.</p>
+          <p>This means every user always has the latest features and bug fixes without doing anything. No "please download the new version" messages.</p>
+        `
+      }
+    };
+
+    function openModal(key) {
+      const d = data[key];
+      document.getElementById('modal-tag').textContent   = d.tag;
+      document.getElementById('modal-title').textContent = d.title;
+      document.getElementById('modal-desc').innerHTML    = d.desc;
+      const imgEl = document.getElementById('modal-img');
+      // Try to load an actual screenshot; fall back to placeholder
+      const img = new Image();
+      img.onload = () => {
+        imgEl.innerHTML = `<img src="${d.img}" alt="${d.title}">`;
+      };
+      img.onerror = () => {
+        imgEl.innerHTML = `<div class="modal-img-placeholder"><svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.5"/><path stroke-width="1.5" d="M3 9h18"/><circle cx="6.5" cy="6" r="1" fill="currentColor"/><circle cx="9.5" cy="6" r="1" fill="currentColor"/></svg><span>Add a screenshot at docs/img/${key}.png</span></div>`;
+      };
+      img.src = d.img;
+      document.getElementById('modal-overlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal(e) {
+      if (e && e.target !== document.getElementById('modal-overlay') && !e.target.classList.contains('modal-close')) return;
+      document.getElementById('modal-overlay').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('modal-overlay').classList.remove('open'); document.body.style.overflow = ''; } });
+
     const obs = new IntersectionObserver(entries => {
       entries.forEach((e, i) => {
-        if (e.isIntersecting) { setTimeout(() => e.target.classList.add('visible'), i * 70); }
+        if (e.isIntersecting) { setTimeout(() => e.target.classList.add('visible'), i * 80); }
         else { e.target.classList.remove('visible'); }
       });
     }, { threshold: 0.08 });
