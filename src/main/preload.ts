@@ -58,6 +58,11 @@ contextBridge.exposeInMainWorld('ai', {
   getKey: ()            => ipcRenderer.invoke('ai-get-key'),
 });
 
+contextBridge.exposeInMainWorld('curseforge', {
+  search:      (opts: { query: string; mcVersion: string }) => ipcRenderer.invoke('cf-search', opts),
+  getDownload: (opts: { modId: number; mcVersion: string }) => ipcRenderer.invoke('cf-get-download-url', opts),
+});
+
 contextBridge.exposeInMainWorld('cosmetics', {
   installMod: () => ipcRenderer.invoke('cosmetics-install-mod'),
   getUuid:    () => ipcRenderer.invoke('mc-get-uuid'),

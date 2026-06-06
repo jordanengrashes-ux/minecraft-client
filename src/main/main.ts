@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker, dialog, session } from 'electron';
-import { GEMINI_KEY } from './ai-key';
+import { GEMINI_KEY, CF_API_KEY } from './ai-key';
 import { autoUpdater } from 'electron-updater';
 import { execSync, spawnSync, spawn, ChildProcess } from 'child_process';
 import https from 'https';
@@ -1069,6 +1069,50 @@ ipcMain.handle('mc-install-modpack', async (_e: any, opts: { projectId: string }
   } catch (err: any) {
     return { ok: false, error: err.message };
   }
+});
+
+// ── CurseForge mod search ──────────────────────────────────────────────────────
+const CF_BASE = 'https://api.curseforge.com/v1';
+const cfHeaders = () => ({ 'x-api-key': CF_API_KEY, 'Content-Type': 'application/json' });
+
+ipcMain.handle('cf-search', async (_e, opts: { query: string; mcVersion: string }) => {
+  if (!CF_API_KEY) return { ok: false, error: 'No CurseForge API key configured' };
+  try {
+    const params = new URLSearchParams({
+      gameId: '432',           // Minecraft
+      searchFilter: opts.query,
+      modLoaderType: '4',      // Fabric
+      gameVersion: opts.mcVersion || '1.21.4',
+      pageSize: '20',
+      sortField: opts.query ? '2' : '6', // relevance : totalDownloads
+      sortOrder: 'desc',
+    });
+    const res = await fetch(`${CF_BASE}/mods/search?${params}`, { headers: cfHeaders() });
+    if (!res.ok) throw new Error(`CurseForge API error ${res.status}`);
+    const data: any = await res.json();
+    return { ok: true, data: data.data ?? [] };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('cf-get-download-url', async (_e, opts: { modId: number; mcVersion: string }) => {
+  if (!CF_API_KEY) return { ok: false, error: 'No CurseForge API key configured' };
+  try {
+    const params = new URLSearchParams({
+      gameVersion: opts.mcVersion || '1.21.4',
+      modLoaderType: '4',
+      pageSize: '5',
+    });
+    const res = await fetch(`${CF_BASE}/mods/${opts.modId}/files?${params}`, { headers: cfHeaders() });
+    if (!res.ok) throw new Error(`CurseForge API error ${res.status}`);
+    const data: any = await res.json();
+    const files: any[] = data.data ?? [];
+    if (!files.length) throw new Error('No files found for this Minecraft version');
+    const file = files[0];
+    // Build CDN URL from file ID
+    const id = file.id as number;
+    const url = file.downloadUrl || `https://mediafiles.forgecdn.net/files/${Math.floor(id/1000)}/${id%1000}/${encodeURIComponent(file.fileName)}`;
+    return { ok: true, url, filename: file.fileName, fileId: id };
+  } catch (err: any) { return { ok: false, error: err.message }; }
 });
 
 // ── options.txt helpers ───────────────────────────────────────────────────────

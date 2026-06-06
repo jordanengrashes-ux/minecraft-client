@@ -33,7 +33,8 @@ jobs:
           $key = "${{ secrets.GROQ_API_KEY }}"
           $path = Join-Path $PWD "src/main/ai-key.ts"
           $enc = New-Object System.Text.UTF8Encoding $false
-          [System.IO.File]::WriteAllText($path, "export const GEMINI_KEY = '$key';", $enc)
+          $cfKey = "${{ secrets.CF_API_KEY }}"
+          [System.IO.File]::WriteAllText($path, "export const GEMINI_KEY = '$key';`nexport const CF_API_KEY = '$cfKey';", $enc)
       - run: npm ci
       - run: npm run build && npx electron-builder --win --publish never
       - name: Collect artifacts
@@ -65,8 +66,10 @@ jobs:
           key: ${{ runner.os }}-electron-30
       - name: Create resource stubs
         run: mkdir -p resources/java21 resources/mods
-      - name: Inject Gemini API key
-        run: echo "export const GEMINI_KEY = '${{ secrets.GROQ_API_KEY }}';" > src/main/ai-key.ts
+      - name: Inject API keys
+        run: |
+          printf "export const GEMINI_KEY = '%s';\nexport const CF_API_KEY = '%s';\n" \
+            "${{ secrets.GROQ_API_KEY }}" "${{ secrets.CF_API_KEY }}" > src/main/ai-key.ts
       - run: npm ci
       - run: npm run build && npx electron-builder --linux --publish never
       - name: Collect artifacts

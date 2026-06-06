@@ -506,8 +506,10 @@ const chatPanelEl = document.getElementById('chat-panel')!;
 const navChat     = document.getElementById('nav-chat')!;
 const aiPanelEl   = document.getElementById('ai-panel')!;
 const navAi       = document.getElementById('nav-ai')!;
-const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl, chatPanelEl, aiPanelEl];
-const allNavs   = [navPlay, navBedrock, navMods, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navServer, navCosmetics, navFriends, navCustomize, navSettings, navChat, navAi];
+const cfPanelEl   = document.getElementById('curseforge-panel')!;
+const navCf       = document.getElementById('nav-curseforge')!;
+const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, cfPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl, chatPanelEl, aiPanelEl];
+const allNavs   = [navPlay, navBedrock, navMods, navCf, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navServer, navCosmetics, navFriends, navCustomize, navSettings, navChat, navAi];
 
 function showPanel(panel: HTMLElement, nav: HTMLElement) {
   allPanels.forEach(p => p.style.display = 'none');
@@ -518,6 +520,7 @@ function showPanel(panel: HTMLElement, nav: HTMLElement) {
 navPlay          .addEventListener('click', () => showPanel(contentEl,             navPlay));
 navBedrock       .addEventListener('click', () => { showPanel(bedrockPanelEl,      navBedrock); initBedrock(); if (!bedrockPanelEl.dataset.loaded) { searchBedrockAddons(''); bedrockPanelEl.dataset.loaded = '1'; } });
 navMods          .addEventListener('click', () => { showPanel(modsPanelEl,         navMods); if (!modsPanelEl.dataset.loaded) { loadRecommendedMods(); modsPanelEl.dataset.loaded = '1'; } });
+navCf            .addEventListener('click', () => { showPanel(cfPanelEl,           navCf);  if (!cfPanelEl.dataset.loaded)  { initCurseForge(); cfPanelEl.dataset.loaded = '1'; } });
 navPvp           .addEventListener('click', () => { showPanel(pvpPanelEl,          navPvp); if (!pvpPanelEl.dataset.loaded) { initPvpMods(); pvpPanelEl.dataset.loaded = '1'; } });
 navBedrockMods   .addEventListener('click', () => { showPanel(bedrockModsPanelEl,  navBedrockMods); if (!bedrockModsPanelEl.dataset.loaded) { searchBedrockMods(''); bedrockModsPanelEl.dataset.loaded = '1'; } });
 navResourcePacks .addEventListener('click', () => { showPanel(resourcePacksPanelEl,navResourcePacks); if (!resourcePacksPanelEl.dataset.loaded) { initResourcePacks(); resourcePacksPanelEl.dataset.loaded = '1'; } });
@@ -1736,6 +1739,109 @@ document.getElementById('mod-profile-save-btn')?.addEventListener('click', () =>
 });
 
 renderModProfiles();
+
+// ── CurseForge mod browser ────────────────────────────────────────────────────
+const cf = (window as any).curseforge;
+
+function initCurseForge() {
+  searchCurseForge('');
+  const searchEl = document.getElementById('cf-search') as HTMLInputElement;
+  let cfTimer: ReturnType<typeof setTimeout> | null = null;
+  searchEl.addEventListener('input', () => {
+    if (cfTimer) clearTimeout(cfTimer);
+    cfTimer = setTimeout(() => searchCurseForge(searchEl.value.trim()), 500);
+  });
+}
+
+async function searchCurseForge(query: string) {
+  const list    = document.getElementById('cf-list')!;
+  const loading = document.getElementById('cf-loading')!;
+  list.innerHTML = '';
+  loading.style.display = 'flex';
+  const ver = (document.getElementById('mc-version') as HTMLSelectElement)?.value || '1.21.4';
+  const res = await cf?.search({ query, mcVersion: ver });
+  loading.style.display = 'none';
+  if (!res?.ok) {
+    list.innerHTML = `<p style="color:#666;font-size:13px;padding:20px;text-align:center">${res?.error ?? 'CurseForge unavailable'}</p>`;
+    return;
+  }
+  if (!res.data?.length) {
+    list.innerHTML = '<p style="color:#484f58;font-size:13px;padding:20px;text-align:center">No results found</p>';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  for (const mod of res.data) {
+    const installed = loadInstalledMods();
+    const isOn = !!Object.values(installed).find((m: any) => m.cfId === mod.id);
+    const card = document.createElement('div');
+    card.className = 'mod-card' + (isOn ? ' enabled' : '');
+    const icon = mod.logo?.thumbnailUrl
+      ? `<img src="${mod.logo.thumbnailUrl}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
+      : `<div class="mod-icon" style="background:#1a0a00;border:1px solid #331100;"></div>`;
+    const dlCount = mod.downloadCount >= 1_000_000
+      ? `${(mod.downloadCount / 1_000_000).toFixed(1)}M`
+      : mod.downloadCount >= 1000 ? `${Math.round(mod.downloadCount / 1000)}k` : String(mod.downloadCount);
+    card.innerHTML = `
+      ${icon}
+      <div class="mod-info">
+        <div class="mod-name">${mod.name}</div>
+        <div class="mod-desc">${mod.summary}</div>
+        <div class="mod-tags">
+          <span class="mod-tag" style="background:rgba(241,100,54,0.1);color:#f16436;border-color:rgba(241,100,54,0.3);">CurseForge</span>
+          <span class="mod-tag" style="margin-left:auto">⬇ ${dlCount}</span>
+        </div>
+      </div>
+      <div class="mod-right">
+        <div class="mod-version" id="cfstatus-${mod.id}"></div>
+        <label class="toggle">
+          <input type="checkbox" ${isOn ? 'checked' : ''} />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>`;
+
+    const input   = card.querySelector('input') as HTMLInputElement;
+    const statusEl = card.querySelector('.mod-version') as HTMLElement;
+    if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+
+    input.addEventListener('change', async e => {
+      const checked = (e.target as HTMLInputElement).checked;
+      input.disabled = true;
+      if (checked) {
+        statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
+        try {
+          const dlRes = await cf.getDownload({ modId: mod.id, mcVersion: ver });
+          if (!dlRes.ok) throw new Error(dlRes.error);
+          statusEl.textContent = '⬇';
+          const installRes = await mc.installMod({ url: dlRes.url, filename: dlRes.filename });
+          if (!installRes.ok) throw new Error(installRes.error);
+          const ins = loadInstalledMods();
+          ins[`cf_${mod.id}`] = { filename: dlRes.filename, name: mod.name, mcVersion: ver, cfId: mod.id } as any;
+          saveInstalledMods(ins);
+          card.className = 'mod-card enabled';
+          statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+          updateModsBadge();
+        } catch (err: any) {
+          input.checked = false; card.className = 'mod-card';
+          statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+          statusEl.title = err.message;
+        }
+      } else {
+        const ins = loadInstalledMods();
+        const info = ins[`cf_${mod.id}`];
+        if (info && mc) await mc.removeMod({ filename: info.filename });
+        delete ins[`cf_${mod.id}`];
+        saveInstalledMods(ins);
+        card.className = 'mod-card';
+        statusEl.textContent = '';
+        updateModsBadge();
+      }
+      input.disabled = false;
+    });
+
+    frag.appendChild(card);
+  }
+  list.appendChild(frag);
+}
 
 function initPvpMods() {
   renderPvpMods('');

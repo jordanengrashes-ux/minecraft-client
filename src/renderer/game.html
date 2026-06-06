@@ -342,6 +342,7 @@
       <div class="nav-item" id="nav-bedrock">Bedrock Edition</div>
       <div class="nav-section-label">Mods</div>
       <div class="nav-item" id="nav-mods">Java Mods</div>
+      <div class="nav-item" id="nav-curseforge">CurseForge</div>
       <div class="nav-item" id="nav-pvp">PvP Mods</div>
       <div class="nav-item" id="nav-bedrock-mods">Bedrock Mods</div>
       <div class="nav-item" id="nav-resourcepacks">Resource Packs</div>
@@ -609,6 +610,27 @@
         Loading from Modrinth…
       </div>
       <div id="mods-list">
+        <!-- Populated by game.ts -->
+      </div>
+    </div>
+
+    <!-- CurseForge panel -->
+    <div id="curseforge-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="padding:18px 26px 14px;border-bottom:1px solid #1e1e1e;background:#111111;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <h2 style="font-size:17px;font-weight:700;">CurseForge</h2>
+          <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#f16436;background:rgba(241,100,54,0.12);border:1px solid rgba(241,100,54,0.25);border-radius:10px;padding:2px 8px;">Fabric</span>
+        </div>
+        <p style="color:#555555;font-size:12px;margin-bottom:12px;">Browse &amp; install mods from CurseForge</p>
+        <input id="cf-search" type="text" placeholder="Search CurseForge mods…"
+          style="width:100%;padding:10px 14px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;color:#ffffff;font-size:14px;outline:none;"
+          onfocus="this.style.borderColor='#f16436'" onblur="this.style.borderColor='#2a2a2a'" />
+      </div>
+      <div id="cf-loading" style="display:none;align-items:center;justify-content:center;gap:10px;padding:32px;color:#555555;font-size:13px;">
+        <div style="width:16px;height:16px;border:2px solid #2a2a2a;border-top-color:#f16436;border-radius:50%;animation:spin 0.7s linear infinite"></div>
+        Searching CurseForge…
+      </div>
+      <div id="cf-list" style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;">
         <!-- Populated by game.ts -->
       </div>
     </div>
