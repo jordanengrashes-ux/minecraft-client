@@ -138,6 +138,15 @@
       color: var(--muted);
       line-height: 1.55;
     }
+    .feat-group-label {
+      grid-column: 1 / -1;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--orange);
+      padding-top: 12px;
+    }
 
     /* Download */
     .download {
@@ -217,30 +226,103 @@
   <div class="divider"></div>
 
   <section class="features" id="features">
+
+    <div class="feat-group-label">Play</div>
+
     <div class="feat">
-      <div class="feat-title">Mod Browser</div>
-      <div class="feat-desc">Search Modrinth and install mods with one click. Required dependencies are downloaded automatically.</div>
+      <div class="feat-title">Java Edition</div>
+      <div class="feat-desc">Launch any Java version with Microsoft or offline login. Configure RAM, Java version, and Fabric loader in one place.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Bedrock Edition</div>
+      <div class="feat-desc">Launch Minecraft Bedrock directly from the launcher alongside Java — no switching between apps.</div>
+    </div>
+
+    <div class="feat-group-label">Mods</div>
+
+    <div class="feat">
+      <div class="feat-title">Java Mod Browser</div>
+      <div class="feat-desc">Search Modrinth and install any Java mod with one click. Required dependencies are downloaded automatically.</div>
     </div>
     <div class="feat">
       <div class="feat-title">Modpack Support</div>
-      <div class="feat-desc">Install full Modrinth modpacks instantly. The launcher configures the correct MC and Fabric versions for you.</div>
+      <div class="feat-desc">Install full Modrinth modpacks instantly. The launcher auto-configures the correct Minecraft and Fabric versions.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">PvP Mods</div>
+      <div class="feat-desc">Curated performance and PvP mod packs — Sodium, Lithium, Iris, Entity Culling and more — ready in seconds.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Bedrock Mods & Add-ons</div>
+      <div class="feat-desc">Browse and install Bedrock-compatible mods and add-ons from Modrinth directly inside the launcher.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Resource Packs</div>
+      <div class="feat-desc">Search, download, and manage resource packs from Modrinth. Installed packs update when you change MC version.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Mod Profiles</div>
+      <div class="feat-desc">Save and switch between mod loadouts. Create separate profiles for PvP, survival, and modpacks.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Minecraft Guide (AI)</div>
+      <div class="feat-desc">Built-in AI assistant for crafting recipes, game tips, and Minecraft questions — powered by a live language model.</div>
+    </div>
+
+    <div class="feat-group-label">Social</div>
+
+    <div class="feat">
+      <div class="feat-title">Skin Manager</div>
+      <div class="feat-desc">Upload and switch skins directly from the launcher. Supports both classic and slim skin variants.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Dedicated Server</div>
+      <div class="feat-desc">Host a 24/7 server from inside the app. Configure RAM, port, MOTD, max players, and auto-restart on crash.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Player Join Alerts</div>
+      <div class="feat-desc">Get a toast notification and the window restores when a player joins your server — even when minimized.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Cosmetics</div>
+      <div class="feat-desc">Equip custom capes visible to other Voxel Client users in-game via a built-in Fabric mod.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Friends & Messaging</div>
+      <div class="feat-desc">Add friends, send messages, and see who is online — all inside the launcher without needing Discord.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Global Chat</div>
+      <div class="feat-desc">Talk with other Voxel Client users across all servers in a built-in global chat channel.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Files Manager</div>
+      <div class="feat-desc">Install worlds and schematics by drag-and-drop. Quick-open your mods, saves, and resource pack folders.</div>
+    </div>
+
+    <div class="feat-group-label">Config</div>
+
+    <div class="feat">
+      <div class="feat-title">Screenshots Viewer</div>
+      <div class="feat-desc">Browse all your Minecraft screenshots inside the launcher and open them with one click.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-title">Account Manager</div>
+      <div class="feat-desc">Manage multiple Microsoft accounts and switch between them without re-logging in.</div>
     </div>
     <div class="feat">
       <div class="feat-title">Auto Updates</div>
       <div class="feat-desc">The launcher updates itself silently in the background. You always have the latest version without doing anything.</div>
     </div>
     <div class="feat">
-      <div class="feat-title">Server Manager</div>
-      <div class="feat-desc">Run a 24/7 dedicated server from inside the launcher. Configure RAM, port, MOTD, and get notified when players join.</div>
+      <div class="feat-title">Start with Windows</div>
+      <div class="feat-desc">Set the launcher to open automatically at boot so your server is always ready when the PC starts.</div>
     </div>
     <div class="feat">
-      <div class="feat-title">Microsoft Login</div>
-      <div class="feat-desc">Full Microsoft account support for online play, plus offline mode for LAN and practice worlds.</div>
+      <div class="feat-title">Customize</div>
+      <div class="feat-desc">Personalize the launcher appearance and settings to match your preferences.</div>
     </div>
-    <div class="feat">
-      <div class="feat-title">Performance Mods</div>
-      <div class="feat-desc">Curated packs — Sodium, Lithium, Iris and more — ready to install in seconds from the built-in mod browser.</div>
-    </div>
+
   </section>
 
   <section class="download" id="download">
