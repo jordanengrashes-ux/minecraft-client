@@ -73,6 +73,7 @@
       background:var(--surface); border:1px solid var(--border); border-radius:14px;
       padding:28px 24px; cursor:pointer; position:relative; overflow:hidden;
       transition:border-color 0.25s, transform 0.18s, box-shadow 0.25s, background 0.25s;
+      color:inherit; text-decoration:none; display:block;
     }
     .top-feat::before { content:''; position:absolute; inset:0; border-radius:14px; background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(245,166,35,0.09) 0%,transparent 65%); opacity:0; transition:opacity 0.3s; }
     .top-feat:hover { border-color:rgba(245,166,35,0.38); background:#141414; transform:translateY(-4px); box-shadow:0 10px 32px rgba(0,0,0,0.45); }
@@ -134,24 +135,24 @@
   </section>
 
   <div class="top-feats">
-    <div class="top-feat reveal" onclick="location.href='features.html#mods'">
+    <a class="top-feat reveal" href="features.html#mods">
       <div class="feat-num">01</div>
       <div class="feat-title">Instant Mod Install</div>
       <div class="feat-desc">Search Modrinth &amp; CurseForge and enable any mod with one toggle. Dependencies install automatically.</div>
       <div class="feat-arrow">See more <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
-    </div>
-    <div class="top-feat reveal" onclick="location.href='features.html#server'">
+    </a>
+    <a class="top-feat reveal" href="features.html#server">
       <div class="feat-num">02</div>
       <div class="feat-title">Dedicated Server</div>
       <div class="feat-desc">Host a 24/7 server from inside the app. Auto-restart, player alerts, and Windows boot launch.</div>
       <div class="feat-arrow">See more <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
-    </div>
-    <div class="top-feat reveal" onclick="location.href='features.html#updates'">
+    </a>
+    <a class="top-feat reveal" href="features.html#updates">
       <div class="feat-num">03</div>
       <div class="feat-title">Silent Auto Updates</div>
       <div class="feat-desc">The launcher updates itself in the background while you play. You never do anything manually.</div>
       <div class="feat-arrow">See more <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
-    </div>
+    </a>
   </div>
 
   <div class="see-all reveal"><a href="features.html">View all features →</a></div>
