@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Features — Voxel Client</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --orange: #f5a623;
+      --orange-dim: rgba(245,166,35,0.08);
+      --orange-border: rgba(245,166,35,0.2);
+      --bg: #0d0d0d;
+      --surface: #111;
+      --border: #1e1e1e;
+      --text: #e6e6e6;
+      --muted: #555;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Subtle orange gradient wash across the top */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 420px;
+      background: linear-gradient(180deg, rgba(245,166,35,0.07) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    nav {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 48px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--orange);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-decoration: none;
+    }
+    .nav-links { display: flex; gap: 32px; }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-links a.active { color: var(--orange); }
+
+    /* Hero */
+    .hero {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 80px 24px 60px;
+    }
+    .hero-label {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--orange);
+      border: 1px solid var(--orange-border);
+      background: var(--orange-dim);
+      padding: 5px 14px;
+      border-radius: 20px;
+      margin-bottom: 22px;
+    }
+    .hero h1 {
+      font-size: clamp(32px, 5vw, 54px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin-bottom: 14px;
+    }
+    .hero h1 span {
+      color: var(--orange);
+    }
+    .hero p {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    /* Feature grid */
+    .grid-wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 1020px;
+      margin: 0 auto;
+      padding: 0 24px 96px;
+    }
+
+    .group {
+      margin-bottom: 56px;
+    }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .group-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--orange);
+    }
+    .group-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .feat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .feat:hover {
+      border-color: var(--orange-border);
+      background: rgba(245,166,35,0.03);
+    }
+    .feat-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 7px;
+    }
+    .feat-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* Back link */
+    .back-btn {
+      display: inline-block;
+      margin: 40px 0 0 48px;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      position: relative;
+      z-index: 1;
+      transition: color 0.15s;
+    }
+    .back-btn:hover { color: var(--orange); }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+      position: relative;
+      z-index: 1;
+    }
+    footer a { color: var(--orange); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      nav { padding: 16px 20px; }
+      .back-btn { margin-left: 20px; }
+    }
+    /* Scroll reveal */
+    .reveal {
+      opacity: 0;
+      transform: translateY(32px);
+      filter: blur(4px);
+      transition: opacity 0.6s ease, transform 0.6s ease, filter 0.6s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="logo">Voxel Client</a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="features.html" class="active">Features</a>
+      <a href="index.html#download">Download</a>
+      <a href="https://github.com/jordanengrashes-ux/minecraft-client" target="_blank">GitHub</a>
+    </div>
+  </nav>
+
+  <a href="index.html" class="back-btn">← Back to home</a>
+
+  <section class="hero reveal">
+    <div class="hero-label">Everything included</div>
+    <h1>Built for <span>serious</span> players</h1>
+    <p>Every feature Voxel Client ships with — no paywalls, no subscriptions.</p>
+  </section>
+
+  <div class="grid-wrap">
+
+    <div class="group">
+      <div class="group-header reveal">
+        <span class="group-title">Play</span>
+        <div class="group-line"></div>
+      </div>
+      <div class="feat-grid reveal">
+        <div class="feat">
+          <div class="feat-title">Java Edition</div>
+          <div class="feat-desc">Launch any Java version with Microsoft or offline login. Configure RAM, Java version, and Fabric loader in one place.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Bedrock Edition</div>
+          <div class="feat-desc">Launch Minecraft Bedrock directly from the launcher alongside Java — no switching between apps.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Offline Mode</div>
+          <div class="feat-desc">Play offline with a custom username for LAN worlds and practice — no Microsoft account needed.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Memory Control</div>
+          <div class="feat-desc">Set minimum and maximum RAM allocation per launch so Minecraft always has exactly what it needs.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Java Version Picker</div>
+          <div class="feat-desc">Switch between Java 17 and Java 21 builds to match older modpacks or newer Minecraft versions.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Crash Reports</div>
+          <div class="feat-desc">View the latest crash report directly inside the launcher when Minecraft closes unexpectedly.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-header reveal">
+        <span class="group-title">Mods</span>
+        <div class="group-line"></div>
+      </div>
+      <div class="feat-grid reveal">
+        <div class="feat">
+          <div class="feat-title">Java Mod Browser</div>
+          <div class="feat-desc">Search Modrinth and install any Fabric mod with one toggle. Required dependencies download automatically.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Modpack Support</div>
+          <div class="feat-desc">Install full Modrinth modpacks instantly. Auto-configures the correct Minecraft and Fabric versions.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Modpack Updates</div>
+          <div class="feat-desc">Update installed modpacks to the latest release with one click — no manual re-install needed.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">PvP Mods</div>
+          <div class="feat-desc">Curated performance and PvP mods — Sodium, Lithium, Iris, Entity Culling, ImmediatelyFast and more.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Bedrock Mods & Add-ons</div>
+          <div class="feat-desc">Browse and install Bedrock-compatible mods and add-ons directly inside the launcher.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Resource Packs</div>
+          <div class="feat-desc">Search, download, and manage resource packs from Modrinth. Update packs when you change MC version.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Mod Profiles</div>
+          <div class="feat-desc">Save and switch between mod loadouts. Separate profiles for PvP, survival, creative, and modpacks.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Enable / Disable Mods</div>
+          <div class="feat-desc">Toggle individual mods on or off without deleting them. Disabled mods stay installed for quick re-enabling.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Mod Conflict Detection</div>
+          <div class="feat-desc">Conflicting mods are automatically disabled when you enable a mod that is incompatible with them.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Minecraft Guide (AI)</div>
+          <div class="feat-desc">Built-in AI assistant for crafting recipes, game tips, and Minecraft questions — with multi-session history.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-header reveal">
+        <span class="group-title">Social</span>
+        <div class="group-line"></div>
+      </div>
+      <div class="feat-grid reveal">
+        <div class="feat">
+          <div class="feat-title">Skin Manager</div>
+          <div class="feat-desc">Upload and apply skins directly from the launcher. Supports classic and slim variants with live preview.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Dedicated Server</div>
+          <div class="feat-desc">Host a 24/7 server from inside the app. Configure RAM, port, MOTD, max players, and auto-restart on crash.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Player Join Alerts</div>
+          <div class="feat-desc">Get a notification and window restore when a player joins your server — even when minimized.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Keep Awake</div>
+          <div class="feat-desc">Prevents the PC from sleeping while a server is running so your server stays online 24/7.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Cosmetics</div>
+          <div class="feat-desc">Equip custom capes visible to other Voxel Client users in-game via a built-in Fabric mod.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Friends & Messaging</div>
+          <div class="feat-desc">Add friends, send messages, and see who is online — all inside the launcher.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Global Chat</div>
+          <div class="feat-desc">Talk with other Voxel Client users across all servers in a built-in global chat channel.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Files Manager</div>
+          <div class="feat-desc">Install worlds and schematics by drag-and-drop. Quick-open mods, saves, and resource pack folders.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-header reveal">
+        <span class="group-title">Config</span>
+        <div class="group-line"></div>
+      </div>
+      <div class="feat-grid reveal">
+        <div class="feat">
+          <div class="feat-title">Screenshots Viewer</div>
+          <div class="feat-desc">Browse all Minecraft screenshots inside the launcher and open them with one click.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Account Manager</div>
+          <div class="feat-desc">Manage multiple Microsoft accounts and switch between them without re-logging in each time.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Auto Updates</div>
+          <div class="feat-desc">The launcher updates itself silently in the background. Always on the latest version automatically.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Start with Windows</div>
+          <div class="feat-desc">Set the launcher to open at boot so your server is always ready when the PC starts.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Customize</div>
+          <div class="feat-desc">Personalize the launcher appearance, backgrounds, and settings to match your setup.</div>
+        </div>
+        <div class="feat">
+          <div class="feat-title">Game Repair</div>
+          <div class="feat-desc">Reinstall corrupted Minecraft files with one click — no manual file deletion needed.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    Not affiliated with Mojang or Microsoft. &nbsp;&middot;&nbsp;
+    <a href="https://github.com/jordanengrashes-ux/minecraft-client">GitHub</a>
+  </footer>
+
+  <script>
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          // Stagger siblings slightly
+          const delay = i * 60;
+          setTimeout(() => e.target.classList.add('visible'), delay);
+          obs.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.08 });
+
+    document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+  </script>
+</body>
+</html>
