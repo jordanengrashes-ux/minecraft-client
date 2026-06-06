@@ -13,6 +13,7 @@ const { Client } = require('minecraft-launcher-core');
 let loginWin:   BrowserWindow | null = null;
 let gameWin:    BrowserWindow | null = null;
 let overlayWin: BrowserWindow | null = null;
+let aiWin:      BrowserWindow | null = null;
 let mcAuthToken: any = null;
 let updateReady = false;
 let serverProcess: ChildProcess | null = null;
@@ -1364,6 +1365,20 @@ RESPONSE STYLE:
 - If asked about something outside Minecraft/Voxel Client, politely redirect
 
 REMEMBER across the conversation: the user's previous questions, items they asked about, and context they provided. Build on prior messages rather than starting fresh each time.`;
+
+ipcMain.handle('open-ai-window', () => {
+  if (aiWin && !aiWin.isDestroyed()) { aiWin.focus(); return; }
+  aiWin = new BrowserWindow({
+    width: 480, height: 600,
+    minWidth: 360, minHeight: 400,
+    title: 'AI Chat — Voxel Client',
+    backgroundColor: '#0a0a0a',
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+  });
+  if (DEV) aiWin.loadURL('http://localhost:5173/ai-chat.html');
+  else aiWin.loadFile(path.join(__dirname, '../dist/ai-chat.html'));
+  aiWin.on('closed', () => { aiWin = null; });
+});
 
 ipcMain.handle('ai-chat', async (_e, messages: { role: string; content: string }[]) => {
   if (!GEMINI_KEY) return { ok: false, error: 'AI not available in this build' };

@@ -1339,6 +1339,11 @@
   <!-- Saves dropdown — fixed so it escapes overflow:hidden panels -->
   <div id="srv-saves-menu" style="display:none;position:fixed;background:#141414;border:1px solid #2a2a2a;border-radius:8px;min-width:200px;max-height:200px;overflow-y:auto;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);"></div>
 
+  <!-- Right-click context menu -->
+  <div id="chat-ctx-menu" style="display:none;position:fixed;background:#141414;border:1px solid #2a2a2a;border-radius:6px;z-index:99999;overflow:hidden;min-width:120px;box-shadow:0 8px 24px rgba(0,0,0,0.6);">
+    <button id="chat-ctx-delete" style="width:100%;padding:8px 14px;background:none;border:none;color:#f85149;font-size:12px;cursor:pointer;text-align:left;font-family:inherit;">Delete message</button>
+  </div>
+
   <!-- Admin: Announce modal -->
   <div id="chat-announce-modal">
     <div class="chat-modal-box">

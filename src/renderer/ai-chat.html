@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Chat — Voxel Client</title>
+  <style>
+    * { margin:0;padding:0;box-sizing:border-box; }
+    body { background:#0a0a0a;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden; }
+
+    #session-bar { display:flex;align-items:center;gap:3px;padding:4px 8px;border-bottom:1px solid #1a1a1a;background:#060606;flex-shrink:0;overflow-x:auto;scrollbar-width:none; }
+    #session-bar::-webkit-scrollbar { display:none; }
+    .stab { background:none;border:1px solid transparent;border-radius:5px;color:#484f58;font-size:10px;cursor:pointer;padding:3px 9px;white-space:nowrap;font-family:inherit;display:flex;align-items:center;gap:4px; }
+    .stab:hover { color:#8b949e;border-color:#1e1e1e; }
+    .stab.active { color:#e6edf3;border-color:#2a2a2a;background:#111; }
+    .stab-x { color:#484f58;font-size:9px; }
+    .stab-x:hover { color:#f85149; }
+    #new-sess { background:none;border:1px solid transparent;border-radius:5px;color:#484f58;font-size:16px;cursor:pointer;padding:0 8px;line-height:1.5;font-family:inherit;flex-shrink:0; }
+    #new-sess:hover { color:#8b949e;border-color:#1e1e1e; }
+
+    #messages { flex:1;overflow-y:auto;padding:12px;scrollbar-width:thin;scrollbar-color:#222 transparent;display:flex;flex-direction:column;gap:8px; }
+    .bubble { max-width:85%;padding:8px 12px;border-radius:10px;font-size:12px;line-height:1.6;word-break:break-word; }
+    .bubble.user { background:#1e1e1e;border:1px solid #2a2a2a;align-self:flex-end;color:#e6edf3; }
+    .bubble.ai { background:#0d1117;border:1px solid #21262d;align-self:flex-start;color:#e6edf3; }
+    .bubble.ai strong { color:#79c0ff; }
+    .bubble.ai em { color:#d2a679; }
+    .bubble.ai code { background:#161b22;padding:1px 5px;border-radius:3px;font-size:11px;color:#79c0ff;font-family:monospace; }
+    .bubble.ai pre { background:#161b22;padding:8px 10px;border-radius:6px;overflow-x:auto;margin:4px 0;font-size:11px; }
+    .bubble.ai ul,.bubble.ai ol { padding-left:16px;margin:4px 0; }
+    .bubble.typing { color:#484f58;font-style:italic; }
+
+    #input-row { padding:8px 10px;border-top:1px solid #1e1e1e;background:#080808;flex-shrink:0;display:flex;gap:6px;align-items:center; }
+    #ai-input { flex:1;background:#0d0d0d;border:1px solid #222;border-radius:5px;padding:7px 10px;color:#fff;font-size:12px;outline:none;font-family:inherit; }
+    #ai-input:focus { border-color:#333; }
+    #web-badge { display:none;font-size:9px;color:#58a6ff;border:1px solid #1e3a5f;border-radius:3px;padding:1px 5px;flex-shrink:0; }
+    #clear-btn { background:none;border:none;color:#484f58;font-size:11px;cursor:pointer;padding:4px 6px;font-family:inherit; }
+    #clear-btn:hover { color:#8b949e; }
+    #send-btn { background:#1e1e1e;border:1px solid #333;border-radius:5px;padding:7px 14px;color:#fff;font-size:12px;cursor:pointer;white-space:nowrap; }
+    #send-btn:hover:not(:disabled) { background:#252525; }
+    #send-btn:disabled { opacity:0.4;cursor:default; }
+  </style>
+</head>
+<body>
+  <div id="session-bar">
+    <button id="new-sess" title="New chat">+</button>
+  </div>
+  <div id="messages"></div>
+  <div id="input-row">
+    <input id="ai-input" type="text" maxlength="500" placeholder="Ask anything about Minecraft…" />
+    <span id="web-badge">Web</span>
+    <button id="clear-btn">Clear</button>
+    <button id="send-btn">Send</button>
+  </div>
+  <script type="module" src="./ai-chat.ts"></script>
+</body>
+</html>

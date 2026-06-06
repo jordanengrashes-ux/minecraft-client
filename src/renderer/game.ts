@@ -3521,11 +3521,12 @@ function usernameColor(name: string): string {
   return `hsl(${hue},55%,42%)`;
 }
 
-function appendChatMessage(m: { user: string; text: string; ts: number; type?: string }, container: HTMLElement, myName: string) {
+function appendChatMessage(m: { user: string; text: string; ts: number; type?: string }, container: HTMLElement, myName: string, fireKey?: string) {
   const time = new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   if (m.type === 'announcement') {
     const div = document.createElement('div');
     div.className = 'chat-announcement';
+    if (fireKey) div.dataset.fireKey = fireKey;
     div.innerHTML =
       `<span style="font-size:10px;color:#8b949e;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Announcement</span>` +
       `<div style="color:#ffffff;font-size:13px;margin-top:5px;word-break:break-word;">${escHtml(m.text)}</div>` +
@@ -3538,6 +3539,7 @@ function appendChatMessage(m: { user: string; text: string; ts: number; type?: s
   const adminBadge = isAdmin ? ` <span class="chat-admin-badge">ADMIN</span>` : '';
 
   const row = document.createElement('div');
+  if (fireKey) row.dataset.fireKey = fireKey;
   // My messages: bubble pushed to right. Others: avatar + bubble on left.
   row.style.cssText = `display:flex;align-items:flex-end;gap:7px;${isMe ? 'justify-content:flex-end;' : ''}`;
 
@@ -3893,14 +3895,14 @@ function initChat() {
   const msgsQuery = query(ref(rtdb, 'voxel_chat/messages'), limitToLast(100));
   onValue(msgsQuery, snap => {
     const val = snap.val() || {};
-    const msgs: { user: string; text: string; ts: number; type?: string }[] = Object.values(val);
-    msgs.sort((a, b) => a.ts - b.ts);
+    const entries = Object.entries(val) as [string, { user: string; text: string; ts: number; type?: string }][];
+    entries.sort(([,a], [,b]) => a.ts - b.ts);
     const atBottom = msgsEl.scrollHeight - msgsEl.scrollTop <= msgsEl.clientHeight + 60;
     msgsEl.innerHTML = '';
-    if (msgs.length === 0) {
+    if (entries.length === 0) {
       msgsEl.innerHTML = '<div style="color:#2a2a2a;font-size:12px;text-align:center;margin:auto;">No messages yet — say hi!</div>';
     } else {
-      msgs.forEach(m => appendChatMessage(m, msgsEl, myName));
+      entries.forEach(([key, m]) => appendChatMessage(m, msgsEl, myName, key));
     }
     if (atBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
   }, { onlyOnce: true });
@@ -3922,7 +3924,7 @@ function initChat() {
       }
     }
     const atBottom = msgsEl.scrollHeight - msgsEl.scrollTop <= msgsEl.clientHeight + 80;
-    appendChatMessage(m, msgsEl, myName);
+    appendChatMessage(m, msgsEl, myName, snap.key!);
     if (atBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
   });
 
@@ -3965,6 +3967,30 @@ function initChat() {
     push(ref(rtdb, 'voxel_chat/messages'), { user: myName, text, ts: Date.now(), type: 'announcement' }).catch(() => {});
     announceModal.style.display = 'none';
     setTimeout(() => { msgsEl.scrollTop = msgsEl.scrollHeight; }, 80);
+  });
+
+  // Right-click context menu (admin: delete message)
+  const ctxMenu   = document.getElementById('chat-ctx-menu')!;
+  const ctxDelete = document.getElementById('chat-ctx-delete')!;
+  let ctxKey: string | null = null;
+
+  msgsEl.addEventListener('contextmenu', e => {
+    if (!adminList.has(myName)) return;
+    const target = (e.target as HTMLElement).closest('[data-fire-key]') as HTMLElement | null;
+    if (!target) return;
+    e.preventDefault();
+    ctxKey = target.dataset.fireKey || null;
+    ctxMenu.style.display = 'block';
+    ctxMenu.style.left = e.clientX + 'px';
+    ctxMenu.style.top  = e.clientY + 'px';
+  });
+
+  document.addEventListener('click', () => { ctxMenu.style.display = 'none'; ctxKey = null; }, true);
+
+  ctxDelete.addEventListener('click', () => {
+    if (ctxKey) remove(ref(rtdb, `voxel_chat/messages/${ctxKey}`)).catch(() => {});
+    ctxKey = null;
+    ctxMenu.style.display = 'none';
   });
 
   // Timeout modal
@@ -4488,13 +4514,14 @@ function initGuide() {
 
   document.querySelectorAll<HTMLButtonElement>('.guide-tab').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (btn.dataset.tab === 'chat') { mc.openAiWindow(); return; }
       document.querySelectorAll('.guide-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activeTab = btn.dataset.tab || 'recipes';
       searchEl.value = '';
-      searchBar.style.display = activeTab === 'chat' ? 'none' : 'block';
-      chatInputEl.style.display = activeTab === 'chat' ? 'flex' : 'none';
-      sessionBar.style.display = activeTab === 'chat' ? 'flex' : 'none';
+      searchBar.style.display = 'block';
+      chatInputEl.style.display = 'none';
+      sessionBar.style.display = 'none';
       renderTab();
     });
   });

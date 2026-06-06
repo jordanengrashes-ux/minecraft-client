@@ -13,6 +13,7 @@ export default defineConfig({
         login:   path.resolve(__dirname, 'src/renderer/login.html'),
         game:    path.resolve(__dirname, 'src/renderer/game.html'),
         overlay: path.resolve(__dirname, 'src/renderer/overlay.html'),
+        'ai-chat': path.resolve(__dirname, 'src/renderer/ai-chat.html'),
       },
     },
   },
