@@ -42,13 +42,25 @@
     .feat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin-bottom:48px; }
     .feat {
       background:var(--surface); border:1px solid var(--border); border-radius:10px;
-      padding:22px; cursor:pointer;
-      transition:border-color 0.2s, background 0.2s, transform 0.15s;
+      padding:22px; cursor:pointer; position:relative; overflow:hidden;
+      transition:border-color 0.25s, background 0.25s, transform 0.18s, box-shadow 0.25s;
     }
-    .feat:hover { border-color:var(--orange-border); background:rgba(245,166,35,0.03); transform:translateY(-2px); }
-    .feat-title { font-size:13px; font-weight:700; margin-bottom:7px; }
-    .feat-desc  { font-size:12px; color:var(--muted); line-height:1.55; }
-    .feat-cta   { margin-top:12px; font-size:11px; color:var(--orange); font-weight:600; }
+    .feat::before {
+      content:''; position:absolute; inset:0; border-radius:10px;
+      background:radial-gradient(circle at var(--mx,50%) var(--my,50%), rgba(245,166,35,0.08) 0%, transparent 65%);
+      opacity:0; transition:opacity 0.3s;
+    }
+    .feat:hover { border-color:rgba(245,166,35,0.35); background:#141414; transform:translateY(-3px); box-shadow:0 8px 28px rgba(0,0,0,0.4); }
+    .feat:hover::before { opacity:1; }
+    .feat:active { transform:translateY(-1px) scale(0.98); }
+    .feat-title { font-size:13px; font-weight:700; margin-bottom:7px; position:relative; }
+    .feat-desc  { font-size:12px; color:var(--muted); line-height:1.55; position:relative; }
+    .feat-cta   { margin-top:12px; font-size:11px; color:var(--orange); font-weight:600; opacity:0; transform:translateX(-4px); transition:opacity 0.2s, transform 0.2s; position:relative; }
+    .feat:hover .feat-cta { opacity:1; transform:translateX(0); }
+
+    /* Ripple */
+    .ripple { position:absolute; border-radius:50%; background:rgba(245,166,35,0.18); transform:scale(0); animation:rippleAnim 0.5s linear; pointer-events:none; }
+    @keyframes rippleAnim { to { transform:scale(4); opacity:0; } }
 
     /* Download */
     .download { position:relative; z-index:1; text-align:center; padding:64px 24px 96px; border-top:1px solid var(--border); }
@@ -329,6 +341,24 @@
         const exe = (d.assets||[]).find(a => a.name.includes('Setup') && a.name.endsWith('.exe'));
         if (exe) { document.getElementById('win-dl').href = exe.browser_download_url; document.getElementById('dl-btn').href = exe.browser_download_url; }
       }).catch(()=>{});
+
+    // Mouse-tracking glow + ripple on feature cards
+    document.querySelectorAll('.feat').forEach(card => {
+      card.addEventListener('mousemove', e => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+        card.style.setProperty('--my', ((e.clientY - r.top)  / r.height * 100) + '%');
+      });
+      card.addEventListener('click', e => {
+        const r = card.getBoundingClientRect();
+        const rip = document.createElement('span');
+        const size = Math.max(r.width, r.height);
+        rip.className = 'ripple';
+        rip.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-r.left-size/2}px;top:${e.clientY-r.top-size/2}px`;
+        card.appendChild(rip);
+        setTimeout(() => rip.remove(), 520);
+      });
+    });
 
     const obs = new IntersectionObserver(entries => {
       entries.forEach((e,i) => {
