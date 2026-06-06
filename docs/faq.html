@@ -143,7 +143,10 @@
       btn.addEventListener('click', () => btn.closest('.faq-item').classList.toggle('open'));
     });
     const obs = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('visible'); }
+        else { e.target.classList.remove('visible'); }
+      });
     }, { threshold: 0.1 });
     document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
   </script>
