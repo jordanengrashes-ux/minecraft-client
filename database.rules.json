@@ -1,36 +1,70 @@
 {
   "rules": {
+
     "voxel_admins": {
       ".read": true,
       ".write": false
     },
-    "voxel_timeouts": {
-      ".read": true,
-      ".write": true
-    },
+
     "voxel_chat": {
       ".read": true,
       ".write": true
     },
+
     "voxel_chat_online": {
       ".read": true,
       ".write": true
     },
-    "voxel_voice": {
+
+    "voxel_timeouts": {
       ".read": true,
       ".write": true
     },
-    "mc_servers": {
-      ".read": true,
-      ".write": true
-    },
+
     "voxel_feedback": {
       ".read": true,
       ".write": true
     },
+
+    "voxel_voice": {
+      ".read": true,
+      ".write": true
+    },
+
+    "voxel_tokens": {
+      ".read": true,
+      ".write": true
+    },
+
+    "voxel_presence": {
+      ".read": true,
+      ".write": true
+    },
+
+    "voxel_user_index": {
+      ".read": true,
+      ".write": true
+    },
+
+    "voxel_friends": {
+      ".read": true,
+      ".write": true
+    },
+
+    "voxel_capes": {
+      ".read": true,
+      ".write": true
+    },
+
     "voxel_users": {
       ".read": true,
       ".write": true
+    },
+
+    "mc_servers": {
+      ".read": true,
+      ".write": true
     }
+
   }
 }
