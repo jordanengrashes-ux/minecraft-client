@@ -1053,7 +1053,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
       statusEl.textContent = '…';
       statusEl.style.color = '#f6c356';
       try {
-        const ver = mcVersion.value || '1.21.4';
+        const ver = mcVersion.value || '26.1.2';
         const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '20' });
         const vRes = await fetch(`https://api.modrinth.com/v2/project/${mod.project_id}/version?${params}`);
         const searchData: any[] = await vRes.json();
@@ -1462,7 +1462,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
     updateBtn.disabled = true;
     updateBtn.textContent = 'Updating…';
     try {
-      await installOneMod(mod, mcVersion.value || '1.21.4');
+      await installOneMod(mod, mcVersion.value || '26.1.2');
       renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
     } catch {
       updateBtn.textContent = '✗ Failed';
@@ -1498,7 +1498,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
 
       statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
       try {
-        const ver = mcVersion.value || '1.21.4';
+        const ver = mcVersion.value || '26.1.2';
         const curInstalled = loadInstalledMods();
         // Install deps that are missing OR installed for the wrong MC version
         const depsToInstall = (mod.deps || [])
@@ -1684,7 +1684,7 @@ function renderModProfiles() {
     });
 
     updateProfileBtn.addEventListener('click', async () => {
-      const ver = mcVersion.value || '1.21.4';
+      const ver = mcVersion.value || '26.1.2';
       updateProfileBtn.disabled = true;
       let done = 0;
       for (const slug of profile.slugs) {
@@ -1758,7 +1758,7 @@ async function searchCurseForge(query: string) {
   const loading = document.getElementById('cf-loading')!;
   list.innerHTML = '';
   loading.style.display = 'flex';
-  const ver = (document.getElementById('mc-version') as HTMLSelectElement)?.value || '1.21.4';
+  const ver = (document.getElementById('mc-version') as HTMLSelectElement)?.value || '26.1.2';
   const res = await cf?.search({ query, mcVersion: ver });
   loading.style.display = 'none';
   if (!res?.ok) {
@@ -4930,4 +4930,6 @@ function initGuide() {
   updateTabLabels();
   renderRecipes('');
 }
+
+
 
