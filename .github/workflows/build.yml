@@ -27,14 +27,14 @@ jobs:
       - name: Create resource stubs
         shell: pwsh
         run: New-Item -ItemType Directory -Force -Path resources/java21,resources/mods
-      - name: Inject Groq API key
+      - name: Inject API keys
         shell: pwsh
         run: |
-          $key = "${{ secrets.GROQ_API_KEY }}"
-          $path = Join-Path $PWD "src/main/ai-key.ts"
-          $enc = New-Object System.Text.UTF8Encoding $false
-          $cfKey = "${{ secrets.CF_API_KEY }}"
-          [System.IO.File]::WriteAllText($path, "export const GEMINI_KEY = '$key';`nexport const CF_API_KEY = '$cfKey';", $enc)
+          $groq = "${{ secrets.GROQ_API_KEY }}"
+          $cf   = "${{ secrets.CF_API_KEY }}"
+          $enc  = New-Object System.Text.UTF8Encoding $false
+          $content = "export const GEMINI_KEY = '$groq';`nexport const CF_API_KEY = '$cf';"
+          [System.IO.File]::WriteAllText((Join-Path $PWD "src/main/ai-key.ts"), $content, $enc)
       - run: npm ci
       - run: npm run build && npx electron-builder --win --publish never
       - name: Collect artifacts
@@ -43,110 +43,34 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist-artifacts
           Get-ChildItem -Path release -Recurse -Include *.exe,*.blockmap,*.yml |
             Copy-Item -Destination dist-artifacts
+      - name: List artifacts
+        shell: pwsh
+        run: Get-ChildItem dist-artifacts
       - uses: actions/upload-artifact@v4
         with:
           name: release-windows
           path: dist-artifacts/
           if-no-files-found: error
 
-  build-linux:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/electron
-            ~/.cache/electron-builder
-          key: ${{ runner.os }}-electron-30
-      - name: Create resource stubs
-        run: mkdir -p resources/java21 resources/mods
-      - name: Inject API keys
-        run: |
-          printf "export const GEMINI_KEY = '%s';\nexport const CF_API_KEY = '%s';\n" \
-            "${{ secrets.GROQ_API_KEY }}" "${{ secrets.CF_API_KEY }}" > src/main/ai-key.ts
-      - run: npm ci
-      - run: npm run build && npx electron-builder --linux --publish never
-      - name: Collect artifacts
-        run: |
-          mkdir -p dist-artifacts
-          find release -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.blockmap" -o -name "*.yml" \) \
-            -exec cp {} dist-artifacts/ \;
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-linux
-          path: dist-artifacts/
-          if-no-files-found: error
-
-  build-mac:
-    runs-on: macos-14
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/Library/Caches/electron
-            ~/Library/Caches/electron-builder
-          key: macos-14-electron-30-v3
-      - name: Create resource stubs
-        run: mkdir -p resources/java21 resources/mods
-      - run: npm ci
-      - env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npm run build && npx electron-builder --mac --publish never
-      - name: Collect artifacts
-        run: |
-          mkdir -p dist-artifacts
-          find release -type f \( -name "*.dmg" -o -name "*.blockmap" -o -name "*.yml" \) \
-            -exec cp {} dist-artifacts/ \;
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-mac
-          path: dist-artifacts/
-          if-no-files-found: warn
-
   publish:
-    needs: [build-windows, build-linux, build-mac]
-    if: always() && needs.build-windows.result == 'success'
+    needs: [build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: release-windows
-          path: release-files
-      - name: Download Linux artifacts (optional)
-        uses: actions/download-artifact@v4
-        if: needs.build-linux.result == 'success'
-        with:
-          name: release-linux
-          path: release-files
-      - name: Download Mac artifacts (optional)
-        uses: actions/download-artifact@v4
-        if: needs.build-mac.result == 'success'
-        with:
-          name: release-mac
-          path: release-files
+          path: dist
+      - name: List files
+        run: ls -la dist/
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Files to release:"
-          ls release-files/
-          gh release delete "${{ github.ref_name }}" --yes 2>/dev/null || true
-          # Build file list safely (handles spaces in filenames)
-          mapfile -d '' files < <(find release-files -type f -print0)
-          gh release create "${{ github.ref_name }}" \
-            --title "Voxel Client ${{ github.ref_name }}" \
-            --notes "Voxel Client ${{ github.ref_name }}" \
+          tag="${{ github.ref_name }}"
+          gh release delete "$tag" --yes 2>/dev/null || true
+          mapfile -d '' files < <(find dist -type f -print0)
+          gh release create "$tag" \
+            --title "Voxel Client $tag" \
+            --notes "Voxel Client $tag" \
             "${files[@]}"
