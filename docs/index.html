@@ -9,8 +9,8 @@
 
     :root {
       --orange: #f5a623;
-      --orange-dim: rgba(245,166,35,0.12);
-      --orange-border: rgba(245,166,35,0.25);
+      --orange-dim: rgba(245,166,35,0.10);
+      --orange-border: rgba(245,166,35,0.22);
       --bg: #0d0d0d;
       --surface: #111;
       --border: #1e1e1e;
@@ -24,309 +24,181 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       line-height: 1.6;
       min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Orange glow behind hero */
+    .bg-glow {
+      position: fixed;
+      top: -160px; left: 50%;
+      transform: translateX(-50%);
+      width: 900px; height: 700px;
+      background: radial-gradient(ellipse at center, rgba(245,166,35,0.13) 0%, transparent 65%);
+      pointer-events: none;
+      z-index: 0;
     }
 
     nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      position: relative; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
       padding: 18px 48px;
       border-bottom: 1px solid var(--border);
     }
-    .logo {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--orange);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-    .nav-links { display: flex; gap: 32px; }
-    .nav-links a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 13px;
-      letter-spacing: 0.5px;
-      transition: color 0.15s;
-    }
-    .nav-links a:hover { color: var(--text); }
+    .logo { font-size:15px; font-weight:700; color:var(--orange); letter-spacing:2px; text-transform:uppercase; text-decoration:none; }
+    .nav-links { display:flex; gap:28px; }
+    .nav-links a { color:var(--muted); text-decoration:none; font-size:13px; transition:color 0.15s; }
+    .nav-links a:hover { color:var(--text); }
 
     /* Hero */
     .hero {
+      position: relative; z-index: 1;
       max-width: 700px;
       margin: 0 auto;
-      padding: 110px 24px 80px;
+      padding: 116px 24px 88px;
       text-align: center;
     }
     .hero-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 3px;
-      text-transform: uppercase;
+      display: inline-block;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 3px; text-transform: uppercase;
       color: var(--orange);
-      margin-bottom: 24px;
+      border: 1px solid var(--orange-border);
+      background: var(--orange-dim);
+      padding: 5px 14px; border-radius: 20px;
+      margin-bottom: 26px;
     }
     .hero h1 {
-      font-size: clamp(38px, 6vw, 64px);
-      font-weight: 800;
-      letter-spacing: -1.5px;
-      line-height: 1.08;
-      margin-bottom: 20px;
+      font-size: clamp(40px, 6.5vw, 70px);
+      font-weight: 800; letter-spacing: -2px; line-height: 1.06;
+      margin-bottom: 22px;
     }
     .hero p {
-      font-size: 16px;
-      color: var(--muted);
-      max-width: 480px;
-      margin: 0 auto 40px;
+      font-size: 16px; color: var(--muted);
+      max-width: 460px; margin: 0 auto 42px;
     }
 
-    .btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+    .btn { display:inline-block; font-size:14px; font-weight:600; padding:13px 30px; border-radius:8px; text-decoration:none; transition:opacity 0.15s, transform 0.1s; }
+    .btn:hover { opacity:0.85; transform:translateY(-1px); }
+    .btn-fill  { background:var(--orange); color:#000; }
+    .btn-ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
+    .btn-ghost:hover { border-color:var(--orange-border); }
 
-    .btn {
-      display: inline-block;
-      font-size: 14px;
-      font-weight: 600;
-      padding: 12px 28px;
-      border-radius: 8px;
-      text-decoration: none;
-      transition: opacity 0.15s, transform 0.1s;
-    }
-    .btn:hover { opacity: 0.85; transform: translateY(-1px); }
-    .btn-fill  { background: var(--orange); color: #000; }
-    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
-    .btn-ghost:hover { border-color: var(--orange); }
+    .hero-sub { margin-top:20px; font-size:12px; color:var(--muted); }
+    .hero-sub span { color:var(--orange); }
 
-    .hero-sub {
-      margin-top: 20px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .hero-sub span { color: var(--orange); }
-
-    /* Divider */
-    .divider {
-      height: 1px;
-      background: var(--border);
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    /* Features */
-    .features {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 72px 24px;
+    /* Highlight cards — just 4 */
+    .highlights {
+      position: relative; z-index: 1;
+      max-width: 880px; margin: 0 auto;
+      padding: 0 24px 80px;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
     }
-    .feat {
+    .hl {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 26px;
+      padding: 24px;
       transition: border-color 0.2s;
     }
-    .feat:hover { border-color: var(--orange-border); }
-    .feat-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 8px;
+    .hl:hover { border-color: var(--orange-border); }
+    .hl-title { font-size:13px; font-weight:600; margin-bottom:7px; }
+    .hl-desc  { font-size:12px; color:var(--muted); line-height:1.55; }
+
+    .see-all {
+      position: relative; z-index: 1;
+      text-align: center; padding-bottom: 72px;
     }
-    .feat-desc {
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.55;
-    }
-    .feat-group-label {
-      grid-column: 1 / -1;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: var(--orange);
-      padding-top: 12px;
-    }
+    .see-all a { font-size:13px; color:var(--orange); text-decoration:none; border-bottom:1px solid var(--orange-border); padding-bottom:2px; }
+    .see-all a:hover { border-color:var(--orange); }
 
     /* Download */
     .download {
+      position: relative; z-index: 1;
       text-align: center;
       padding: 72px 24px 96px;
       border-top: 1px solid var(--border);
     }
-    .download h2 {
-      font-size: 26px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-    .download > p {
-      font-size: 13px;
-      color: var(--muted);
-      margin-bottom: 40px;
-    }
-
-    .platform-row {
-      display: flex;
-      gap: 14px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
+    .download h2 { font-size:26px; font-weight:700; margin-bottom:8px; }
+    .download > p { font-size:13px; color:var(--muted); margin-bottom:40px; }
+    .platform-row { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
     .platform {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 22px 36px;
-      text-decoration: none;
-      color: var(--text);
-      min-width: 160px;
-      text-align: center;
-      transition: border-color 0.2s, transform 0.15s;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:10px; padding:22px 36px;
+      text-decoration:none; color:var(--text); min-width:160px;
+      text-align:center; transition:border-color 0.2s, transform 0.15s;
     }
-    .platform:hover { border-color: var(--orange); transform: translateY(-2px); }
-    .platform-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-    .platform-ext  { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; }
+    .platform:hover { border-color:var(--orange); transform:translateY(-2px); }
+    .platform-name { font-size:15px; font-weight:600; margin-bottom:4px; }
+    .platform-ext  { font-size:11px; color:var(--muted); }
+
+    /* Scroll reveal */
+    .reveal { opacity:0; transform:translateY(28px); filter:blur(4px); transition:opacity 0.65s ease, transform 0.65s ease, filter 0.65s ease; }
+    .reveal.visible { opacity:1; transform:translateY(0); filter:blur(0); }
 
     footer {
-      text-align: center;
-      padding: 24px;
-      border-top: 1px solid var(--border);
-      font-size: 12px;
-      color: var(--muted);
+      position: relative; z-index: 1;
+      text-align:center; padding:24px;
+      border-top:1px solid var(--border);
+      font-size:12px; color:var(--muted);
     }
-    footer a { color: var(--orange); text-decoration: none; }
+    footer a { color:var(--orange); text-decoration:none; }
+    .foot-links { display:flex; gap:20px; justify-content:center; flex-wrap:wrap; margin-bottom:8px; }
 
-    @media (max-width: 600px) {
-      nav { padding: 16px 20px; }
-      .hero { padding: 72px 20px 56px; }
-    }
+    @media(max-width:600px){ nav{ padding:16px 20px; } .hero{ padding:72px 20px 56px; } }
   </style>
 </head>
 <body>
 
+  <div class="bg-glow"></div>
+
   <nav>
-    <div class="logo">Voxel Client</div>
+    <a href="index.html" class="logo">Voxel Client</a>
     <div class="nav-links">
-      <a href="#features">Features</a>
+      <a href="features.html">Features</a>
+      <a href="faq.html">FAQ</a>
+      <a href="support.html">Support</a>
       <a href="#download">Download</a>
-      <a href="https://github.com/jordanengrashes-ux/minecraft-client" target="_blank">GitHub</a>
     </div>
   </nav>
 
-  <section class="hero">
+  <section class="hero reveal">
     <div class="hero-label">Free &amp; Open Source</div>
     <h1>A better Minecraft launcher</h1>
     <p>One-click mods, automatic updates, built-in server management — everything in one clean app.</p>
     <div class="btn-row">
-      <a id="dl-btn" href="#download" class="btn btn-fill">Download</a>
+      <a id="dl-btn" href="#download" class="btn btn-fill">Download Free</a>
       <a href="features.html" class="btn btn-ghost">View All Features</a>
-      <a href="https://github.com/jordanengrashes-ux/minecraft-client" target="_blank" class="btn btn-ghost">GitHub</a>
     </div>
-    <p class="hero-sub">Latest release: <span id="latest-ver">—</span> &nbsp;·&nbsp; Auto-updates included</p>
+    <p class="hero-sub">Latest: <span id="latest-ver">—</span> &nbsp;·&nbsp; Auto-updates included</p>
   </section>
 
-  <div class="divider"></div>
+  <div class="highlights">
+    <div class="hl reveal">
+      <div class="hl-title">One-Click Mods</div>
+      <div class="hl-desc">Search Modrinth and install any mod instantly. Dependencies download automatically.</div>
+    </div>
+    <div class="hl reveal">
+      <div class="hl-title">Auto Updates</div>
+      <div class="hl-desc">The launcher silently updates itself in the background — always on the latest version.</div>
+    </div>
+    <div class="hl reveal">
+      <div class="hl-title">Dedicated Server</div>
+      <div class="hl-desc">Host a 24/7 server directly from the app with auto-restart, player alerts, and boot launch.</div>
+    </div>
+    <div class="hl reveal">
+      <div class="hl-title">Friends & Chat</div>
+      <div class="hl-desc">Add friends, message them, and chat with players globally — no Discord needed.</div>
+    </div>
+  </div>
 
-  <section class="features" id="features">
+  <div class="see-all reveal">
+    <a href="features.html">See all features →</a>
+  </div>
 
-    <div class="feat-group-label">Play</div>
-
-    <div class="feat">
-      <div class="feat-title">Java Edition</div>
-      <div class="feat-desc">Launch any Java version with Microsoft or offline login. Configure RAM, Java version, and Fabric loader in one place.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Bedrock Edition</div>
-      <div class="feat-desc">Launch Minecraft Bedrock directly from the launcher alongside Java — no switching between apps.</div>
-    </div>
-
-    <div class="feat-group-label">Mods</div>
-
-    <div class="feat">
-      <div class="feat-title">Java Mod Browser</div>
-      <div class="feat-desc">Search Modrinth and install any Java mod with one click. Required dependencies are downloaded automatically.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Modpack Support</div>
-      <div class="feat-desc">Install full Modrinth modpacks instantly. The launcher auto-configures the correct Minecraft and Fabric versions.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">PvP Mods</div>
-      <div class="feat-desc">Curated performance and PvP mod packs — Sodium, Lithium, Iris, Entity Culling and more — ready in seconds.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Bedrock Mods & Add-ons</div>
-      <div class="feat-desc">Browse and install Bedrock-compatible mods and add-ons from Modrinth directly inside the launcher.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Resource Packs</div>
-      <div class="feat-desc">Search, download, and manage resource packs from Modrinth. Installed packs update when you change MC version.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Mod Profiles</div>
-      <div class="feat-desc">Save and switch between mod loadouts. Create separate profiles for PvP, survival, and modpacks.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Minecraft Guide (AI)</div>
-      <div class="feat-desc">Built-in AI assistant for crafting recipes, game tips, and Minecraft questions — powered by a live language model.</div>
-    </div>
-
-    <div class="feat-group-label">Social</div>
-
-    <div class="feat">
-      <div class="feat-title">Skin Manager</div>
-      <div class="feat-desc">Upload and switch skins directly from the launcher. Supports both classic and slim skin variants.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Dedicated Server</div>
-      <div class="feat-desc">Host a 24/7 server from inside the app. Configure RAM, port, MOTD, max players, and auto-restart on crash.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Player Join Alerts</div>
-      <div class="feat-desc">Get a toast notification and the window restores when a player joins your server — even when minimized.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Cosmetics</div>
-      <div class="feat-desc">Equip custom capes visible to other Voxel Client users in-game via a built-in Fabric mod.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Friends & Messaging</div>
-      <div class="feat-desc">Add friends, send messages, and see who is online — all inside the launcher without needing Discord.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Global Chat</div>
-      <div class="feat-desc">Talk with other Voxel Client users across all servers in a built-in global chat channel.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Files Manager</div>
-      <div class="feat-desc">Install worlds and schematics by drag-and-drop. Quick-open your mods, saves, and resource pack folders.</div>
-    </div>
-
-    <div class="feat-group-label">Config</div>
-
-    <div class="feat">
-      <div class="feat-title">Screenshots Viewer</div>
-      <div class="feat-desc">Browse all your Minecraft screenshots inside the launcher and open them with one click.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Account Manager</div>
-      <div class="feat-desc">Manage multiple Microsoft accounts and switch between them without re-logging in.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Auto Updates</div>
-      <div class="feat-desc">The launcher updates itself silently in the background. You always have the latest version without doing anything.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Start with Windows</div>
-      <div class="feat-desc">Set the launcher to open automatically at boot so your server is always ready when the PC starts.</div>
-    </div>
-    <div class="feat">
-      <div class="feat-title">Customize</div>
-      <div class="feat-desc">Personalize the launcher appearance and settings to match your preferences.</div>
-    </div>
-
-  </section>
-
-  <section class="download" id="download">
+  <section class="download reveal" id="download">
     <h2>Download Voxel Client</h2>
     <p>Free forever — no account required</p>
     <div class="platform-row">
@@ -346,22 +218,35 @@
   </section>
 
   <footer>
-    Not affiliated with Mojang or Microsoft. &nbsp;&middot;&nbsp;
-    <a href="https://github.com/jordanengrashes-ux/minecraft-client">GitHub</a>
+    <div class="foot-links">
+      <a href="features.html">Features</a>
+      <a href="faq.html">FAQ</a>
+      <a href="support.html">Support</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="https://github.com/jordanengrashes-ux/minecraft-client" target="_blank">GitHub</a>
+    </div>
+    Not affiliated with Mojang or Microsoft.
   </footer>
 
   <script>
+    // Fetch latest version
     fetch('https://api.github.com/repos/jordanengrashes-ux/minecraft-client/releases/latest')
-      .then(r => r.json())
-      .then(d => {
+      .then(r => r.json()).then(d => {
         if (d.tag_name) document.getElementById('latest-ver').textContent = d.tag_name;
         const exe = (d.assets || []).find(a => a.name.includes('Setup') && a.name.endsWith('.exe'));
-        if (exe) {
-          document.getElementById('win-dl').href = exe.browser_download_url;
-          document.getElementById('dl-btn').href = exe.browser_download_url;
+        if (exe) { document.getElementById('win-dl').href = exe.browser_download_url; document.getElementById('dl-btn').href = exe.browser_download_url; }
+      }).catch(() => {});
+
+    // Scroll reveal
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          setTimeout(() => e.target.classList.add('visible'), i * 80);
+          obs.unobserve(e.target);
         }
-      })
-      .catch(() => {});
+      });
+    }, { threshold: 0.08 });
+    document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
   </script>
 
 </body>
