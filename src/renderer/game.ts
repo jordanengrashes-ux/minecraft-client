@@ -2942,6 +2942,11 @@ document.getElementById('srv-log-copy')?.addEventListener('click', function() {
   setTimeout(() => { (this as HTMLButtonElement).textContent = 'Copy'; (this as HTMLButtonElement).style.color = ''; }, 1500);
 });
 
+document.getElementById('srv-log-clear')?.addEventListener('click', () => {
+  srvLogLines = [];
+  srvLog.innerHTML = '';
+});
+
 // Copy address button
 document.getElementById('srv-copy-addr-btn')?.addEventListener('click', () => {
   const addr = srvAddress.textContent || 'localhost:25565';
