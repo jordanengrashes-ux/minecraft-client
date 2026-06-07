@@ -88,6 +88,18 @@
     .ripple { position:absolute; border-radius:50%; background:rgba(245,166,35,0.15); transform:scale(0); animation:rip 0.5s linear; pointer-events:none; }
     @keyframes rip { to { transform:scale(4); opacity:0; } }
 
+    /* Front-page modal */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.84); z-index:200; display:none; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(8px); }
+    .modal-overlay.open { display:flex; }
+    .modal { background:#111; border:1px solid #252525; border-radius:16px; width:100%; max-width:560px; animation:mIn 0.22s ease; }
+    @keyframes mIn { from{opacity:0;transform:translateY(12px) scale(0.97)} to{opacity:1;transform:none} }
+    .modal-body { padding:28px 30px 30px; }
+    .modal-close { float:right; margin:-2px -6px 0 0; width:28px; height:28px; border-radius:50%; background:#1a1a1a; border:1px solid #2a2a2a; color:#555; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s,color 0.15s; }
+    .modal-close:hover { background:#252525; color:var(--text); }
+    .modal-tag { font-size:10px; font-weight:700; letter-spacing:2.5px; color:var(--orange); text-transform:uppercase; margin-bottom:8px; }
+    .modal-title { font-size:22px; font-weight:800; letter-spacing:-0.5px; margin-bottom:12px; }
+    .modal-desc { font-size:14px; color:#999; line-height:1.75; }
+
     /* See all link */
     .see-all { position:relative; z-index:1; text-align:center; padding-bottom:64px; }
     .see-all a { font-size:13px; color:var(--orange); text-decoration:none; border-bottom:1px solid var(--orange-border); padding-bottom:2px; transition:border-color 0.15s; }
@@ -136,20 +148,23 @@
   </section>
 
   <div class="top-feats">
-    <div class="top-feat reveal">
+    <div class="top-feat reveal" onclick="showModal('mods')">
       <div class="feat-num">01</div>
       <div class="feat-title">Instant Mod Install</div>
       <div class="feat-desc">Search Modrinth &amp; CurseForge and enable any mod with one toggle. Dependencies install automatically.</div>
+      <div class="feat-arrow">Learn more <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
     </div>
-    <div class="top-feat reveal">
+    <div class="top-feat reveal" onclick="showModal('server')">
       <div class="feat-num">02</div>
       <div class="feat-title">Dedicated Server</div>
       <div class="feat-desc">Host a 24/7 server from inside the app. Auto-restart, player alerts, and Windows boot launch.</div>
+      <div class="feat-arrow">Learn more <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
     </div>
-    <div class="top-feat reveal">
+    <div class="top-feat reveal" onclick="showModal('updates')">
       <div class="feat-num">03</div>
       <div class="feat-title">Silent Auto Updates</div>
       <div class="feat-desc">The launcher updates itself in the background while you play. You never do anything manually.</div>
+      <div class="feat-arrow">Learn more <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></div>
     </div>
   </div>
 
@@ -197,7 +212,35 @@
     Not affiliated with Mojang or Microsoft.
   </footer>
 
+  <!-- Feature modal -->
+  <div class="modal-overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <div class="modal-body">
+        <button class="modal-close" onclick="closeModal()">✕</button>
+        <div class="modal-tag" id="m-tag"></div>
+        <div class="modal-title" id="m-title"></div>
+        <div class="modal-desc" id="m-desc"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
+    const FEATS = {
+      mods:    { tag:'Mods',    title:'Instant Mod Install',  desc:'<p>Search the full Modrinth and CurseForge mod libraries and toggle any Fabric mod on with one click. The launcher picks the correct build for your Minecraft version automatically.</p><p>Required dependencies like Fabric API are downloaded automatically. Disable mods without deleting them, or update all mods to a new MC version in one click.</p>' },
+      server:  { tag:'Server',  title:'Dedicated Server',     desc:'<p>Run a 24/7 Minecraft Java server from inside the launcher. Configure version, RAM, port, MOTD, and max players — no command line. Enable Auto-restart to recover from crashes. Enable Start with Windows so the server launches at boot even without logging in.</p><p>When a player joins, the launcher restores from the taskbar and shows a notification with the player\'s name.</p>' },
+      updates: { tag:'Updates', title:'Silent Auto Updates',  desc:'<p>Every time Voxel Client opens it checks GitHub for a newer version. If found, it downloads silently while you use the app. When Minecraft is not running, the update installs and the launcher restarts — you never see a download prompt or installer window.</p>' },
+    };
+    function showModal(key) {
+      const d = FEATS[key]; if (!d) return;
+      document.getElementById('m-tag').textContent   = d.tag;
+      document.getElementById('m-title').textContent = d.title;
+      document.getElementById('m-desc').innerHTML    = d.desc;
+      document.getElementById('overlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeModal() { document.getElementById('overlay').classList.remove('open'); document.body.style.overflow = ''; }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
     fetch('https://api.github.com/repos/jordanengrashes-ux/minecraft-client/releases/latest')
       .then(r=>r.json()).then(d=>{
         if(d.tag_name) document.getElementById('latest-ver').textContent=d.tag_name;
