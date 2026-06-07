@@ -56,10 +56,16 @@
     /* Modal */
     .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.84); z-index:200; display:none; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(8px); }
     .modal-overlay.open { display:flex; }
-    .modal { background:#111; border:1px solid #252525; border-radius:16px; width:100%; max-width:700px; max-height:90vh; overflow-y:auto; animation:mIn 0.24s ease; }
+    .modal { background:#111; border:1px solid #252525; border-radius:16px; width:100%; max-width:860px; max-height:90vh; overflow-y:auto; animation:mIn 0.24s ease; }
     @keyframes mIn { from{opacity:0;transform:translateY(14px) scale(0.97)} to{opacity:1;transform:none} }
-    .modal-img { width:100%; background:#0a0a0a; border-radius:15px 15px 0 0; border-bottom:1px solid #1e1e1e; overflow:hidden; }
-    .modal-img img { width:100%; height:auto; display:block; border-radius:15px 15px 0 0; }
+    .modal-img { width:100%; background:#0a0a0a; border-radius:15px 15px 0 0; border-bottom:1px solid #1e1e1e; overflow:hidden; display:flex; align-items:center; justify-content:center; min-height:200px; padding:16px; }
+    .modal-img img { max-width:100%; height:auto; max-height:480px; object-fit:contain; border-radius:8px; cursor:zoom-in; transition:transform 0.15s; }
+    .modal-img img:hover { transform:scale(1.015); }
+    /* Zoom lightbox */
+    #zoom-lbox { position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:500; display:none; align-items:center; justify-content:center; padding:20px; cursor:zoom-out; backdrop-filter:blur(6px); }
+    #zoom-lbox.open { display:flex; }
+    #zoom-lbox img { max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; box-shadow:0 0 80px rgba(0,0,0,0.8); animation:zIn 0.2s ease; }
+    @keyframes zIn { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:scale(1)} }
     .modal-placeholder { color:#252525; font-size:12px; display:flex; flex-direction:column; align-items:center; gap:8px; }
     .modal-body { padding:28px 30px 32px; }
     .modal-close { float:right; margin:-2px -6px 0 0; width:28px; height:28px; border-radius:50%; background:#1a1a1a; border:1px solid #2a2a2a; color:var(--muted); font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s,color 0.15s; }
@@ -161,6 +167,9 @@
     Not affiliated with Mojang or Microsoft.
   </footer>
 
+  <!-- Zoom lightbox -->
+  <div id="zoom-lbox" onclick="closeZoom()"><img id="zoom-img" src="" alt=""></div>
+
   <!-- Modal -->
   <div class="modal-overlay" id="overlay" onclick="handleClose(event)">
     <div class="modal">
@@ -213,7 +222,10 @@
       imgEl.style.display = 'none';
       imgEl.innerHTML = '';
       const img = new Image();
-      img.onload  = () => { imgEl.style.display = ''; imgEl.innerHTML = `<img src="${d.img}" alt="${d.title}">`; };
+      img.onload  = () => {
+        imgEl.style.display = '';
+        imgEl.innerHTML = `<img src="${d.img}" alt="${d.title}" onclick="openZoom('${d.img}')">`;
+      };
       img.onerror = () => { imgEl.style.display = 'none'; };
       img.src = d.img;
       document.getElementById('overlay').classList.add('open');
@@ -221,7 +233,9 @@
     }
     function closeModal() { document.getElementById('overlay').classList.remove('open'); document.body.style.overflow=''; }
     function handleClose(e) { if (e.target===document.getElementById('overlay')) closeModal(); }
-    document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+    function openZoom(src) { document.getElementById('zoom-img').src=src; document.getElementById('zoom-lbox').classList.add('open'); }
+    function closeZoom() { document.getElementById('zoom-lbox').classList.remove('open'); }
+    document.addEventListener('keydown', e => { if(e.key==='Escape'){ closeZoom(); closeModal(); } });
 
     // Jump to section from anchor
     const hash = location.hash.replace('#','');
