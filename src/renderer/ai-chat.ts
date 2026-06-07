@@ -71,8 +71,48 @@ function escHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Render a [A][B][C] / [D][E][F] / [G][H][I] crafting grid as visual slots
+function renderCraftingGrids(text: string): string {
+  const rowPat = /^\s*(\[[^\]]*\]){3}\s*$/;
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (rowPat.test(lines[i]) && rowPat.test(lines[i + 1] ?? '') && rowPat.test(lines[i + 2] ?? '')) {
+      const rows = [lines[i], lines[i + 1], lines[i + 2]];
+      const html = rows.map(row => {
+        const cells: string[] = [];
+        const re = /\[([^\]]*)\]/g; let m;
+        while ((m = re.exec(row)) !== null) cells.push(m[1].trim());
+        return `<div class="craft-row">${cells.map(c => `<div class="craft-slot">${escHtml(c)}</div>`).join('')}</div>`;
+      }).join('');
+      out.push(`<div class="craft-grid"><div class="craft-label">Crafting</div>${html}</div>`);
+      i += 3;
+    } else {
+      out.push(lines[i]);
+      i++;
+    }
+  }
+  return out.join('\n');
+}
+
+// Turn [IMAGE: description] into a Pollinations.ai generated image
+function renderImages(text: string): string {
+  return text.replace(/\[IMAGE:\s*([^\]]+)\]/gi, (_: string, desc: string) => {
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(desc.trim())}?width=480&height=300&nologo=true`;
+    return `<div class="ai-img-wrap">
+      <img src="${url}" class="ai-img" alt="${escHtml(desc)}" loading="lazy"
+        onerror="this.parentElement.style.display='none'" />
+      <div class="ai-img-caption">${escHtml(desc)}</div>
+    </div>`;
+  });
+}
+
 function mdToHtml(text: string): string {
-  return escHtml(text)
+  const withGrids  = renderCraftingGrids(text);
+  const withImages = renderImages(withGrids);
+  return escHtml(withImages)
+    .replace(/&lt;div class="craft-grid"&gt;[\s\S]*?&lt;\/div&gt;/g, m => m) // don't double-escape grids
     .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -85,7 +125,26 @@ function mdToHtml(text: string): string {
 function addBubble(text: string, isUser: boolean): HTMLElement {
   const div = document.createElement('div');
   div.className = 'bubble ' + (isUser ? 'user' : 'ai');
-  div.innerHTML = isUser ? escHtml(text) : mdToHtml(text);
+  if (isUser) {
+    div.textContent = text;
+  } else {
+    // Build DOM directly to avoid double-escaping the grid/image HTML
+    const withGrids  = renderCraftingGrids(text);
+    const withImages = renderImages(withGrids);
+    // Split on the special blocks, render the rest as markdown
+    const parts = withImages.split(/(<div class="(?:craft-grid|ai-img-wrap)[\s\S]*?<\/div>\s*<\/div>|<div class="craft-grid[\s\S]*?<\/div>)/);
+    div.innerHTML = parts.map((p, idx) => {
+      if (p.startsWith('<div class="craft-grid') || p.startsWith('<div class="ai-img-wrap')) return p;
+      return escHtml(p)
+        .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^#{1,3} (.+)$/gm, '<strong>$1</strong>')
+        .replace(/^- (.+)$/gm, '• $1')
+        .replace(/\n/g, '<br>');
+    }).join('');
+  }
   messagesEl.appendChild(div);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return div;
