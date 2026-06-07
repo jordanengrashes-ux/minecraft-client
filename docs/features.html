@@ -37,19 +37,20 @@
 
     .tile-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }
     .tile {
-      background:var(--surface); border:1px solid var(--border); border-radius:10px;
+      border:1px solid rgba(255,255,255,0.08); border-radius:10px;
       padding:18px 16px; cursor:pointer; position:relative; overflow:hidden;
-      transition:border-color 0.22s, background 0.22s, transform 0.16s, box-shadow 0.22s;
+      transition:border-color 0.22s, transform 0.16s, box-shadow 0.22s;
       display:flex; align-items:center; justify-content:space-between; gap:8px;
+      background-size:cover; background-position:center; min-height:76px;
     }
-    .tile::before { content:''; position:absolute; inset:0; border-radius:10px; background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(245,166,35,0.09) 0%,transparent 65%); opacity:0; transition:opacity 0.25s; }
-    .tile:hover { border-color:rgba(245,166,35,0.35); background:#141414; transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.4); }
-    .tile:hover::before { opacity:1; }
+    .tile::before { content:''; position:absolute; inset:0; border-radius:10px; background:rgba(0,0,0,0.62); transition:background 0.22s; z-index:0; }
+    .tile:hover { border-color:rgba(245,166,35,0.42); transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.55); }
+    .tile:hover::before { background:rgba(0,0,0,0.50); }
     .tile:active { transform:scale(0.97); }
-    .tile-name { font-size:13px; font-weight:600; position:relative; }
-    .tile-icon { font-size:16px; flex-shrink:0; opacity:0; transform:translateX(-4px); transition:opacity 0.18s, transform 0.18s; position:relative; color:var(--orange); }
+    .tile-name { font-size:13px; font-weight:600; position:relative; z-index:1; color:#fff; }
+    .tile-icon { font-size:16px; flex-shrink:0; opacity:0; transform:translateX(-4px); transition:opacity 0.18s, transform 0.18s; position:relative; z-index:1; color:var(--orange); }
     .tile:hover .tile-icon { opacity:1; transform:translateX(0); }
-    .ripple { position:absolute; border-radius:50%; background:rgba(245,166,35,0.15); transform:scale(0); animation:rip 0.45s linear; pointer-events:none; }
+    .ripple { position:absolute; border-radius:50%; background:rgba(245,166,35,0.18); transform:scale(0); animation:rip 0.45s linear; pointer-events:none; z-index:2; }
     @keyframes rip { to{transform:scale(4);opacity:0;} }
 
     /* Modal */
@@ -103,46 +104,46 @@
     <div class="group reveal">
       <div class="group-label">Play</div>
       <div class="tile-grid">
-        <div class="tile" id="tile-java"         onclick="showFeature('java')">        <span class="tile-name">Java Edition</span>         <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-bedrock"      onclick="showFeature('bedrock')">     <span class="tile-name">Bedrock Edition</span>      <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-offline"      onclick="showFeature('offline')">     <span class="tile-name">Offline Mode</span>         <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-repair"       onclick="showFeature('repair')">      <span class="tile-name">Game Repair</span>          <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-crash"        onclick="showFeature('crash')">       <span class="tile-name">Crash Reports</span>        <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-java"         onclick="showFeature('java')"         style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/01e67d2bc1cfb34d2b80790eddcc836d00de5e55.jpeg')">        <span class="tile-name">Java Edition</span>         <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-bedrock"      onclick="showFeature('bedrock')"      style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/65422dcd9b3e88c064994725f9b6cdb4bb7fb9f7.jpeg')">     <span class="tile-name">Bedrock Edition</span>      <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-offline"      onclick="showFeature('offline')"      style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/9d4c7944ff46854f349a835215bc6c6715079631.jpeg')">     <span class="tile-name">Offline Mode</span>         <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-repair"       onclick="showFeature('repair')"       style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/f9dc692dae4c4c44fcef54a0d921ce83fe7f9800.jpeg')">      <span class="tile-name">Game Repair</span>          <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-crash"        onclick="showFeature('crash')"        style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/3727f342ecccc4f1eb0ecbe78e44304615c83187_350.webp')">       <span class="tile-name">Crash Reports</span>        <span class="tile-icon">→</span></div>
       </div>
     </div>
 
     <div class="group reveal">
       <div class="group-label">Mods</div>
       <div class="tile-grid">
-        <div class="tile" id="tile-mods"         onclick="showFeature('mods')">        <span class="tile-name">Mod Browser</span>          <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-curseforge"   onclick="showFeature('curseforge')">  <span class="tile-name">CurseForge</span>           <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-modpacks"     onclick="showFeature('modpacks')">    <span class="tile-name">Modpacks</span>             <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-pvp"          onclick="showFeature('pvp')">         <span class="tile-name">PvP Mods</span>             <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-resourcepacks"onclick="showFeature('resourcepacks')"><span class="tile-name">Resource Packs</span>      <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-profiles"     onclick="showFeature('profiles')">    <span class="tile-name">Mod Profiles</span>         <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-ai"           onclick="showFeature('ai')">          <span class="tile-name">Minecraft Guide (AI)</span> <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-mods"         onclick="showFeature('mods')"          style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/40b899ae09647c98722d67bb2288f790ae28b4fc_350.webp')">        <span class="tile-name">Mod Browser</span>          <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-curseforge"   onclick="showFeature('curseforge')"   style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/62527fc1990c6e8b37184a68d0ec46bcebe03d5b_350.webp')">  <span class="tile-name">CurseForge</span>           <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-modpacks"     onclick="showFeature('modpacks')"     style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/783089c26adfe2abf523780740859ead70a409e1_350.webp')">    <span class="tile-name">Modpacks</span>             <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-pvp"          onclick="showFeature('pvp')"          style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/f5b5407d8a034c32fb9ab21fd000320413cf18bc_350.webp')">         <span class="tile-name">PvP Mods</span>             <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-resourcepacks"onclick="showFeature('resourcepacks')"style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/8d0066231932c06e58ffbf84ad1b3a367da4fbd4_350.webp')"><span class="tile-name">Resource Packs</span>      <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-profiles"     onclick="showFeature('profiles')"     style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/01e67d2bc1cfb34d2b80790eddcc836d00de5e55.jpeg')">    <span class="tile-name">Mod Profiles</span>         <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-ai"           onclick="showFeature('ai')"           style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/65422dcd9b3e88c064994725f9b6cdb4bb7fb9f7.jpeg')">          <span class="tile-name">Minecraft Guide (AI)</span> <span class="tile-icon">→</span></div>
       </div>
     </div>
 
     <div class="group reveal">
       <div class="group-label">Social &amp; Server</div>
       <div class="tile-grid">
-        <div class="tile" id="tile-server"       onclick="showFeature('server')">      <span class="tile-name">Dedicated Server</span>     <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-skins"        onclick="showFeature('skins')">       <span class="tile-name">Skin Manager</span>          <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-cosmetics"    onclick="showFeature('cosmetics')">   <span class="tile-name">Cosmetics</span>            <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-friends"      onclick="showFeature('friends')">     <span class="tile-name">Friends &amp; Chat</span>   <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-files"        onclick="showFeature('files')">       <span class="tile-name">Files Manager</span>        <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-server"       onclick="showFeature('server')"       style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/9d4c7944ff46854f349a835215bc6c6715079631.jpeg')">      <span class="tile-name">Dedicated Server</span>     <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-skins"        onclick="showFeature('skins')"        style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/f9dc692dae4c4c44fcef54a0d921ce83fe7f9800.jpeg')">       <span class="tile-name">Skin Manager</span>          <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-cosmetics"    onclick="showFeature('cosmetics')"    style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/3727f342ecccc4f1eb0ecbe78e44304615c83187_350.webp')">   <span class="tile-name">Cosmetics</span>            <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-friends"      onclick="showFeature('friends')"      style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/40b899ae09647c98722d67bb2288f790ae28b4fc_350.webp')">     <span class="tile-name">Friends &amp; Chat</span>   <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-files"        onclick="showFeature('files')"        style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/62527fc1990c6e8b37184a68d0ec46bcebe03d5b_350.webp')">       <span class="tile-name">Files Manager</span>        <span class="tile-icon">→</span></div>
       </div>
     </div>
 
     <div class="group reveal">
       <div class="group-label">Config &amp; Auto</div>
       <div class="tile-grid">
-        <div class="tile" id="tile-updates"      onclick="showFeature('updates')">     <span class="tile-name">Auto Updates</span>         <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-screenshots"  onclick="showFeature('screenshots')"> <span class="tile-name">Screenshots</span>          <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-accounts"     onclick="showFeature('accounts')">    <span class="tile-name">Accounts</span>             <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-boot"         onclick="showFeature('boot')">        <span class="tile-name">Start with Windows</span>  <span class="tile-icon">→</span></div>
-        <div class="tile" id="tile-customize"    onclick="showFeature('customize')">   <span class="tile-name">Customize</span>            <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-updates"      onclick="showFeature('updates')"      style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/783089c26adfe2abf523780740859ead70a409e1_350.webp')">     <span class="tile-name">Auto Updates</span>         <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-screenshots"  onclick="showFeature('screenshots')"  style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/f5b5407d8a034c32fb9ab21fd000320413cf18bc_350.webp')"> <span class="tile-name">Screenshots</span>          <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-accounts"     onclick="showFeature('accounts')"     style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/8d0066231932c06e58ffbf84ad1b3a367da4fbd4_350.webp')">    <span class="tile-name">Accounts</span>             <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-boot"         onclick="showFeature('boot')"         style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/01e67d2bc1cfb34d2b80790eddcc836d00de5e55.jpeg')">        <span class="tile-name">Start with Windows</span>  <span class="tile-icon">→</span></div>
+        <div class="tile" id="tile-customize"    onclick="showFeature('customize')"    style="background-image:url('https://cdn.modrinth.com/data/Q1vvjJYV/images/65422dcd9b3e88c064994725f9b6cdb4bb7fb9f7.jpeg')">   <span class="tile-name">Customize</span>            <span class="tile-icon">→</span></div>
       </div>
     </div>
 
