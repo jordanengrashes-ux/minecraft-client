@@ -31,22 +31,21 @@ function onSuccess(data: { uid: string; name: string; email: string }) {
 }
 
 // ── Check for existing session (auto-login) ───────────────────────────────────
-document.body.style.visibility = 'hidden';
-
-// Safety net — always show the form within 4s even if Firebase/IPC hangs
-const showFormTimeout = setTimeout(() => { document.body.style.visibility = 'visible'; }, 4000);
-
-function showForm() { clearTimeout(showFormTimeout); document.body.style.visibility = 'visible'; }
+// Use an overlay veil (not body visibility) — changing body visibility can freeze
+// Chromium's hit-test map, making buttons visible but unclickable.
+const veil = document.getElementById('loading-veil') as HTMLElement;
+const showForm = () => { veil.classList.add('done'); };
+const hideFormTimeout = setTimeout(showForm, 3500);
 
 async function checkAutoLogin() {
   try {
-    // Fast path: disk-cached user from Electron main process
     if (window.electron?.loadFirebaseUser) {
       let cached: { uid: string; name: string } | null = null;
       try { cached = await window.electron.loadFirebaseUser(); } catch {}
       if (cached?.uid) {
         const unsub = onAuthStateChanged(auth, (user) => {
           unsub();
+          clearTimeout(hideFormTimeout);
           if (user) {
             onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || cached!.name || 'Player', email: user.email || '' });
           } else {
@@ -57,9 +56,9 @@ async function checkAutoLogin() {
         return;
       }
     }
-    // No disk cache — rely on Firebase IndexedDB session
     const unsub = onAuthStateChanged(auth, (user) => {
       unsub();
+      clearTimeout(hideFormTimeout);
       if (user) {
         onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player', email: user.email || '' });
       } else {
@@ -67,6 +66,7 @@ async function checkAutoLogin() {
       }
     });
   } catch {
+    clearTimeout(hideFormTimeout);
     showForm();
   }
 }

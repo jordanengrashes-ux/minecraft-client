@@ -63,9 +63,15 @@
       transition: background 0.2s;
     }
     .google-btn:hover { background: #222233; }
+    #loading-veil {
+      position: fixed; inset: 0; background: #0a0a0f; z-index: 9999;
+      transition: opacity 0.25s; pointer-events: all;
+    }
+    #loading-veil.done { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body>
+  <div id="loading-veil"></div>
   <div id="titlebar">
     <button class="tbtn" id="btn-minimize">─</button>
     <button class="tbtn" id="close">✕</button>
