@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   updateProfile, GoogleAuthProvider, signInWithPopup, signOut,
+  browserLocalPersistence, setPersistence,
 } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 
@@ -18,6 +19,9 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const rtdb = getDatabase(app);
+
+// Explicitly set local persistence so auth state survives Electron restarts via IndexedDB
+setPersistence(auth, browserLocalPersistence).catch(() => {});
 
 export async function loginEmail(email: string, password: string) {
   const { user } = await signInWithEmailAndPassword(auth, email, password);

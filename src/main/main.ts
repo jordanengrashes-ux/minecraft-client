@@ -23,9 +23,10 @@ let mcProcess: ChildProcess | null = null;
 let javaReadyPromise: Promise<string> | null = null;
 
 const DEV = !app.isPackaged;
-const AUTH_CACHE       = path.join(app.getPath('userData'), 'mc-auth.json');
-const JAVA_PATH_CACHE  = path.join(app.getPath('userData'), 'java-path.json');  // legacy Java 21 cache
-const JAVA_PATHS_CACHE = path.join(app.getPath('userData'), 'java-paths.json'); // multi-version cache
+const AUTH_CACHE            = path.join(app.getPath('userData'), 'mc-auth.json');
+const JAVA_PATH_CACHE       = path.join(app.getPath('userData'), 'java-path.json');  // legacy Java 21 cache
+const JAVA_PATHS_CACHE      = path.join(app.getPath('userData'), 'java-paths.json'); // multi-version cache
+const FIREBASE_USER_CACHE   = path.join(app.getPath('userData'), 'firebase-user.json');
 
 function loadJavaPathsDict(): Record<string, string> {
   try { return JSON.parse(fs.readFileSync(JAVA_PATHS_CACHE, 'utf-8')); } catch { return {}; }
@@ -364,6 +365,20 @@ async function authenticateWithMinecraft(code: string): Promise<any> {
   };
 }
 
+// ── Firebase user cache (reliable disk-based persistence for Electron) ────────
+ipcMain.handle('save-firebase-user', (_e, data: { uid: string; name: string }) => {
+  try { fs.writeFileSync(FIREBASE_USER_CACHE, JSON.stringify(data), 'utf-8'); return true; } catch { return false; }
+});
+ipcMain.handle('load-firebase-user', () => {
+  try {
+    if (fs.existsSync(FIREBASE_USER_CACHE)) return JSON.parse(fs.readFileSync(FIREBASE_USER_CACHE, 'utf-8'));
+  } catch {}
+  return null;
+});
+ipcMain.handle('clear-firebase-user', () => {
+  try { if (fs.existsSync(FIREBASE_USER_CACHE)) fs.unlinkSync(FIREBASE_USER_CACHE); } catch {}
+});
+
 // ── Windows ───────────────────────────────────────────────────────────────────
 function createLoginWindow() {
   loginWin = new BrowserWindow({
@@ -371,6 +386,16 @@ function createLoginWindow() {
     resizable: false, frame: false, titleBarStyle: 'hidden',
     backgroundColor: '#0a0a0f',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+  });
+  // Allow Firebase Google auth popup windows (signInWithPopup needs window.open)
+  loginWin.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.includes('firebaseapp.com') || url.includes('accounts.google.com') || url.includes('googleapis.com')) {
+      return { action: 'allow', overrideBrowserWindowOptions: {
+        width: 500, height: 660, frame: true,
+        webPreferences: { nodeIntegration: false, contextIsolation: true },
+      }};
+    }
+    return { action: 'deny' };
   });
   if (DEV) loginWin.loadURL('http://localhost:5173/login.html');
   else loginWin.loadFile(path.join(__dirname, '../dist/login.html'));

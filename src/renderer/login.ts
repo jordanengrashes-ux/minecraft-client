@@ -22,6 +22,7 @@ function setLoading(btn: HTMLButtonElement, loading: boolean, label: string) {
 }
 function onSuccess(data: { uid: string; name: string }) {
   if (window.electron) {
+    window.electron.saveFirebaseUser?.(data);
     window.electron.loginSuccess(data);
   } else {
     sessionStorage.setItem('userData', JSON.stringify(data));
@@ -30,19 +31,40 @@ function onSuccess(data: { uid: string; name: string }) {
 }
 
 // ── Check for existing session (auto-login) ───────────────────────────────────
-// Hide everything while Firebase restores the session
+// Hide everything while we check auth state
 document.body.style.visibility = 'hidden';
 
-const unsub = onAuthStateChanged(auth, (user) => {
-  unsub(); // only fire once
-  if (user) {
-    // Already logged in — skip straight to game
-    onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player' });
-  } else {
-    // Not logged in — show the form
-    document.body.style.visibility = 'visible';
+async function checkAutoLogin() {
+  // Fast path: disk-cached user (reliable across Electron restarts)
+  if (window.electron?.loadFirebaseUser) {
+    const cached = await window.electron.loadFirebaseUser();
+    if (cached?.uid) {
+      // Verify Firebase still considers this user valid (IndexedDB backup check)
+      const unsub = onAuthStateChanged(auth, (user) => {
+        unsub();
+        if (user) {
+          onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || cached.name || 'Player' });
+        } else {
+          // Firebase session expired — clear disk cache, show login
+          window.electron?.clearFirebaseUser?.();
+          document.body.style.visibility = 'visible';
+        }
+      });
+      return;
+    }
   }
-});
+  // No disk cache — use Firebase auth state only
+  const unsub = onAuthStateChanged(auth, (user) => {
+    unsub();
+    if (user) {
+      onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player' });
+    } else {
+      document.body.style.visibility = 'visible';
+    }
+  });
+}
+
+checkAutoLogin();
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 tabLogin.addEventListener('click', () => {
@@ -125,6 +147,14 @@ void card;
 
 declare global {
   interface Window {
-    electron?: { loginSuccess: (d: object) => void; close: () => void; minimize: () => void; maximize: () => void; };
+    electron?: {
+      loginSuccess:      (d: object) => void;
+      close:             () => void;
+      minimize:          () => void;
+      maximize:          () => void;
+      saveFirebaseUser?: (d: object) => void;
+      loadFirebaseUser?: () => Promise<{ uid: string; name: string } | null>;
+      clearFirebaseUser?:() => void;
+    };
   }
 }

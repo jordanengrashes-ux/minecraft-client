@@ -1,14 +1,17 @@
 import { contextBridge, ipcRenderer, clipboard } from 'electron';
 
 contextBridge.exposeInMainWorld('electron', {
-  loginSuccess: (userData: object) => ipcRenderer.send('login-success', userData),
-  onUserData:   (cb: (data: any) => void) => ipcRenderer.on('user-data', (_e, d) => cb(d)),
-  close:        () => ipcRenderer.send('win-close'),
-  minimize:     () => ipcRenderer.send('win-minimize'),
-  relaunch:     () => ipcRenderer.send('win-relaunch'),
-  maximize:     () => ipcRenderer.send('win-maximize'),
-  copyText:     (text: string) => clipboard.writeText(text),
-  openExternal: (url: string)  => ipcRenderer.send('open-external', url),
+  loginSuccess:       (userData: object) => ipcRenderer.send('login-success', userData),
+  onUserData:         (cb: (data: any) => void) => ipcRenderer.on('user-data', (_e, d) => cb(d)),
+  close:              () => ipcRenderer.send('win-close'),
+  minimize:           () => ipcRenderer.send('win-minimize'),
+  relaunch:           () => ipcRenderer.send('win-relaunch'),
+  maximize:           () => ipcRenderer.send('win-maximize'),
+  copyText:           (text: string) => clipboard.writeText(text),
+  openExternal:       (url: string)  => ipcRenderer.send('open-external', url),
+  saveFirebaseUser:   (data: object) => ipcRenderer.invoke('save-firebase-user', data),
+  loadFirebaseUser:   ()             => ipcRenderer.invoke('load-firebase-user'),
+  clearFirebaseUser:  ()             => ipcRenderer.invoke('clear-firebase-user'),
 });
 
 contextBridge.exposeInMainWorld('updater', {
