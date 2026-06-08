@@ -435,15 +435,20 @@ function createLoginWindow() {
     backgroundColor: '#0a0a0f',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
-  // Allow Firebase Google auth popup windows (signInWithPopup needs window.open)
+  // Allow Firebase Google auth popup (signInWithPopup needs window.open)
   loginWin.webContents.setWindowOpenHandler(({ url }) => {
     if (url.includes('firebaseapp.com') || url.includes('accounts.google.com') || url.includes('googleapis.com')) {
       return { action: 'allow', overrideBrowserWindowOptions: {
         width: 500, height: 660, frame: true,
-        webPreferences: { nodeIntegration: false, contextIsolation: true },
+        // contextIsolation:false so window.opener.postMessage works from the popup
+        webPreferences: { nodeIntegration: false, contextIsolation: false },
       }};
     }
     return { action: 'deny' };
+  });
+  // Strip "Electron/x.x.x" from UA — Google blocks embedded-browser sign-in otherwise
+  loginWin.webContents.on('did-create-window', (win) => {
+    win.webContents.userAgent = win.webContents.userAgent.replace(/ Electron\/[\d.]+/, '');
   });
   if (DEV) loginWin.loadURL('http://localhost:5173/login.html');
   else loginWin.loadFile(path.join(__dirname, '../dist/login.html'));
