@@ -31,11 +31,16 @@ function onSuccess(data: { uid: string; name: string; email: string }) {
 }
 
 // ── Check for existing session (auto-login) ───────────────────────────────────
-// Use an overlay veil (not body visibility) — changing body visibility can freeze
-// Chromium's hit-test map, making buttons visible but unclickable.
 const veil = document.getElementById('loading-veil') as HTMLElement;
 const showForm = () => { veil.classList.add('done'); };
-const hideFormTimeout = setTimeout(showForm, 3500);
+
+// In a browser (not Electron) show the form immediately — no disk cache to check
+// and we don't want Firebase's network round-trip blocking the UI.
+if (!window.electron) {
+  showForm();
+}
+// In Electron, keep veil up briefly while we check the disk cache
+const hideFormTimeout = window.electron ? setTimeout(showForm, 3500) : 0;
 
 async function checkAutoLogin() {
   try {
@@ -55,14 +60,14 @@ async function checkAutoLogin() {
         });
         return;
       }
+      showForm();
+      return;
     }
+    // Browser: check Firebase session in background, redirect silently if logged in
     const unsub = onAuthStateChanged(auth, (user) => {
       unsub();
-      clearTimeout(hideFormTimeout);
       if (user) {
         onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player', email: user.email || '' });
-      } else {
-        showForm();
       }
     });
   } catch {
