@@ -20,7 +20,7 @@ function setLoading(btn: HTMLButtonElement, loading: boolean, label: string) {
   btn.disabled = loading;
   btn.textContent = loading ? 'Please wait…' : label;
 }
-function onSuccess(data: { uid: string; name: string }) {
+function onSuccess(data: { uid: string; name: string; email: string }) {
   if (window.electron) {
     window.electron.saveFirebaseUser?.(data);
     window.electron.loginSuccess(data);
@@ -31,37 +31,44 @@ function onSuccess(data: { uid: string; name: string }) {
 }
 
 // ── Check for existing session (auto-login) ───────────────────────────────────
-// Hide everything while we check auth state
 document.body.style.visibility = 'hidden';
 
+// Safety net — always show the form within 4s even if Firebase/IPC hangs
+const showFormTimeout = setTimeout(() => { document.body.style.visibility = 'visible'; }, 4000);
+
+function showForm() { clearTimeout(showFormTimeout); document.body.style.visibility = 'visible'; }
+
 async function checkAutoLogin() {
-  // Fast path: disk-cached user (reliable across Electron restarts)
-  if (window.electron?.loadFirebaseUser) {
-    const cached = await window.electron.loadFirebaseUser();
-    if (cached?.uid) {
-      // Verify Firebase still considers this user valid (IndexedDB backup check)
-      const unsub = onAuthStateChanged(auth, (user) => {
-        unsub();
-        if (user) {
-          onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || cached.name || 'Player', email: user.email || '' });
-        } else {
-          // Firebase session expired — clear disk cache, show login
-          window.electron?.clearFirebaseUser?.();
-          document.body.style.visibility = 'visible';
-        }
-      });
-      return;
+  try {
+    // Fast path: disk-cached user from Electron main process
+    if (window.electron?.loadFirebaseUser) {
+      let cached: { uid: string; name: string } | null = null;
+      try { cached = await window.electron.loadFirebaseUser(); } catch {}
+      if (cached?.uid) {
+        const unsub = onAuthStateChanged(auth, (user) => {
+          unsub();
+          if (user) {
+            onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || cached!.name || 'Player', email: user.email || '' });
+          } else {
+            try { window.electron?.clearFirebaseUser?.(); } catch {}
+            showForm();
+          }
+        });
+        return;
+      }
     }
+    // No disk cache — rely on Firebase IndexedDB session
+    const unsub = onAuthStateChanged(auth, (user) => {
+      unsub();
+      if (user) {
+        onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player', email: user.email || '' });
+      } else {
+        showForm();
+      }
+    });
+  } catch {
+    showForm();
   }
-  // No disk cache — use Firebase auth state only
-  const unsub = onAuthStateChanged(auth, (user) => {
-    unsub();
-    if (user) {
-      onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player', email: user.email || '' });
-    } else {
-      document.body.style.visibility = 'visible';
-    }
-  });
 }
 
 checkAutoLogin();
@@ -153,7 +160,7 @@ declare global {
       minimize:          () => void;
       maximize:          () => void;
       saveFirebaseUser?: (d: object) => void;
-      loadFirebaseUser?: () => Promise<{ uid: string; name: string } | null>;
+      loadFirebaseUser?: () => Promise<{ uid: string; name: string; email?: string } | null>;
       clearFirebaseUser?:() => void;
     };
   }
