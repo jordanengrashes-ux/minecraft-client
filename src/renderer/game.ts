@@ -3241,15 +3241,19 @@ async function loadServerVersions() {
   try {
     const res  = await fetch('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json');
     const data = await res.json() as { versions: { id: string; type: string }[] };
-    srvAllVersions = data.versions.filter(v => v.type === 'release' || v.type === 'snapshot');
+    const fetched = data.versions.filter(v => v.type === 'release' || v.type === 'snapshot');
+    // Prepend Paper versions not in Mojang manifest
+    const paperVersions = ['26.1.2', '26.1.1', '26.1'].map(id => ({ id, type: 'release' }));
+    srvAllVersions = [...paperVersions, ...fetched.filter(v => !paperVersions.find(p => p.id === v.id))];
     populateSrvVersions();
   } catch {
     srvAllVersions = [
-      { id: '1.21.5', type: 'release' }, { id: '1.21.4', type: 'release' },
-      { id: '1.21.3', type: 'release' }, { id: '1.21.1', type: 'release' },
-      { id: '1.21',   type: 'release' }, { id: '1.20.6', type: 'release' },
-      { id: '1.20.4', type: 'release' }, { id: '1.20.1', type: 'release' },
-      { id: '1.19.4', type: 'release' },
+      { id: '26.1.2', type: 'release' }, { id: '26.1.1', type: 'release' },
+      { id: '26.1',   type: 'release' }, { id: '1.21.5', type: 'release' },
+      { id: '1.21.4', type: 'release' }, { id: '1.21.3', type: 'release' },
+      { id: '1.21.1', type: 'release' }, { id: '1.21',   type: 'release' },
+      { id: '1.20.6', type: 'release' }, { id: '1.20.4', type: 'release' },
+      { id: '1.20.1', type: 'release' }, { id: '1.19.4', type: 'release' },
     ];
     populateSrvVersions();
   }
