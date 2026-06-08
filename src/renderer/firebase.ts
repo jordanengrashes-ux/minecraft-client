@@ -25,19 +25,19 @@ setPersistence(auth, browserLocalPersistence).catch(() => {});
 
 export async function loginEmail(email: string, password: string) {
   const { user } = await signInWithEmailAndPassword(auth, email, password);
-  return { uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player' };
+  return { uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player', email: user.email || '' };
 }
 
 export async function registerEmail(email: string, password: string, username: string) {
   const { user } = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(user, { displayName: username });
-  return { uid: user.uid, name: username };
+  return { uid: user.uid, name: username, email: user.email || email };
 }
 
 export async function loginGoogle() {
   const provider = new GoogleAuthProvider();
   const { user } = await signInWithPopup(auth, provider);
-  return { uid: user.uid, name: user.displayName || 'Player' };
+  return { uid: user.uid, name: user.displayName || 'Player', email: user.email || '' };
 }
 
 export { signOut };

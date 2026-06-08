@@ -365,6 +365,54 @@ async function authenticateWithMinecraft(code: string): Promise<any> {
   };
 }
 
+// ── Voxel SMP — external Paper server control ─────────────────────────────────
+const VOXEL_SRV_DIR       = 'C:\\Users\\Jorda\\VoxelServer';
+const VOXEL_SRV_BAT       = path.join(VOXEL_SRV_DIR, 'start.bat');
+const VOXEL_SRV_AUTOSTART = path.join(app.getPath('userData'), 'voxel-srv-autostart.json');
+let voxelSrvProcess: ReturnType<typeof spawn> | null = null;
+
+function voxelSrvRunning(): boolean {
+  if (voxelSrvProcess && !voxelSrvProcess.killed) return true;
+  // Also check if port 25565 is already listening (started outside the app)
+  try {
+    const r = spawnSync('powershell', ['-NoProfile', '-Command',
+      '(netstat -an | Select-String ":25565.*LISTENING").Count -gt 0'], { encoding: 'utf-8', timeout: 3000 });
+    return (r.stdout || '').trim() === 'True';
+  } catch { return false; }
+}
+
+ipcMain.handle('voxel-srv-status', () => ({ running: voxelSrvRunning() }));
+
+ipcMain.handle('voxel-srv-start', async () => {
+  if (voxelSrvRunning()) return { ok: false, error: 'Already running' };
+  if (!fs.existsSync(VOXEL_SRV_BAT)) return { ok: false, error: `start.bat not found at ${VOXEL_SRV_BAT}` };
+  try {
+    voxelSrvProcess = spawn('cmd.exe', ['/c', VOXEL_SRV_BAT], {
+      cwd: VOXEL_SRV_DIR, stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    voxelSrvProcess.stdout?.on('data', (d: Buffer) => gameWin?.webContents.send('voxel-srv-log', d.toString()));
+    voxelSrvProcess.stderr?.on('data', (d: Buffer) => gameWin?.webContents.send('voxel-srv-log', d.toString()));
+    voxelSrvProcess.on('close', () => { voxelSrvProcess = null; gameWin?.webContents.send('voxel-srv-closed'); });
+    return { ok: true };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('voxel-srv-stop', async () => {
+  if (voxelSrvProcess?.stdin) { voxelSrvProcess.stdin.write('stop\n'); }
+  setTimeout(() => { try { voxelSrvProcess?.kill(); } catch {} voxelSrvProcess = null; }, 8000);
+  return { ok: true };
+});
+
+ipcMain.handle('voxel-srv-autostart-get', () => {
+  try { return JSON.parse(fs.readFileSync(VOXEL_SRV_AUTOSTART, 'utf-8')).enabled ?? false; } catch { return false; }
+});
+ipcMain.handle('voxel-srv-autostart-set', (_e, enabled: boolean) => {
+  try { fs.writeFileSync(VOXEL_SRV_AUTOSTART, JSON.stringify({ enabled }), 'utf-8'); } catch {}
+  // Also register/unregister the app itself to open at Windows login
+  app.setLoginItemSettings({ openAtLogin: enabled, path: app.getPath('exe') });
+  return { ok: true };
+});
+
 // ── Firebase user cache (reliable disk-based persistence for Electron) ────────
 ipcMain.handle('save-firebase-user', (_e, data: { uid: string; name: string }) => {
   try { fs.writeFileSync(FIREBASE_USER_CACHE, JSON.stringify(data), 'utf-8'); return true; } catch { return false; }

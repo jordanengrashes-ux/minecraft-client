@@ -838,6 +838,27 @@
         </label>
       </div>
 
+      <!-- Voxel SMP — external Paper server control -->
+      <div style="padding:14px 24px;background:rgba(63,185,80,0.05);border-bottom:1px solid rgba(63,185,80,0.15);flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:20px;">🌍</span>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:#e6edf3;">Voxel SMP</div>
+            <div style="font-size:11px;color:#555;margin-top:1px;">99.240.116.116 &nbsp;·&nbsp; Paper 26.1.2 &nbsp;·&nbsp; <a id="voxel-srv-map-link" href="#" style="color:#58a6ff;text-decoration:none;" onclick="(window as any).electron?.openExternal('http://99.240.116.116:8100');return false;">Live Map</a></div>
+          </div>
+          <span id="voxel-srv-dot" style="width:8px;height:8px;border-radius:50%;background:#30363d;flex-shrink:0;"></span>
+          <span id="voxel-srv-status-text" style="font-size:11px;color:#555555;min-width:60px;">Checking…</span>
+          <button id="voxel-srv-start-btn" style="padding:5px 14px;background:#238636;border:1px solid #2ea043;border-radius:6px;color:#fff;font-size:12px;cursor:pointer;">Start</button>
+          <button id="voxel-srv-stop-btn"  style="padding:5px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:12px;cursor:pointer;">Stop</button>
+          <button id="voxel-srv-restart-btn" style="padding:5px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:12px;cursor:pointer;">Restart</button>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-shrink:0;">
+            <span style="font-size:11px;color:#aaaaaa;white-space:nowrap;">Auto-start</span>
+            <label class="toggle toggle-sm"><input type="checkbox" id="voxel-srv-autostart-toggle" /><span class="toggle-slider"></span></label>
+          </label>
+        </div>
+        <div id="voxel-srv-msg" style="font-size:11px;color:#555;margin-top:6px;display:none;"></div>
+      </div>
+
       <!-- Config header -->
       <div style="padding:16px 24px;border-bottom:1px solid rgba(60,60,60,0.6);flex-shrink:0;display:flex;flex-direction:column;gap:12px;">
 

@@ -14,6 +14,16 @@ contextBridge.exposeInMainWorld('electron', {
   clearFirebaseUser:  ()             => ipcRenderer.invoke('clear-firebase-user'),
 });
 
+contextBridge.exposeInMainWorld('voxelSrv', {
+  status:        ()               => ipcRenderer.invoke('voxel-srv-status'),
+  start:         ()               => ipcRenderer.invoke('voxel-srv-start'),
+  stop:          ()               => ipcRenderer.invoke('voxel-srv-stop'),
+  autostartGet:  ()               => ipcRenderer.invoke('voxel-srv-autostart-get'),
+  autostartSet:  (e: boolean)     => ipcRenderer.invoke('voxel-srv-autostart-set', e),
+  onLog:         (cb: (s: string) => void) => ipcRenderer.on('voxel-srv-log',    (_e, s) => cb(s)),
+  onClosed:      (cb: () => void)          => ipcRenderer.on('voxel-srv-closed', () => cb()),
+});
+
 contextBridge.exposeInMainWorld('updater', {
   onChecking:    (cb: () => void)             => ipcRenderer.on('update-checking',      () => cb()),
   onAvailable:   (cb: (ver: string) => void)  => ipcRenderer.on('update-available',     (_e, v) => cb(v)),

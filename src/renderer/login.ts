@@ -43,7 +43,7 @@ async function checkAutoLogin() {
       const unsub = onAuthStateChanged(auth, (user) => {
         unsub();
         if (user) {
-          onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || cached.name || 'Player' });
+          onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || cached.name || 'Player', email: user.email || '' });
         } else {
           // Firebase session expired — clear disk cache, show login
           window.electron?.clearFirebaseUser?.();
@@ -57,7 +57,7 @@ async function checkAutoLogin() {
   const unsub = onAuthStateChanged(auth, (user) => {
     unsub();
     if (user) {
-      onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player' });
+      onSuccess({ uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player', email: user.email || '' });
     } else {
       document.body.style.visibility = 'visible';
     }

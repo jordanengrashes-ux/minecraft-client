@@ -43,10 +43,15 @@ const recentLines: string[] = [];
 if ((window as any).electron) {
   (window as any).electron.onUserData((d: any) => {
     userName.textContent = d.name || 'Player';
+    if (d.email) initAdminPanel(d.email);
   });
 } else {
   const stored = sessionStorage.getItem('userData');
-  if (stored) userName.textContent = JSON.parse(stored).name || 'Player';
+  if (stored) {
+    const p = JSON.parse(stored);
+    userName.textContent = p.name || 'Player';
+    if (p.email) setTimeout(() => initAdminPanel(p.email), 0);
+  }
 }
 
 const mcSwitchBtn = document.getElementById('mc-switch-btn') as HTMLButtonElement | null;
@@ -2966,6 +2971,105 @@ srvSaveBtn?.addEventListener('click', async () => {
 });
 
 // Capture uid from user-data — init tokens, presence, friends
+const ADMIN_EMAILS = ['jordanengrashes@gmail.com'];
+let adminPanelInited = false;
+
+function initAdminPanel(email: string) {
+  if (adminPanelInited) return;
+  adminPanelInited = true;
+  const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+  const voxelCard = document.getElementById('voxel-srv-card')?.parentElement as HTMLElement | null;
+  // The card is inside server-panel; gate visibility
+  const card = document.querySelector('[id^="voxel-srv-dot"]')?.closest('div[style*="voxel"]') as HTMLElement | null;
+  // Find it by the dedicated bar's next sibling approach — target the green-tinted card
+  const allPanelDivs = document.querySelectorAll('#server-panel > div');
+  // The Voxel SMP card is the 2nd child (index 1), Dedicated Mode bar is index 0
+  const voxelSmpCard = allPanelDivs[1] as HTMLElement | null;
+  const dedicatedBar = allPanelDivs[0] as HTMLElement | null;
+
+  if (voxelSmpCard) voxelSmpCard.style.display = isAdmin ? '' : 'none';
+  if (dedicatedBar)  dedicatedBar.style.display  = isAdmin ? '' : 'none';
+
+  if (!isAdmin) return;
+
+  const vSrv = (window as any).voxelSrv;
+  if (!vSrv) return;
+
+  const dotEl    = document.getElementById('voxel-srv-dot') as HTMLElement;
+  const statusEl = document.getElementById('voxel-srv-status-text') as HTMLElement;
+  const startBtn = document.getElementById('voxel-srv-start-btn')    as HTMLButtonElement;
+  const stopBtn  = document.getElementById('voxel-srv-stop-btn')     as HTMLButtonElement;
+  const rstBtn   = document.getElementById('voxel-srv-restart-btn')  as HTMLButtonElement;
+  const autoTgl  = document.getElementById('voxel-srv-autostart-toggle') as HTMLInputElement;
+  const msgEl    = document.getElementById('voxel-srv-msg') as HTMLElement;
+
+  function setVoxelStatus(running: boolean) {
+    dotEl.style.background    = running ? '#3fb950' : '#da3633';
+    statusEl.textContent      = running ? 'Online' : 'Offline';
+    statusEl.style.color      = running ? '#3fb950' : '#da3633';
+    startBtn.disabled         = running;
+    stopBtn.disabled          = !running;
+    rstBtn.disabled           = false;
+    startBtn.style.opacity    = running ? '0.4' : '1';
+    stopBtn.style.opacity     = running ? '1'   : '0.4';
+  }
+
+  function showMsg(m: string, color = '#8b949e') {
+    msgEl.textContent  = m;
+    msgEl.style.color  = color;
+    msgEl.style.display = m ? 'block' : 'none';
+  }
+
+  // Poll status every 10s
+  async function refreshStatus() {
+    try { const r = await vSrv.status(); setVoxelStatus(r.running); } catch {}
+  }
+  refreshStatus();
+  setInterval(refreshStatus, 10000);
+
+  // Load autostart toggle
+  vSrv.autostartGet().then((v: boolean) => { autoTgl.checked = !!v; });
+
+  autoTgl.addEventListener('change', async () => {
+    await vSrv.autostartSet(autoTgl.checked);
+    showMsg(autoTgl.checked ? 'Server will start automatically when you open the app.' : 'Auto-start disabled.', '#8b949e');
+  });
+
+  startBtn.addEventListener('click', async () => {
+    startBtn.disabled = true;
+    showMsg('Starting…', '#f5a623');
+    const r = await vSrv.start();
+    if (r.ok) { showMsg('Server starting — may take ~30s to be joinable.', '#3fb950'); setTimeout(refreshStatus, 5000); }
+    else       { showMsg(`Error: ${r.error}`, '#da3633'); startBtn.disabled = false; }
+  });
+
+  stopBtn.addEventListener('click', async () => {
+    stopBtn.disabled = true;
+    showMsg('Stopping…', '#f5a623');
+    await vSrv.stop();
+    setTimeout(() => { refreshStatus(); showMsg(''); }, 5000);
+  });
+
+  rstBtn.addEventListener('click', async () => {
+    rstBtn.disabled = true;
+    showMsg('Restarting…', '#f5a623');
+    await vSrv.stop();
+    await new Promise(r => setTimeout(r, 6000));
+    const r = await vSrv.start();
+    rstBtn.disabled = false;
+    showMsg(r.ok ? 'Server restarted — ready in ~30s.' : `Error: ${r.error}`, r.ok ? '#3fb950' : '#da3633');
+    setTimeout(refreshStatus, 8000);
+  });
+
+  // Auto-start on app open if preference is set
+  vSrv.autostartGet().then(async (enabled: boolean) => {
+    if (enabled) {
+      const s = await vSrv.status();
+      if (!s.running) { await vSrv.start(); showMsg('Auto-starting server…', '#f5a623'); setTimeout(refreshStatus, 8000); }
+    }
+  });
+}
+
 if ((window as any).electron) {
   (window as any).electron.onUserData((d: any) => {
     if (d.uid && d.uid !== myUid) {
@@ -2974,6 +3078,7 @@ if ((window as any).electron) {
       initPresence(myUid);
       initFriends(myUid);
     }
+    if (d.email) initAdminPanel(d.email);
   });
 }
 
