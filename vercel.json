@@ -1,3 +1,5 @@
 {
-  "outputDirectory": "docs"
+  "buildCommand": "",
+  "outputDirectory": "docs",
+  "installCommand": ""
 }

@@ -66,6 +66,8 @@ function setMcAuthed(name: string) {
   mcPlayBtn.disabled = false;
   setStatus(`Authenticated as ${name}`, 'green');
   if (myUid) registerUserIndex(myUid, name);
+  const avatarEl = document.getElementById('user-avatar')!;
+  avatarEl.innerHTML = `<img src="https://crafatar.com/renders/body/${encodeURIComponent(name)}?scale=2&overlay" style="height:52px;width:auto;image-rendering:pixelated;" onerror="this.style.display='none'">`;
 }
 
 function clearMcAuthed() {
@@ -1767,7 +1769,13 @@ async function searchCurseForge(query: string) {
   const res = await cf?.search({ query, mcVersion: ver });
   loading.style.display = 'none';
   if (!res?.ok) {
-    list.innerHTML = `<p style="color:#666;font-size:13px;padding:20px;text-align:center">${res?.error ?? 'CurseForge unavailable'}</p>`;
+    const q = encodeURIComponent(query || '');
+    const url = `https://www.curseforge.com/minecraft/search?search=${q}&class=mc-mods`;
+    list.innerHTML = `<div style="text-align:center;padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;">
+      <p style="color:#666;font-size:13px;">CurseForge API unavailable. Browse on the website:</p>
+      <a href="${url}" style="background:#f16436;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;cursor:pointer;"
+         onclick="event.preventDefault();(window as any).electron?.openExternal?.('${url}')||window.open('${url}')">Browse on CurseForge →</a>
+    </div>`;
     return;
   }
   if (!res.data?.length) {
@@ -4734,14 +4742,19 @@ function initGuide() {
 
   document.querySelectorAll<HTMLButtonElement>('.guide-tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (btn.dataset.tab === 'chat') { mc.openAiWindow(); return; }
       document.querySelectorAll('.guide-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activeTab = btn.dataset.tab || 'recipes';
       searchEl.value = '';
-      searchBar.style.display = 'block';
-      chatInputEl.style.display = 'none';
-      sessionBar.style.display = 'none';
+      if (activeTab === 'chat') {
+        searchBar.style.display = 'none';
+        chatInputEl.style.display = 'flex';
+        sessionBar.style.display = 'flex';
+      } else {
+        searchBar.style.display = 'block';
+        chatInputEl.style.display = 'none';
+        sessionBar.style.display = 'none';
+      }
       renderTab();
     });
   });
