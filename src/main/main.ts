@@ -511,9 +511,10 @@ ipcMain.on('login-success', (_e, userData) => {
   gameWin?.webContents.once('did-finish-load', () => {
     gameWin?.webContents.send('user-data', userData);
     if (mcAuthToken) gameWin?.webContents.send('mc-already-authed', mcAuthToken.name);
-    // Start Java resolution immediately so it's ready when the user clicks Play
+    // Pre-warm Java 21 and Java 25 so they're ready when the user clicks Play
     javaReadyPromise = ensureJava21((msg) => gameWin?.webContents.send('mc-log', msg));
     javaReadyPromise.catch(() => { javaReadyPromise = null; });
+    ensureJava(25, (msg) => gameWin?.webContents.send('mc-log', msg)).catch(() => {});
   });
 });
 
@@ -584,7 +585,7 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
     gameWin?.webContents.send('mc-log', `[Launcher] Java path: ${javaPath}`);
     gameWin?.webContents.send('mc-log', `[Launcher] Java version detected: ${detectedVer || 'UNKNOWN'}`);
     if (detectedVer !== requestedJava && !(requestedJava === 21 && detectedVer >= 21)) {
-      throw new Error(`Java ${detectedVer || 'unknown'} found but Java ${requestedJava} was requested. Delete %APPDATA%\\VoxelClient\\java${requestedJava} and relaunch to re-download.`);
+      throw new Error(`Java ${detectedVer || 'unknown'} found but Java ${requestedJava} is required for this version. Try restarting VoxelClient — it will download the correct Java automatically.`);
     }
     gameWin?.webContents.send('mc-log', `[Launcher] version: ${opts.version || '1.21.4'}, mem: ${opts.maxMem || 4}G, Java ${detectedVer}, user: ${auth.name}`);
 
