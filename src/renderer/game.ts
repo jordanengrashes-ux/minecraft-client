@@ -5010,30 +5010,18 @@ function initGuide() {
     chatBusy = true; aiSendBtn.disabled = true;
     addBubble(q, true);
     const sess = currentSess();
-    // Inject web context for factual-looking queries
-    let webCtx = '';
-    if (/what|how|when|where|which|who|latest|new|update/i.test(q)) {
-      webCtx = await fetchWebContext(q);
-    }
-    const msgToSend = webCtx ? `${webCtx}${q}` : q;
-    sess.history.push({ role: 'user', content: msgToSend });
+    sess.history.push({ role: 'user', content: q });
+    if (sess.history.length > 30) sess.history.splice(0, 2);
     const typing = document.createElement('div');
     typing.className = 'ai-typing'; typing.textContent = '…';
     contentEl.appendChild(typing);
     contentEl.scrollTop = contentEl.scrollHeight;
-    const res = await (window as any).ai?.chat(sess.history) || { ok: false, error: 'AI not configured' };
+    await new Promise(r => setTimeout(r, 180));
+    const { localAnswer } = await import('./local-ai');
+    const answer = localAnswer(q, sess.history);
     typing.remove();
-    if (res.ok) {
-      addBubble(res.text, false);
-      sess.history.push({ role: 'assistant', content: res.text });
-      // Keep last 30 messages (15 exchanges) per session
-      if (sess.history.length > 30) sess.history.splice(0, 2);
-    } else {
-      const err = document.createElement('div');
-      err.style.cssText = 'color:#f85149;font-size:12px;padding:4px 0;';
-      err.textContent = `Error: ${res.error}`;
-      contentEl.appendChild(err);
-    }
+    sess.history.push({ role: 'assistant', content: answer });
+    addBubble(answer, false);
     chatBusy = false; aiSendBtn.disabled = false;
     aiInputEl.focus();
   }

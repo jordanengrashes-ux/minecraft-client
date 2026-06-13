@@ -351,9 +351,13 @@ async function authenticateWithMinecraft(code: string): Promise<any> {
   });
 
   // 5. Profile
-  const profile = await fetchJson('https://api.minecraftservices.com/minecraft/profile', {
+  const profileRes = await (net.fetch as any)('https://api.minecraftservices.com/minecraft/profile', {
     headers: { Authorization: `Bearer ${mc.access_token}` },
   });
+  if (profileRes.status === 404) throw new Error('This Microsoft account does not own Minecraft Java Edition.');
+  if (!profileRes.ok) throw new Error(`Profile fetch failed: HTTP ${profileRes.status}`);
+  const profile = await profileRes.json();
+  if (!profile.id) throw new Error('This Microsoft account does not own Minecraft Java Edition.');
 
   return {
     access_token: mc.access_token,
@@ -571,7 +575,11 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
         saveCachedAuth(token);
         gameWin?.webContents.send('mc-already-authed', token.name);
       } catch (err: any) {
-        return { ok: false, error: 'Microsoft sign-in cancelled or failed — use Offline Mode to play without an account.' };
+        const msg = err.message || String(err);
+        const isCancel = msg.includes('Window closed') || msg.includes('Cancelled') || msg.includes('cancel');
+        return { ok: false, error: isCancel
+          ? 'Microsoft sign-in was cancelled. Use Offline Mode to play without an account.'
+          : `Microsoft auth failed: ${msg}` };
       }
     }
   }
