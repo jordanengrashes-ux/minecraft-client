@@ -903,6 +903,36 @@ ipcMain.handle('server-pick-world', async () => {
   return result.filePaths[0];
 });
 
+// Returns the Java major version required to run a given Minecraft version
+function javaForMcVersion(id: string): number {
+  const m = id.match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!m) return 21;
+  const maj = parseInt(m[1]);
+  if (maj !== 1) return 25;                           // year-based (26.x …) → Java 25
+  const min = parseInt(m[2]);
+  const patch = m[3] ? parseInt(m[3]) : 0;
+  if (min < 17) return 8;
+  if (min < 21) return 17;
+  if (min === 21 && patch <= 11) return 21;
+  return 25;                                          // 1.21.12+ → Java 25
+}
+
+// Try PaperMC API for a server JAR download URL
+async function getPaperJarUrl(version: string): Promise<{ url: string; size: number } | null> {
+  try {
+    const data = await fetchJson(`https://api.papermc.io/v2/projects/paper/versions/${version}/builds`);
+    const builds: any[] = data.builds ?? [];
+    if (!builds.length) return null;
+    const latest  = builds[builds.length - 1];
+    const dlName  = latest.downloads?.application?.name as string | undefined;
+    if (!dlName) return null;
+    return {
+      url:  `https://api.papermc.io/v2/projects/paper/versions/${version}/builds/${latest.build}/downloads/${dlName}`,
+      size: latest.downloads?.application?.size ?? 0,
+    };
+  } catch { return null; }
+}
+
 // ── IPC: server hosting ───────────────────────────────────────────────────────
 ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: number; minMem?: number; name: string; port?: number; maxPlayers?: number; motd?: string; seed?: string; worldPath?: string; javaVersion?: number; }) => {
   if (serverProcess) return { ok: false, error: 'Server is already running' };
@@ -914,19 +944,35 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
     // Download server.jar if not cached
     if (!fs.existsSync(jarPath)) {
       gameWin?.webContents.send('server-log', '[Host] Fetching version info…');
-      const manifest = await fetchJson('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json');
-      const entry    = (manifest.versions as any[]).find(v => v.id === opts.version);
-      if (!entry) throw new Error(`Version ${opts.version} not in manifest`);
-      const info     = await fetchJson(entry.url);
-      const dl       = info.downloads?.server;
-      if (!dl?.url) throw new Error('No server JAR available for this version (try 1.17+)');
-      gameWin?.webContents.send('server-log', `[Host] Downloading server.jar (${Math.round(dl.size / 1024 / 1024)}MB)…`);
-      let lastPct = -1;
-      await downloadFileTo(dl.url, jarPath, pct => {
-        if (pct !== lastPct && pct % 10 === 0) {
-          lastPct = pct;
-          gameWin?.webContents.send('server-log', `[Host] Downloading… ${pct}%`);
+
+      let dlUrl  = '';
+      let dlSize = 0;
+
+      // 1. Try Mojang manifest (vanilla)
+      try {
+        const manifest = await fetchJson('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json');
+        const entry    = (manifest.versions as any[]).find((v: any) => v.id === opts.version);
+        if (entry) {
+          const info = await fetchJson(entry.url);
+          dlUrl  = info.downloads?.server?.url  ?? '';
+          dlSize = info.downloads?.server?.size ?? 0;
         }
+      } catch {}
+
+      // 2. Fall back to PaperMC (handles year-based versions and versions missing from Mojang manifest)
+      if (!dlUrl) {
+        gameWin?.webContents.send('server-log', '[Host] Not in Mojang manifest — trying PaperMC…');
+        const paper = await getPaperJarUrl(opts.version);
+        if (paper) { dlUrl = paper.url; dlSize = paper.size; gameWin?.webContents.send('server-log', '[Host] Found on PaperMC ✓'); }
+      }
+
+      if (!dlUrl) throw new Error(`No server JAR found for ${opts.version}. Check the version name and try again.`);
+
+      const sizeMB = dlSize > 0 ? ` (${Math.round(dlSize / 1024 / 1024)}MB)` : '';
+      gameWin?.webContents.send('server-log', `[Host] Downloading server.jar${sizeMB}…`);
+      let lastPct = -1;
+      await downloadFileTo(dlUrl, jarPath, pct => {
+        if (pct !== lastPct && pct % 10 === 0) { lastPct = pct; gameWin?.webContents.send('server-log', `[Host] Downloading… ${pct}%`); }
       });
       gameWin?.webContents.send('server-log', '[Host] Download complete');
     }
@@ -965,7 +1011,7 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
 
     // Resolve Java the same way as game launch (bundled → cache → system → download)
     // Use java.exe not javaw.exe — server needs stdout
-    const srvJava = opts.javaVersion ?? 21;
+    const srvJava = opts.javaVersion ?? javaForMcVersion(opts.version);
     const javawPath = await ensureJava(srvJava, (msg) => gameWin?.webContents.send('server-log', msg));
     const javaExe   = javawPath.replace(/javaw(\.exe)?$/i, 'java$1');
 
