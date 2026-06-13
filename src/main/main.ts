@@ -1008,6 +1008,8 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
       'view-distance':            '10',
       'motd':                     opts.motd               || 'Voxel Client Server',
       'pause-when-empty-seconds': '0',
+      'spawn-protection':         '32',
+      'enforce-secure-profile':   'false',
     };
     if (opts.seed) patchProps['level-seed'] = opts.seed;
     let propsContent = fs.existsSync(propsPath) ? fs.readFileSync(propsPath, 'utf-8') : '';
@@ -1052,12 +1054,37 @@ ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: numbe
         serverReady = true;
         gameWin?.webContents.send('server-ready', port);
       }
-      // Player join → restore window + notify renderer
+      // Player join → restore window + notify renderer + starter kit
       const joinM = text.match(/(\w+) joined the game/);
       if (joinM) {
         if (gameWin?.isMinimized()) gameWin.restore();
         gameWin?.show();
-        gameWin?.webContents.send('server-player-join', joinM[1]);
+        const player = joinM[1];
+        gameWin?.webContents.send('server-player-join', player);
+
+        // First-join starter kit: 16 steak, stone tools, leather armor
+        const kitsPath = path.join(serverDir, 'kits-given.json');
+        let kitsGiven: string[] = [];
+        try { kitsGiven = JSON.parse(fs.readFileSync(kitsPath, 'utf-8')); } catch {}
+        if (!kitsGiven.includes(player)) {
+          kitsGiven.push(player);
+          try { fs.writeFileSync(kitsPath, JSON.stringify(kitsGiven)); } catch {}
+          setTimeout(() => {
+            if (!serverProcess?.stdin) return;
+            const give = (item: string, n: number) =>
+              serverProcess!.stdin!.write(`give ${player} ${item} ${n}\n`);
+            give('minecraft:cooked_beef',        16);
+            give('minecraft:stone_sword',         1);
+            give('minecraft:stone_pickaxe',       1);
+            give('minecraft:stone_axe',           1);
+            give('minecraft:stone_shovel',        1);
+            give('minecraft:leather_helmet',      1);
+            give('minecraft:leather_chestplate',  1);
+            give('minecraft:leather_leggings',    1);
+            give('minecraft:leather_boots',       1);
+            gameWin?.webContents.send('server-log', `[Host] Starter kit sent to ${player}\n`);
+          }, 2500);
+        }
       }
       // Player count from /list response
       const cntM = text.match(/There are (\d+) of a max(?: of)? (\d+) players/);
