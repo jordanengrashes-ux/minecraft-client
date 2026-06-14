@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "voxelcosmetics",
+  "version": "${version}",
+  "name": "Voxel Client Cosmetics",
+  "description": "Custom capes visible to all Voxel Client players",
+  "authors": ["Voxel Client"],
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.voxelclient.cosmetics.VoxelCosmeticsMod"]
+  },
+  "mixins": ["voxelcosmetics.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": ">=1.21",
+    "java": ">=21"
+  }
+}
