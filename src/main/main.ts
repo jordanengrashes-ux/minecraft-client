@@ -662,20 +662,13 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
     const isFabricOff = (opts.version || '').startsWith('fabric-loader-');
     const mcVerOff    = isFabricOff ? opts.version.replace(/^fabric-loader-[\d.]+-/, '') : (opts.version || '1.21.4');
 
-    // Check game files are cached — offline launch can't download them
-    const versionDir = path.join(mcRoot, 'versions', mcVerOff);
-    const versionJar = path.join(versionDir, `${mcVerOff}.jar`);
-    if (!fs.existsSync(versionJar)) {
-      throw new Error(`Game files for ${mcVerOff} not found. Launch once with internet to download them first.`);
-    }
-
     mcProcess = launcher.launch({
       authorization: { access_token: 'offline', client_token: 'offline', uuid, name: opts.username, user_properties: '{}', meta: { type: 'mojang', demo: false } },
       root: mcRoot,
       version: { number: mcVerOff, type: 'release', ...(isFabricOff ? { custom: opts.version } : {}) },
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
-      overrides: { maxSockets: 0, checkHash: false },
+      overrides: { maxSockets: 64, checkHash: false },
     });
     launcher.on('data',     (d: string) => gameWin?.webContents.send('mc-log',      d));
     launcher.on('progress', (e: any)    => gameWin?.webContents.send('mc-progress', e));

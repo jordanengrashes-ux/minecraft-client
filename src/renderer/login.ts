@@ -5,6 +5,10 @@ const errEl       = document.getElementById('err-msg')      as HTMLElement;
 const btnLogin    = document.getElementById('btn-login')     as HTMLButtonElement;
 const btnRegister = document.getElementById('btn-register')  as HTMLButtonElement;
 const btnGoogle   = document.getElementById('btn-google')    as HTMLButtonElement;
+const btnGuest    = document.getElementById('btn-guest')     as HTMLButtonElement;
+const guestWrap   = document.getElementById('guest-name-wrap') as HTMLElement;
+const guestInput  = document.getElementById('guest-name')    as HTMLInputElement;
+const btnGuestGo  = document.getElementById('btn-guest-go')  as HTMLButtonElement;
 const tabLogin    = document.getElementById('tab-login')     as HTMLButtonElement;
 const tabRegister = document.getElementById('tab-register')  as HTMLButtonElement;
 const formLogin   = document.getElementById('form-login')    as HTMLElement;
@@ -134,6 +138,18 @@ btnGoogle.addEventListener('click', async () => {
     btnGoogle.disabled = false;
   }
 });
+
+// ── Guest ─────────────────────────────────────────────────────────────────────
+btnGuest.addEventListener('click', () => {
+  guestWrap.style.display = guestWrap.style.display === 'none' ? '' : 'none';
+  if (guestWrap.style.display !== 'none') guestInput.focus();
+});
+function doGuest() {
+  const name = guestInput.value.trim() || 'Guest';
+  onSuccess({ uid: 'guest', name, email: '' });
+}
+btnGuestGo.addEventListener('click', doGuest);
+guestInput.addEventListener('keydown', e => { if (e.key === 'Enter') doGuest(); });
 
 // ── Enter key ─────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
