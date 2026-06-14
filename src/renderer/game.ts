@@ -5016,12 +5016,16 @@ function initGuide() {
     typing.className = 'ai-typing'; typing.textContent = '…';
     contentEl.appendChild(typing);
     contentEl.scrollTop = contentEl.scrollHeight;
-    await new Promise(r => setTimeout(r, 180));
-    const { localAnswer } = await import('./local-ai');
-    const answer = localAnswer(q, sess.history);
-    typing.remove();
-    sess.history.push({ role: 'assistant', content: answer });
-    addBubble(answer, false);
+    try {
+      const res = await (window as any).ai.chat(sess.history);
+      typing.remove();
+      if (!res.ok) throw new Error(res.error);
+      sess.history.push({ role: 'assistant', content: res.text });
+      addBubble(res.text, false);
+    } catch {
+      typing.remove();
+      addBubble('Sorry, something went wrong. Try again.', false);
+    }
     chatBusy = false; aiSendBtn.disabled = false;
     aiInputEl.focus();
   }

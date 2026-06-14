@@ -1587,41 +1587,24 @@ ipcMain.handle('open-ai-window', () => {
 ipcMain.handle('ai-chat', async (_e, messages: { role: string; content: string }[]) => {
   if (!GEMINI_KEY) return { ok: false, error: 'AI not available in this build' };
   try {
-    const contents = messages.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-    // Gemini requires alternating turns — merge consecutive same-role messages
-    const merged: { role: string; parts: { text: string }[] }[] = [];
-    for (const c of contents) {
-      if (merged.length && merged[merged.length - 1].role === c.role) {
-        merged[merged.length - 1].parts[0].text += '\n' + c.parts[0].text;
-      } else {
-        merged.push({ role: c.role, parts: [{ text: c.parts[0].text }] });
-      }
-    }
-    if (merged[0]?.role !== 'user') merged.unshift({ role: 'user', parts: [{ text: '(start)' }] });
-
     const body = JSON.stringify({
-      systemInstruction: { parts: [{ text: AI_SYSTEM }] },
-      contents: merged,
-      generationConfig: { maxOutputTokens: 1024, temperature: 0.65 },
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT',       threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-      ],
+      model: 'google/gemini-2.0-flash-exp:free',
+      messages: [{ role: 'system', content: AI_SYSTEM }, ...messages],
+      max_tokens: 1024,
+      temperature: 0.65,
     });
 
-    const path = `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
     const resp = await new Promise<string>((resolve, reject) => {
       const req = https.request({
-        hostname: 'generativelanguage.googleapis.com',
-        path,
+        hostname: 'openrouter.ai',
+        path: '/api/v1/chat/completions',
         method: 'POST',
         timeout: 20000,
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GEMINI_KEY}`,
+          'Content-Length': Buffer.byteLength(body),
+        },
       }, res => {
         let data = '';
         res.on('data', chunk => { data += chunk; });
@@ -1634,8 +1617,8 @@ ipcMain.handle('ai-chat', async (_e, messages: { role: string; content: string }
     });
 
     const json = JSON.parse(resp);
-    if (json.error) return { ok: false, error: json.error.message };
-    const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    if (json.error) return { ok: false, error: json.error.message ?? String(json.error) };
+    const text = json.choices?.[0]?.message?.content ?? '';
     return text ? { ok: true, text } : { ok: false, error: 'No response from AI' };
   } catch (err: any) {
     return { ok: false, error: err.message };

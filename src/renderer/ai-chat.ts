@@ -1,5 +1,3 @@
-import { localAnswer } from './local-ai';
-
 interface AiSession { id: string; name: string; history: { role: string; content: string }[]; }
 
 const sessions: AiSession[] = [{ id: 's1', name: 'Chat 1', history: [] }];
@@ -123,12 +121,16 @@ async function sendChat(q: string) {
   sess.history.push({ role: 'user', content: q });
   if (sess.history.length > 20) sess.history.splice(0, sess.history.length - 20);
 
-  await new Promise(r => setTimeout(r, 180));
-
-  const answer = localAnswer(q, sess.history);
-  typing.remove();
-  sess.history.push({ role: 'assistant', content: answer });
-  addBubble(answer, false);
+  try {
+    const res = await (window as any).ai.chat(sess.history);
+    typing.remove();
+    if (!res.ok) throw new Error(res.error);
+    sess.history.push({ role: 'assistant', content: res.text });
+    addBubble(res.text, false);
+  } catch (err: any) {
+    typing.remove();
+    addBubble('Sorry, something went wrong. Try again.', false);
+  }
 
   chatBusy = false;
   sendBtn.disabled = false;
