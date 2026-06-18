@@ -615,6 +615,24 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
       }
     } catch {}
 
+    // Auto-install bundled shader packs (only on first run — preserves user settings)
+    try {
+      const shaderSrcDir = app.isPackaged
+        ? path.join(process.resourcesPath, 'shaderpacks')
+        : path.join(__dirname, '../../resources/shaderpacks');
+      if (fs.existsSync(shaderSrcDir)) {
+        const shaderDestDir = path.join(mcRoot, 'shaderpacks');
+        if (!fs.existsSync(shaderDestDir)) fs.mkdirSync(shaderDestDir, { recursive: true });
+        for (const packName of fs.readdirSync(shaderSrcDir)) {
+          const dest = path.join(shaderDestDir, packName);
+          if (!fs.existsSync(dest)) {
+            fs.cpSync(path.join(shaderSrcDir, packName), dest, { recursive: true });
+            gameWin?.webContents.send('mc-log', `[Launcher] Shader pack installed: ${packName}`);
+          }
+        }
+      }
+    } catch {}
+
     const isFabric = (opts.version || '').startsWith('fabric-loader-');
     const mcVer    = isFabric ? opts.version.replace(/^fabric-loader-[\d.]+-/, '') : (opts.version || '1.21.4');
 
@@ -659,6 +677,25 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
 
     gameWin?.webContents.send('mc-log', `[Launcher] Offline mode — user: ${opts.username}, uuid: ${uuid}`);
     setOptionsKey(mcRoot, 'backgroundBlur', '0');
+
+    // Auto-install bundled shader packs (only on first run — preserves user settings)
+    try {
+      const shaderSrcDir = app.isPackaged
+        ? path.join(process.resourcesPath, 'shaderpacks')
+        : path.join(__dirname, '../../resources/shaderpacks');
+      if (fs.existsSync(shaderSrcDir)) {
+        const shaderDestDir = path.join(mcRoot, 'shaderpacks');
+        if (!fs.existsSync(shaderDestDir)) fs.mkdirSync(shaderDestDir, { recursive: true });
+        for (const packName of fs.readdirSync(shaderSrcDir)) {
+          const dest = path.join(shaderDestDir, packName);
+          if (!fs.existsSync(dest)) {
+            fs.cpSync(path.join(shaderSrcDir, packName), dest, { recursive: true });
+            gameWin?.webContents.send('mc-log', `[Launcher] Shader pack installed: ${packName}`);
+          }
+        }
+      }
+    } catch {}
+
     const isFabricOff = (opts.version || '').startsWith('fabric-loader-');
     const mcVerOff    = isFabricOff ? opts.version.replace(/^fabric-loader-[\d.]+-/, '') : (opts.version || '1.21.4');
 
@@ -1491,6 +1528,22 @@ ipcMain.handle('mc-open-folder', async (_e, type: string) => {
   const dir = dirs[type] || mcRoot();
   fs.mkdirSync(dir, { recursive: true });
   shell.openPath(dir);
+});
+
+ipcMain.handle('download-avengers-mod', async () => {
+  const src  = 'C:\\Users\\Jorda\\Documents\\GitHub\\avengers-mod';
+  const dest = path.join(os.homedir(), 'Downloads', 'avengers-mod-source.zip');
+  try {
+    if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    execSync(
+      `powershell -Command "Compress-Archive -Path '${src}' -DestinationPath '${dest}'"`,
+      { timeout: 30000 }
+    );
+    shell.showItemInFolder(dest);
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
 });
 
 // ── IPC: window controls ──────────────────────────────────────────────────────
