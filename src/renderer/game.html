@@ -1258,6 +1258,23 @@
           </div>
           <button id="mc-reauth-btn" style="padding:8px 18px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:7px;color:#ffffff;font-size:13px;cursor:pointer;white-space:nowrap;">Re-authenticate</button>
         </div>
+
+        <div class="section-label" style="margin-top:24px;">Video / Performance</div>
+        <div class="control-card" style="display:flex;align-items:center;gap:16px;margin-bottom:10px;">
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;">VSync</div>
+            <div style="font-size:12px;color:#aaaaaa;margin-top:3px;">Locks framerate to monitor refresh rate — reduces screen tearing</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="vsync-toggle" checked /><span class="toggle-slider"></span></label>
+        </div>
+        <div class="control-card">
+          <label>Active Shader Pack</label>
+          <select id="shaderpack-select" style="margin-top:8px;">
+            <option value="">None (vanilla)</option>
+            <option value="UltraRealism-Shaders">UltraRealism Shaders (Built-in)</option>
+          </select>
+          <div style="font-size:11px;color:#444444;margin-top:7px;">Applied on next launch — requires Iris mod (install via Fabric on the Play tab)</div>
+        </div>
       </div>
     </div>
 

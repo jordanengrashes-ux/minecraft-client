@@ -553,7 +553,7 @@ ipcMain.handle('mc-reauth', async () => {
 });
 
 // ── IPC: launch Minecraft ─────────────────────────────────────────────────────
-ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; javaVersion?: number }) => {
+ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; javaVersion?: number; vsync?: boolean; shaderpack?: string }) => {
   const requestedJava = opts.javaVersion || 21;
   const javaPromise = (requestedJava === 21 && javaReadyPromise)
     ? javaReadyPromise
@@ -601,6 +601,8 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
     const packDir = path.join(mcRoot, 'resourcepacks', 'VoxelClient');
     if (fs.existsSync(packDir)) enableVoxelResourcePack(mcRoot);
     setOptionsKey(mcRoot, 'backgroundBlur', '0');
+    setOptionsKey(mcRoot, 'enableVsync', opts.vsync !== false ? 'true' : 'false');
+    applyShaderPack(mcRoot, opts.shaderpack || '');
 
     // Auto-install cosmetics mod if bundled
     try {
@@ -655,7 +657,7 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
 });
 
 // ── IPC: offline launch ───────────────────────────────────────────────────────
-ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: number; username: string; javaVersion?: number }) => {
+ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: number; username: string; javaVersion?: number; vsync?: boolean; shaderpack?: string }) => {
   const requestedJava = opts.javaVersion || 21;
   try {
     const mcRoot   = path.join(app.getPath('userData'), '.minecraft');
@@ -677,6 +679,8 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
 
     gameWin?.webContents.send('mc-log', `[Launcher] Offline mode — user: ${opts.username}, uuid: ${uuid}`);
     setOptionsKey(mcRoot, 'backgroundBlur', '0');
+    setOptionsKey(mcRoot, 'enableVsync', opts.vsync !== false ? 'true' : 'false');
+    applyShaderPack(mcRoot, opts.shaderpack || '');
 
     // Auto-install bundled shader packs (only on first run — preserves user settings)
     try {
@@ -1316,6 +1320,27 @@ function setOptionsKey(mcRoot: string, key: string, value: string) {
     txt += (txt.endsWith('\n') || txt === '' ? '' : '\n') + `${key}:${value}\n`;
   }
   try { fs.writeFileSync(optPath, txt, 'utf-8'); } catch {}
+}
+
+function applyShaderPack(mcRoot: string, packName: string) {
+  try {
+    const irisDir = path.join(mcRoot, 'config');
+    if (!fs.existsSync(irisDir)) fs.mkdirSync(irisDir, { recursive: true });
+    const irisProps = path.join(irisDir, 'iris.properties');
+    let content = fs.existsSync(irisProps) ? fs.readFileSync(irisProps, 'utf-8') : '';
+    function setProp(txt: string, key: string, val: string): string {
+      const re = new RegExp(`^${key}=.*`, 'm');
+      if (re.test(txt)) return txt.replace(re, `${key}=${val}`);
+      return txt + (txt.endsWith('\n') || txt === '' ? '' : '\n') + `${key}=${val}\n`;
+    }
+    if (packName) {
+      content = setProp(content, 'shaderPack', packName);
+      content = setProp(content, 'enableShaders', 'true');
+    } else {
+      content = setProp(content, 'enableShaders', 'false');
+    }
+    fs.writeFileSync(irisProps, content, 'utf-8');
+  } catch {}
 }
 
 function enableVoxelResourcePack(mcRoot: string) {

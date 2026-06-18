@@ -29,6 +29,8 @@ const logClose      = document.getElementById('log-close') as HTMLButtonElement;
 const fabricToggle      = document.getElementById('fabric-toggle') as HTMLInputElement;
 const fabricStatus      = document.getElementById('fabric-status')!;
 const mcForceQuitBtn    = document.getElementById('mc-force-quit-btn') as HTMLButtonElement;
+const vsyncToggle       = document.getElementById('vsync-toggle')      as HTMLInputElement | null;
+const shaderpackSelect  = document.getElementById('shaderpack-select') as HTMLSelectElement | null;
 
 declare const __APP_VERSION__: string;
 const appVersionEl = document.getElementById('app-version');
@@ -273,6 +275,13 @@ fabricToggle.addEventListener('change', () => {
   updateModsBadge();
 });
 
+vsyncToggle?.addEventListener('change', () => {
+  localStorage.setItem('voxel_vsync', String(vsyncToggle!.checked));
+});
+shaderpackSelect?.addEventListener('change', () => {
+  localStorage.setItem('voxel_shaderpack', shaderpackSelect!.value);
+});
+
 // ── Restore saved settings on launch ─────────────────────────────────────────
 {
   const savedFabric  = localStorage.getItem('voxel_fabric_on')    === 'true';
@@ -283,6 +292,10 @@ fabricToggle.addEventListener('change', () => {
   if (savedMemory) { mcMemory.value = savedMemory; mcMemoryVal.textContent = savedMemory; }
   const savedJava = localStorage.getItem('voxel_java_version');
   if (savedJava && javaVersionSel) javaVersionSel.value = savedJava;
+  const savedVsync = localStorage.getItem('voxel_vsync');
+  if (vsyncToggle) vsyncToggle.checked = savedVsync !== null ? savedVsync === 'true' : true;
+  const savedShader = localStorage.getItem('voxel_shaderpack');
+  if (shaderpackSelect && savedShader !== null) shaderpackSelect.value = savedShader;
   updateModsBadge();
 }
 
@@ -376,9 +389,11 @@ mcPlayBtn.addEventListener('click', async () => {
 
   addLog(`Launching Minecraft ${version} with ${maxMem}GB RAM, Java ${javaVersion}…`);
 
+  const vsync      = vsyncToggle?.checked !== false;
+  const shaderpack = shaderpackSelect?.value ?? '';
   const res = offlineToggle.checked
-    ? await mc.launchOffline({ version, maxMem, username: offlineUsername.value.trim() || 'Player', javaVersion })
-    : await mc.launch({ version, maxMem, javaVersion });
+    ? await mc.launchOffline({ version, maxMem, username: offlineUsername.value.trim() || 'Player', javaVersion, vsync, shaderpack })
+    : await mc.launch({ version, maxMem, javaVersion, vsync, shaderpack });
   if (!res.ok) {
     setStatus(`Launch failed: ${res.error}`, 'red');
     addLog(`Error: ${res.error}`, 'error');
