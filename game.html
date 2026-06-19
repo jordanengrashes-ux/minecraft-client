@@ -117,28 +117,105 @@ const PASSABLE = new Set([AIR, LEAVES]);
 // Blocks that are transparent (show neighboring faces)
 const TRANSPARENT = new Set([AIR, LEAVES]);
 
-// ── Block colours: [top, side, bottom] each [r,g,b] 0-1 ──
-const BCOLOR = {
-  [GRASS]:  { t:[0.30,0.62,0.20], s:[0.50,0.35,0.13], b:[0.50,0.35,0.13] },
-  [DIRT]:   { t:[0.50,0.35,0.13], s:[0.50,0.35,0.13], b:[0.50,0.35,0.13] },
-  [STONE]:  { t:[0.52,0.52,0.52], s:[0.52,0.52,0.52], b:[0.52,0.52,0.52] },
-  [WOOD]:   { t:[0.46,0.36,0.17], s:[0.38,0.27,0.10], b:[0.46,0.36,0.17] },
-  [LEAVES]: { t:[0.20,0.47,0.11], s:[0.20,0.47,0.11], b:[0.20,0.47,0.11] },
+// ── Texture atlas tile indices ──
+const NUM_TILES = 8;
+const TI = { GRASS_T:0, GRASS_S:1, DIRT:2, STONE:3, WOOD_T:4, WOOD_S:5, LEAVES:6 };
+
+// Which atlas tile each block face uses
+const BTILE = {
+  [GRASS]:  { t:TI.GRASS_T, s:TI.GRASS_S, b:TI.DIRT   },
+  [DIRT]:   { t:TI.DIRT,    s:TI.DIRT,    b:TI.DIRT    },
+  [STONE]:  { t:TI.STONE,   s:TI.STONE,   b:TI.STONE   },
+  [WOOD]:   { t:TI.WOOD_T,  s:TI.WOOD_S,  b:TI.WOOD_T  },
+  [LEAVES]: { t:TI.LEAVES,  s:TI.LEAVES,  b:TI.LEAVES  },
 };
+
+// ── Generate 128×16 pixel-art texture atlas on canvas ──
+function makeAtlas() {
+  const TS = 16, N = NUM_TILES;
+  const cv = document.createElement('canvas');
+  cv.width = N * TS; cv.height = TS;
+  const c = cv.getContext('2d');
+
+  // Fill everything opaque white first (ensures no stray transparent pixels)
+  c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, TS);
+
+  function mkRng(seed) {
+    let s = seed | 0;
+    return () => { s = (Math.imul(s,1664525)+1013904223)|0; return (s>>>0)/0xffffffff; };
+  }
+  function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+  function px(ti, lx, ly, r, g, b, a=255) {
+    c.fillStyle = `rgba(${clamp(r,0,255)|0},${clamp(g,0,255)|0},${clamp(b,0,255)|0},${a/255})`;
+    c.fillRect(ti*TS+lx, ly, 1, 1);
+  }
+
+  // Tile 0 — Grass top: noisy green
+  let rng = mkRng(1);
+  for (let x=0;x<TS;x++) for (let y=0;y<TS;y++) {
+    const v=(rng()-.5)*40; px(0,x,y, 55+v, 128+v, 34+v);
+  }
+
+  // Tile 1 — Grass side: green strip at top (canvas y=0 = block top with flipY), brown below
+  rng = mkRng(2);
+  for (let x=0;x<TS;x++) for (let y=0;y<TS;y++) {
+    const v=(rng()-.5)*18;
+    if (y<4) px(1,x,y, 55+v, 120+v, 30+v);
+    else      px(1,x,y, 120+v, 84+v, 30+v);
+  }
+
+  // Tile 2 — Dirt: brown with random dark speckles
+  rng = mkRng(3);
+  for (let x=0;x<TS;x++) for (let y=0;y<TS;y++) {
+    const v=(rng()-.5)*28, dk=rng()>.88?-22:0;
+    px(2,x,y, 122+v+dk, 84+v+dk, 32+v+dk);
+  }
+
+  // Tile 3 — Stone: gray with subtle crack lines
+  rng = mkRng(4);
+  for (let x=0;x<TS;x++) for (let y=0;y<TS;y++) {
+    const v=(rng()-.5)*18;
+    const crack=((x===5||x===11)&&rng()<.45)||((y===6||y===13)&&rng()<.35)?-28:0;
+    px(3,x,y, 138+v+crack, 138+v+crack, 138+v+crack);
+  }
+
+  // Tile 4 — Wood top: concentric ring pattern
+  for (let x=0;x<TS;x++) for (let y=0;y<TS;y++) {
+    const dx=x-7.5, dy=y-7.5, d=Math.sqrt(dx*dx+dy*dy);
+    const light=(Math.floor(d*1.1)%2===0);
+    const b=light?110:75; px(4,x,y, b, b*.65, b*.22);
+  }
+
+  // Tile 5 — Wood side: vertical grain stripes
+  rng = mkRng(5);
+  for (let x=0;x<TS;x++) for (let y=0;y<TS;y++) {
+    const v=(rng()-.5)*14, stripe=(x%4<2)?0:14;
+    px(5,x,y, 92+v+stripe, 60+v+stripe*.6, 20+v+stripe*.15);
+  }
+
+  // Tile 6 — Leaves: noisy green, 22% of pixels transparent (holes)
+  rng = mkRng(6);
+  for (let x=0;x<TS;x++) for (let y=0;y<TS;y++) {
+    const v=(rng()-.5)*55, hole=rng()>.78;
+    if (hole) px(6,x,y,0,0,0,0); else px(6,x,y, 30+v, 105+v, 18+v);
+  }
+
+  return cv;
+}
 
 const HOTBAR_IDS   = [GRASS, DIRT, STONE, WOOD, LEAVES];
 const HOTBAR_CSS   = { [GRASS]:'#4e9e30',[DIRT]:'#7a5522',[STONE]:'#808080',[WOOD]:'#5f3d14',[LEAVES]:'#2e7a14' };
 const HOTBAR_NAMES = { [GRASS]:'Grass',  [DIRT]:'Dirt',   [STONE]:'Stone',  [WOOD]:'Wood',   [LEAVES]:'Leaves' };
 
 // ── Six face definitions ──
-// Each face: dir (neighbour offset), corners (4 vertex offsets), which colour slot
+// uv([cx,cy,cz]) returns [local_u, local_v] in 0..1 for that corner within its tile
 const FACES = [
-  { d:[0,1,0],  c:[[0,1,1],[1,1,1],[0,1,0],[1,1,0]], col:'t', shade:1.00 }, // top
-  { d:[0,-1,0], c:[[0,0,0],[1,0,0],[0,0,1],[1,0,1]], col:'b', shade:0.60 }, // bottom
-  { d:[0,0,1],  c:[[0,0,1],[1,0,1],[0,1,1],[1,1,1]], col:'s', shade:0.80 }, // front
-  { d:[0,0,-1], c:[[1,0,0],[0,0,0],[1,1,0],[0,1,0]], col:'s', shade:0.80 }, // back
-  { d:[1,0,0],  c:[[1,0,1],[1,0,0],[1,1,1],[1,1,0]], col:'s', shade:0.90 }, // right
-  { d:[-1,0,0], c:[[0,0,0],[0,0,1],[0,1,0],[0,1,1]], col:'s', shade:0.70 }, // left
+  { d:[0,1,0],  c:[[0,1,1],[1,1,1],[0,1,0],[1,1,0]], uv:([cx,cy,cz])=>[cx,    cz  ], slot:'t', shade:1.00 }, // top
+  { d:[0,-1,0], c:[[0,0,0],[1,0,0],[0,0,1],[1,0,1]], uv:([cx,cy,cz])=>[cx,  1-cz  ], slot:'b', shade:0.60 }, // bottom
+  { d:[0,0,1],  c:[[0,0,1],[1,0,1],[0,1,1],[1,1,1]], uv:([cx,cy,cz])=>[cx,    cy  ], slot:'s', shade:0.80 }, // front
+  { d:[0,0,-1], c:[[1,0,0],[0,0,0],[1,1,0],[0,1,0]], uv:([cx,cy,cz])=>[1-cx,  cy  ], slot:'s', shade:0.80 }, // back
+  { d:[1,0,0],  c:[[1,0,1],[1,0,0],[1,1,1],[1,1,0]], uv:([cx,cy,cz])=>[1-cz,  cy  ], slot:'s', shade:0.90 }, // right
+  { d:[-1,0,0], c:[[0,0,0],[0,0,1],[0,1,0],[0,1,1]], uv:([cx,cy,cz])=>[cz,    cy  ], slot:'s', shade:0.70 }, // left
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -176,11 +253,22 @@ function fbm(x, z, octs, scale, persist) {
 
 class World {
   constructor(scene) {
-    this.scene   = scene;
-    this.chunks  = new Map(); // key→Uint8Array
-    this.meshes  = new Map(); // key→Mesh
-    this.mat     = new THREE.MeshLambertMaterial({ vertexColors:true, side:THREE.FrontSide });
-    this.leafMat = new THREE.MeshLambertMaterial({ vertexColors:true, transparent:true, opacity:0.82 });
+    this.scene  = scene;
+    this.chunks = new Map();
+    this.meshes = new Map();
+
+    const atlasCv = makeAtlas();
+    const atlasTex = new THREE.CanvasTexture(atlasCv);
+    atlasTex.magFilter = THREE.NearestFilter;
+    atlasTex.minFilter = THREE.NearestFilter;
+    atlasTex.needsUpdate = true;
+
+    // MeshBasicMaterial: texture × vertex-color (shade) — no extra lighting math
+    this.mat = new THREE.MeshBasicMaterial({
+      map: atlasTex,
+      vertexColors: true,
+      alphaTest: 0.1,  // drops transparent leaf pixels
+    });
   }
 
   key(cx,cz)    { return `${cx},${cz}`; }
@@ -287,7 +375,7 @@ class World {
     const old=this.meshes.get(key);
     if (old) { this.scene.remove(old); old.geometry.dispose(); }
 
-    const pos=[],col=[],nor=[],idx=[];
+    const pos=[],col=[],uvs=[],idx=[];
     let vi=0;
     const ox=cx*CHUNK_W, oz=cz*CHUNK_W;
 
@@ -296,26 +384,24 @@ class World {
     for (let lz=0;lz<CHUNK_W;lz++) {
       const bid=d[this.idx(lx,y,lz)];
       if (bid===AIR) continue;
-      const def=BCOLOR[bid]; if (!def) continue;
+      const btile=BTILE[bid]; if (!btile) continue;
 
       const wx=ox+lx, wz=oz+lz;
 
       for (const f of FACES) {
-        // Face only needed if neighbour is transparent
         const nb=this.getBlock(wx+f.d[0], y+f.d[1], wz+f.d[2]);
         if (!TRANSPARENT.has(nb)) continue;
-        // For leaves-to-leaves, skip (avoid internal leaf faces)
         if (bid===LEAVES && nb===LEAVES) continue;
 
-        const c=def[f.col];
-        const r=c[0]*f.shade, g=c[1]*f.shade, b=c[2]*f.shade;
+        const ti = btile[f.slot];    // atlas tile index
+        const sh = f.shade;          // grayscale shade multiplier
 
-        for (const [cx2,cy2,cz2] of f.c) {
-          pos.push(wx+cx2, y+cy2, wz+cz2);
-          col.push(r,g,b);
-          nor.push(f.d[0],f.d[1],f.d[2]);
+        for (const corner of f.c) {
+          pos.push(wx+corner[0], y+corner[1], wz+corner[2]);
+          col.push(sh, sh, sh);      // shade × texture color in shader
+          const [lu, lv] = f.uv(corner);
+          uvs.push((ti + lu) / NUM_TILES, lv);
         }
-        // Two triangles with correct winding (CCW from outside)
         idx.push(vi,vi+2,vi+1, vi+1,vi+2,vi+3);
         vi+=4;
       }
@@ -325,8 +411,8 @@ class World {
 
     const geo=new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
-    geo.setAttribute('normal',   new THREE.Float32BufferAttribute(nor,3));
     geo.setAttribute('color',    new THREE.Float32BufferAttribute(col,3));
+    geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvs,2));
     geo.setIndex(idx);
     geo.computeBoundingSphere();
 
@@ -575,12 +661,7 @@ scene.fog    = new THREE.Fog(SKY, RENDER_D*CHUNK_W*0.45, RENDER_D*CHUNK_W*0.90);
 
 const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.05, 1000);
 
-// Lighting
-const ambient = new THREE.AmbientLight(0xffffff, 0.65);
-scene.add(ambient);
-const sun = new THREE.DirectionalLight(0xfff5d0, 1.1);
-sun.position.set(80,200,60);
-scene.add(sun);
+// No scene lights needed — MeshBasicMaterial uses vertex shade multipliers instead
 
 // World + player
 const world  = new World(scene);
