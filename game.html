@@ -430,7 +430,12 @@ class World {
       if (dx*dx+dz*dz > RENDER_D*RENDER_D) continue;
       const cx=pcx+dx, cz=pcz+dz;
       const k=this.key(cx,cz);
-      if (!this.chunks.has(k)) { this._generate(cx,cz); this._rebuild(cx,cz); }
+      if (!this.chunks.has(k)) {
+        this._generate(cx,cz); this._rebuild(cx,cz);
+        // Neighbors may have interior faces now hidden by the new chunk — rebuild them
+        this._rebuild(cx-1,cz); this._rebuild(cx+1,cz);
+        this._rebuild(cx,cz-1); this._rebuild(cx,cz+1);
+      }
     }
 
     // Unload distant chunks
