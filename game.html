@@ -691,12 +691,25 @@ let   locked=false;
 let   lmbHeld=false, rmbOnce=false;
 let   lastRmb=0;
 
+// Shortcuts that should never reach the browser while playing
+const BLOCKED_KEYS = new Set([
+  'KeyW','KeyR','KeyT','KeyN','KeyF','KeyL','KeyP','KeyS','KeyA','KeyD',
+  'F5','F11','F3','Tab',
+]);
+
 document.addEventListener('keydown', e=>{
+  // Block browser shortcuts (Ctrl/Alt combos) while locked, and always block Ctrl+W / F5
+  const ctrl = e.ctrlKey || e.metaKey;
+  const alwaysBlock = (ctrl && (e.code==='KeyW'||e.code==='KeyR'||e.code==='KeyT'||e.code==='KeyN')) || e.code==='F5';
+  if (alwaysBlock) { e.preventDefault(); e.stopPropagation(); return; }
+  if (locked && ctrl) { e.preventDefault(); return; }
+  if (locked && (e.code==='F11'||e.code==='F3'||e.code==='Tab')) { e.preventDefault(); return; }
+
   keys[e.code]=true;
   if (e.code==='Space')  { e.preventDefault(); player.jump(); }
   for (let i=0;i<5;i++) if (e.code===`Digit${i+1}`) { player.selSlot=i; buildHotbar(); }
 });
-document.addEventListener('keyup',   e=>{ keys[e.code]=false; });
+document.addEventListener('keyup', e=>{ keys[e.code]=false; });
 
 document.addEventListener('mousemove', e=>{
   if (!locked) return;
@@ -707,6 +720,7 @@ document.addEventListener('mousemove', e=>{
 
 document.addEventListener('mousedown', e=>{
   if (!locked) return;
+  e.preventDefault();
   if (e.button===0) lmbHeld=true;
   if (e.button===2) {
     const now=performance.now();
@@ -714,13 +728,14 @@ document.addEventListener('mousedown', e=>{
   }
 });
 document.addEventListener('mouseup', e=>{ if (e.button===0) lmbHeld=false; });
-document.addEventListener('contextmenu', e=>e.preventDefault());
+document.addEventListener('contextmenu', e=>{ e.preventDefault(); e.stopPropagation(); }, true);
 
 document.addEventListener('wheel', e=>{
+  if (locked) e.preventDefault();
   const d=e.deltaY>0?1:-1;
   player.selSlot=(player.selSlot+d+5)%5;
   buildHotbar();
-});
+}, { passive: false });
 
 // Pointer lock
 const overlay=document.getElementById('overlay');
