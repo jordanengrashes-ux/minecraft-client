@@ -1,5 +1,6 @@
 {
   "buildCommand": "",
-  "outputDirectory": "docs",
-  "installCommand": ""
+  "outputDirectory": ".",
+  "installCommand": "",
+  "rewrites": [{"source":"/","destination":"/game.html"}]
 }
