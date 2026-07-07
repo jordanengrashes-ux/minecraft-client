@@ -1,0 +1,13 @@
+{
+  "name": "voxelhosting-agent",
+  "version": "1.0.0",
+  "description": "Runs on your PC and connects to VoxelHosting so you can host a real Minecraft server from the dashboard.",
+  "main": "agent.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node agent.js"
+  },
+  "dependencies": {
+    "firebase": "^10.14.0"
+  }
+}

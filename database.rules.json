@@ -64,6 +64,11 @@
     "mc_servers": {
       ".read": true,
       ".write": true
+    },
+
+    "vhServers": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
 
   }
