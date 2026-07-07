@@ -4467,20 +4467,26 @@ function initChat() {
     rateNoticeTimer = setTimeout(() => { rateNotice.style.display = 'none'; }, 2500);
   }
 
-  const SEND_COOLDOWN_MS = 1000;
+  const SEND_COOLDOWN_MS = 4000;
   const WORD_LIMIT_PER_MIN = 100;
+  const CHAR_LIMIT = 200;
   let lastSendTs = 0;
   let recentSends: { ts: number; words: number }[] = [];
 
   const send = () => {
     const text = inputEl.value.trim();
     if (!text) return;
+    if (text.length > CHAR_LIMIT) {
+      showRateNotice(`Message too long — ${CHAR_LIMIT} characters max.`);
+      return;
+    }
     const to = chatTimeouts[myName];
     if (to && Date.now() < to.until) return;
 
     const now = Date.now();
     if (now - lastSendTs < SEND_COOLDOWN_MS) {
-      showRateNotice('Slow down — wait a second between messages.');
+      const waitSec = Math.ceil((SEND_COOLDOWN_MS - (now - lastSendTs)) / 1000);
+      showRateNotice(`Slow down — wait ${waitSec}s between messages.`);
       return;
     }
     recentSends = recentSends.filter(e => now - e.ts < 60000);
