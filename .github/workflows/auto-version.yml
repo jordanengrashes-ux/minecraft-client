@@ -17,7 +17,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # A PAT is required here (not the default GITHUB_TOKEN) — pushes made
+          # with the default token don't trigger other workflows, which was
+          # silently preventing Build & Release from ever running on the tag.
+          token: ${{ secrets.RELEASE_PAT }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
