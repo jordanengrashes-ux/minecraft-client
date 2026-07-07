@@ -13,7 +13,7 @@ const { spawn } = require('child_process');
 
 const { initializeApp } = require('firebase/app');
 const {
-  getAuth, signInWithEmailAndPassword,
+  initializeAuth, inMemoryPersistence, signInWithEmailAndPassword,
 } = require('firebase/auth');
 const {
   getFirestore, collection, query, where, onSnapshot, doc, setDoc,
@@ -36,7 +36,10 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// initializeAuth (not getAuth) with an explicit persistence — in plain Node,
+// getAuth() probes for IndexedDB (browser-only) to pick a persistence layer
+// and that probe can hang instead of failing fast.
+const auth = initializeAuth(app, { persistence: inMemoryPersistence });
 const db = getFirestore(app);
 const rtdb = getDatabase(app);
 const storage = getStorage(app);
@@ -53,9 +56,17 @@ const FOLDER_MAP = {
 
 const running = new Map(); // serverId -> { proc, dir }
 
+// One shared interface for the whole CLI session — creating a new
+// readline.createInterface() per question can swallow buffered input meant
+// for the next prompt (e.g. when stdin is piped), leaving later prompts
+// hanging forever with no input left to read.
+let _rl = null;
+function getRl() {
+  if (!_rl) _rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return _rl;
+}
 function ask(question) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise(resolve => rl.question(question, ans => { rl.close(); resolve(ans); }));
+  return new Promise(resolve => getRl().question(question, resolve));
 }
 
 function askHidden(question) {
@@ -247,19 +258,46 @@ function watchServerCommands(serverId, cfgRef) {
   });
 }
 
-async function main() {
-  console.log('VoxelHosting Agent — connects your dashboard to a real Minecraft server on this PC.\n');
-  const email = await ask('Dashboard email: ');
-  const password = await askHidden('Password: ');
+const SESSION_FILE = path.join(__dirname, '.session.json');
 
-  let user;
+async function login() {
+  if (process.argv.includes('--logout')) {
+    try { fs.unlinkSync(SESSION_FILE); } catch {}
+    console.log('Saved login cleared.');
+  }
+
+  let email, password;
+  const cached = fs.existsSync(SESSION_FILE) ? JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8')) : null;
+  if (cached) {
+    console.log(`Using saved login for ${cached.email}… (run "node agent.js --logout" to forget it)`);
+    email = cached.email; password = cached.password;
+  } else {
+    email = await ask('Dashboard email: ');
+    password = await askHidden('Password: ');
+  }
+
   try {
-    ({ user } = await signInWithEmailAndPassword(auth, email, password));
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out reaching Firebase — check your internet connection or firewall.')), 15000));
+    const { user } = await Promise.race([signInWithEmailAndPassword(auth, email, password), timeout]);
+    if (!cached) {
+      const remember = (await ask('Save login on this PC so you don\'t have to enter it again? (y/n): ')).trim().toLowerCase();
+      if (remember === 'y' || remember === 'yes') {
+        fs.writeFileSync(SESSION_FILE, JSON.stringify({ email, password }), { mode: 0o600 });
+        console.log('Saved. Next time, just run the agent and it will log in automatically.');
+      }
+    }
+    return user;
   } catch (e) {
+    if (cached) { try { fs.unlinkSync(SESSION_FILE); } catch {} }
     console.error('Login failed:', e.message);
     console.error('Note: Google-only accounts need an email/password set (Firebase console → Authentication) before the agent can log in.');
     process.exit(1);
   }
+}
+
+async function main() {
+  console.log('VoxelHosting Agent — connects your dashboard to a real Minecraft server on this PC.\n');
+  const user = await login();
   console.log(`Logged in as ${user.email}. Watching your servers…\n`);
 
   const watched = new Set();
