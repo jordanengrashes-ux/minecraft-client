@@ -1174,6 +1174,14 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
       if (!Array.isArray(versions) || !versions.length) continue;
       if (versions[0].id === pack.versionId) continue;
 
+      // Remove the previous pack's files first — installModpack only adds
+      // files from the new .mrpack index, it doesn't know which old files
+      // to clean up, so skipping this leaves stale + new versions of the
+      // same mod jars side by side (causes NoSuchMethodError-style crashes).
+      for (const filename of pack.filenames) {
+        try { await mc.removeMod({ filename }); } catch {}
+      }
+
       const result = await mc.installModpack({ projectId });
       if (!result.ok) continue;
       packs[projectId] = { projectId, title: pack.title, mcVersion: result.mcVersion, filenames: result.filenames, versionId: result.versionId };
