@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, clipboard } from 'electron';
 
 contextBridge.exposeInMainWorld('electron', {
   loginSuccess:       (userData: object) => ipcRenderer.send('login-success', userData),
+  logout:             () => ipcRenderer.send('logout'),
   onUserData:         (cb: (data: any) => void) => ipcRenderer.on('user-data', (_e, d) => cb(d)),
   close:              () => ipcRenderer.send('win-close'),
   minimize:           () => ipcRenderer.send('win-minimize'),
@@ -12,6 +13,7 @@ contextBridge.exposeInMainWorld('electron', {
   saveFirebaseUser:   (data: object) => ipcRenderer.invoke('save-firebase-user', data),
   loadFirebaseUser:   ()             => ipcRenderer.invoke('load-firebase-user'),
   clearFirebaseUser:  ()             => ipcRenderer.invoke('clear-firebase-user'),
+  googleAuth:         ()             => ipcRenderer.invoke('google-auth'),
 });
 
 contextBridge.exposeInMainWorld('voxelSrv', {
@@ -57,6 +59,7 @@ contextBridge.exposeInMainWorld('overlay', {
 });
 
 contextBridge.exposeInMainWorld('files', {
+  downloadAvengers: () => ipcRenderer.invoke('download-avengers-mod'),
   listWorlds:       () => ipcRenderer.invoke('mc-list-worlds'),
   savesDir:         () => ipcRenderer.invoke('mc-saves-dir'),
   installWorld:     (p: string) => ipcRenderer.invoke('mc-install-world', p),
@@ -74,6 +77,7 @@ contextBridge.exposeInMainWorld('ai', {
 contextBridge.exposeInMainWorld('curseforge', {
   search:      (opts: { query: string; mcVersion: string }) => ipcRenderer.invoke('cf-search', opts),
   getDownload: (opts: { modId: number; mcVersion: string }) => ipcRenderer.invoke('cf-get-download-url', opts),
+  checkUpdates:(mods: { modId: number; fileId: number }[], mcVersion: string) => ipcRenderer.invoke('cf-check-updates', mods, mcVersion),
 });
 
 contextBridge.exposeInMainWorld('cosmetics', {

@@ -1,12 +1,15 @@
 {
   "name": "minecraft-client",
-  "version": "1.0.244",
+  "version": "1.0.250",
   "description": "Voxel game client",
   "author": {
     "name": "Voxel Client",
     "email": "jordanengrashes@gmail.com"
   },
   "main": "dist-electron/main.js",
+  "bin": {
+    "voxelclient": "./cli.js"
+  },
   "scripts": {
     "postinstall": "patch-package",
     "dev": "concurrently \"vite\" \"electron .\"",
@@ -34,6 +37,13 @@
       {
         "from": "resources/mods",
         "to": "mods",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources/shaderpacks",
+        "to": "shaderpacks",
         "filter": [
           "**/*"
         ]
@@ -65,7 +75,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Voxel Client",
       "artifactName": "VoxelClient-Setup-${version}.exe",
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh"
     },
     "mac": {
       "target": [

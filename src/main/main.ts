@@ -1,8 +1,9 @@
 import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker, dialog, session } from 'electron';
-import { GEMINI_KEY, CF_API_KEY } from './ai-key';
+import { GEMINI_KEY, CF_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from './ai-key';
 import { autoUpdater } from 'electron-updater';
 import { execSync, spawnSync, spawn, ChildProcess } from 'child_process';
 import https from 'https';
+import http from 'http';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -258,6 +259,68 @@ function clearCachedAuth() {
 const MS_CLIENT_ID = '00000000402b5328';
 const MS_REDIRECT  = 'https://login.live.com/oauth20_desktop.srf';
 
+const GOOGLE_REDIRECT_PORT = 53215;
+const GOOGLE_REDIRECT      = `http://127.0.0.1:${GOOGLE_REDIRECT_PORT}/callback`;
+
+// Google blocks its OAuth consent screen inside Electron's embedded browser
+// windows, so sign-in has to happen in the user's real default browser —
+// we spin up a one-shot local HTTP server just to catch the redirect.
+function openGoogleAuthInSystemBrowser(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const authUrl =
+      `https://accounts.google.com/o/oauth2/v2/auth` +
+      `?client_id=${GOOGLE_CLIENT_ID}` +
+      `&redirect_uri=${encodeURIComponent(GOOGLE_REDIRECT)}` +
+      `&response_type=code` +
+      `&scope=${encodeURIComponent('openid email profile')}` +
+      `&prompt=select_account`;
+
+    let settled = false;
+    const server = http.createServer((req, res) => {
+      const url = new URL(req.url || '/', GOOGLE_REDIRECT);
+      if (url.pathname !== '/callback') { res.writeHead(404); res.end(); return; }
+      const code = url.searchParams.get('code');
+      const err  = url.searchParams.get('error');
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end('<html><body style="font-family:sans-serif;background:#0d0d0d;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><h2>Signed in — you can close this tab.</h2></body></html>');
+      finish(code, err);
+    });
+
+    function finish(code: string | null, err: string | null) {
+      if (settled) return;
+      settled = true;
+      server.close();
+      if (code) resolve(code);
+      else reject(new Error(err || 'Cancelled'));
+    }
+
+    server.on('error', (e) => { if (!settled) { settled = true; reject(e); } });
+    server.listen(GOOGLE_REDIRECT_PORT, '127.0.0.1', () => {
+      shell.openExternal(authUrl);
+    });
+
+    // Give up if nothing happens in 3 minutes
+    setTimeout(() => finish(null, 'Timed out'), 3 * 60 * 1000);
+  });
+}
+
+async function authenticateWithGoogle(code: string): Promise<{ idToken: string }> {
+  const body = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    client_secret: GOOGLE_CLIENT_SECRET,
+    code,
+    grant_type: 'authorization_code',
+    redirect_uri: GOOGLE_REDIRECT,
+  });
+  const json = await fetchJson('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!json.id_token) throw new Error('No ID token returned from Google');
+  return { idToken: json.id_token };
+}
+
 function openMicrosoftAuthWindow(): Promise<string> {
   return new Promise((resolve, reject) => {
     const authUrl =
@@ -498,6 +561,10 @@ function createGameWindow() {
   }
   gameWin.on('closed', () => {
     gameWin = null;
+    if (loggingOut) {
+      loggingOut = false;
+      return;
+    }
     if (updateReady) {
       updateReady = false;
       try { autoUpdater.quitAndInstall(true, true); } catch { app.quit(); }
@@ -520,6 +587,25 @@ ipcMain.on('login-success', (_e, userData) => {
     javaReadyPromise.catch(() => { javaReadyPromise = null; });
     ensureJava(25, (msg) => gameWin?.webContents.send('mc-log', msg)).catch(() => {});
   });
+});
+
+let loggingOut = false;
+ipcMain.on('logout', () => {
+  try { if (fs.existsSync(FIREBASE_USER_CACHE)) fs.unlinkSync(FIREBASE_USER_CACHE); } catch {}
+  loggingOut = true;
+  gameWin?.close();
+  createLoginWindow();
+});
+
+// ── IPC: Google sign-in (system browser, since Google blocks embedded auth) ───
+ipcMain.handle('google-auth', async () => {
+  try {
+    const code = await openGoogleAuthInSystemBrowser();
+    const { idToken } = await authenticateWithGoogle(code);
+    return { ok: true, idToken };
+  } catch (e: any) {
+    return { ok: false, error: e.message || String(e) };
+  }
 });
 
 // ── IPC: Minecraft auth ───────────────────────────────────────────────────────
@@ -553,7 +639,7 @@ ipcMain.handle('mc-reauth', async () => {
 });
 
 // ── IPC: launch Minecraft ─────────────────────────────────────────────────────
-ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; javaVersion?: number }) => {
+ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; javaVersion?: number; vsync?: boolean; shaderpack?: string }) => {
   const requestedJava = opts.javaVersion || 21;
   const javaPromise = (requestedJava === 21 && javaReadyPromise)
     ? javaReadyPromise
@@ -601,6 +687,8 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
     const packDir = path.join(mcRoot, 'resourcepacks', 'VoxelClient');
     if (fs.existsSync(packDir)) enableVoxelResourcePack(mcRoot);
     setOptionsKey(mcRoot, 'backgroundBlur', '0');
+    setOptionsKey(mcRoot, 'enableVsync', opts.vsync !== false ? 'true' : 'false');
+    applyShaderPack(mcRoot, opts.shaderpack || '');
 
     // Auto-install cosmetics mod if bundled
     try {
@@ -612,6 +700,24 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
         if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
         fs.copyFileSync(cosmeticsSrc, path.join(modsDir, 'voxel-cosmetics.jar'));
         gameWin?.webContents.send('mc-log', '[Launcher] Cosmetics mod installed');
+      }
+    } catch {}
+
+    // Auto-install bundled shader packs (only on first run — preserves user settings)
+    try {
+      const shaderSrcDir = app.isPackaged
+        ? path.join(process.resourcesPath, 'shaderpacks')
+        : path.join(__dirname, '../../resources/shaderpacks');
+      if (fs.existsSync(shaderSrcDir)) {
+        const shaderDestDir = path.join(mcRoot, 'shaderpacks');
+        if (!fs.existsSync(shaderDestDir)) fs.mkdirSync(shaderDestDir, { recursive: true });
+        for (const packName of fs.readdirSync(shaderSrcDir)) {
+          const dest = path.join(shaderDestDir, packName);
+          if (!fs.existsSync(dest)) {
+            fs.cpSync(path.join(shaderSrcDir, packName), dest, { recursive: true });
+            gameWin?.webContents.send('mc-log', `[Launcher] Shader pack installed: ${packName}`);
+          }
+        }
       }
     } catch {}
 
@@ -637,7 +743,7 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
 });
 
 // ── IPC: offline launch ───────────────────────────────────────────────────────
-ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: number; username: string; javaVersion?: number }) => {
+ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: number; username: string; javaVersion?: number; vsync?: boolean; shaderpack?: string }) => {
   const requestedJava = opts.javaVersion || 21;
   try {
     const mcRoot   = path.join(app.getPath('userData'), '.minecraft');
@@ -659,6 +765,27 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
 
     gameWin?.webContents.send('mc-log', `[Launcher] Offline mode — user: ${opts.username}, uuid: ${uuid}`);
     setOptionsKey(mcRoot, 'backgroundBlur', '0');
+    setOptionsKey(mcRoot, 'enableVsync', opts.vsync !== false ? 'true' : 'false');
+    applyShaderPack(mcRoot, opts.shaderpack || '');
+
+    // Auto-install bundled shader packs (only on first run — preserves user settings)
+    try {
+      const shaderSrcDir = app.isPackaged
+        ? path.join(process.resourcesPath, 'shaderpacks')
+        : path.join(__dirname, '../../resources/shaderpacks');
+      if (fs.existsSync(shaderSrcDir)) {
+        const shaderDestDir = path.join(mcRoot, 'shaderpacks');
+        if (!fs.existsSync(shaderDestDir)) fs.mkdirSync(shaderDestDir, { recursive: true });
+        for (const packName of fs.readdirSync(shaderSrcDir)) {
+          const dest = path.join(shaderDestDir, packName);
+          if (!fs.existsSync(dest)) {
+            fs.cpSync(path.join(shaderSrcDir, packName), dest, { recursive: true });
+            gameWin?.webContents.send('mc-log', `[Launcher] Shader pack installed: ${packName}`);
+          }
+        }
+      }
+    } catch {}
+
     const isFabricOff = (opts.version || '').startsWith('fabric-loader-');
     const mcVerOff    = isFabricOff ? opts.version.replace(/^fabric-loader-[\d.]+-/, '') : (opts.version || '1.21.4');
 
@@ -1268,6 +1395,34 @@ ipcMain.handle('cf-get-download-url', async (_e, opts: { modId: number; mcVersio
   } catch (err: any) { return { ok: false, error: err.message }; }
 });
 
+// Checks each installed CurseForge mod against the given Minecraft version and
+// reports: up to date, an available update, or incompatible (no file exists
+// for that version/loader at all — the caller disables the mod in that case).
+ipcMain.handle('cf-check-updates', async (_e, mods: { modId: number; fileId: number }[], mcVersion: string) => {
+  if (!CF_API_KEY) return { ok: false, error: 'No CurseForge API key configured' };
+  const results = await Promise.all(mods.map(async (m) => {
+    try {
+      const params = new URLSearchParams({ gameVersion: mcVersion || '1.21.4', modLoaderType: '4', pageSize: '5' });
+      const res = await fetch(`${CF_BASE}/mods/${m.modId}/files?${params}`, { headers: cfHeaders() });
+      if (!res.ok) throw new Error(`CurseForge API error ${res.status}`);
+      const data: any = await res.json();
+      const files: any[] = data.data ?? [];
+      if (!files.length) return { modId: m.modId, compatible: false };
+      const latest = files[0];
+      const id = latest.id as number;
+      const url = latest.downloadUrl || `https://mediafiles.forgecdn.net/files/${Math.floor(id/1000)}/${id%1000}/${encodeURIComponent(latest.fileName)}`;
+      return {
+        modId: m.modId, compatible: true,
+        upToDate: id === m.fileId,
+        fileId: id, filename: latest.fileName, url,
+      };
+    } catch (err: any) {
+      return { modId: m.modId, compatible: false, error: err.message };
+    }
+  }));
+  return { ok: true, results };
+});
+
 // ── options.txt helpers ───────────────────────────────────────────────────────
 function setOptionsKey(mcRoot: string, key: string, value: string) {
   const optPath = path.join(mcRoot, 'options.txt');
@@ -1279,6 +1434,27 @@ function setOptionsKey(mcRoot: string, key: string, value: string) {
     txt += (txt.endsWith('\n') || txt === '' ? '' : '\n') + `${key}:${value}\n`;
   }
   try { fs.writeFileSync(optPath, txt, 'utf-8'); } catch {}
+}
+
+function applyShaderPack(mcRoot: string, packName: string) {
+  try {
+    const irisDir = path.join(mcRoot, 'config');
+    if (!fs.existsSync(irisDir)) fs.mkdirSync(irisDir, { recursive: true });
+    const irisProps = path.join(irisDir, 'iris.properties');
+    let content = fs.existsSync(irisProps) ? fs.readFileSync(irisProps, 'utf-8') : '';
+    function setProp(txt: string, key: string, val: string): string {
+      const re = new RegExp(`^${key}=.*`, 'm');
+      if (re.test(txt)) return txt.replace(re, `${key}=${val}`);
+      return txt + (txt.endsWith('\n') || txt === '' ? '' : '\n') + `${key}=${val}\n`;
+    }
+    if (packName) {
+      content = setProp(content, 'shaderPack', packName);
+      content = setProp(content, 'enableShaders', 'true');
+    } else {
+      content = setProp(content, 'enableShaders', 'false');
+    }
+    fs.writeFileSync(irisProps, content, 'utf-8');
+  } catch {}
 }
 
 function enableVoxelResourcePack(mcRoot: string) {
@@ -1493,6 +1669,22 @@ ipcMain.handle('mc-open-folder', async (_e, type: string) => {
   shell.openPath(dir);
 });
 
+ipcMain.handle('download-avengers-mod', async () => {
+  const src  = 'C:\\Users\\Jorda\\Documents\\GitHub\\avengers-mod';
+  const dest = path.join(os.homedir(), 'Downloads', 'avengers-mod-source.zip');
+  try {
+    if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    execSync(
+      `powershell -Command "Compress-Archive -Path '${src}' -DestinationPath '${dest}'"`,
+      { timeout: 30000 }
+    );
+    shell.showItemInFolder(dest);
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
+});
+
 // ── IPC: window controls ──────────────────────────────────────────────────────
 ipcMain.on('win-close',    () => BrowserWindow.getFocusedWindow()?.close());
 ipcMain.on('win-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());
@@ -1577,45 +1769,64 @@ ipcMain.handle('open-ai-window', () => {
   aiWin.on('closed', () => { aiWin = null; });
 });
 
+// Free OpenRouter models get rate-limited often since their capacity is shared
+// across every anonymous user — fall through this list until one responds.
+const AI_FALLBACK_MODELS = [
+  'google/gemma-4-31b-it:free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'openai/gpt-oss-20b:free',
+  'qwen/qwen3-next-80b-a3b-instruct:free',
+];
+
+function callOpenRouter(model: string, messages: { role: string; content: string }[]): Promise<any> {
+  const body = JSON.stringify({
+    model,
+    messages: [{ role: 'system', content: AI_SYSTEM }, ...messages],
+    max_tokens: 1024,
+    temperature: 0.65,
+  });
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'openrouter.ai',
+      path: '/api/v1/chat/completions',
+      method: 'POST',
+      timeout: 20000,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GEMINI_KEY}`,
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, res => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+    });
+    req.on('timeout', () => { req.destroy(new Error('Request timed out')); });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 ipcMain.handle('ai-chat', async (_e, messages: { role: string; content: string }[]) => {
   if (!GEMINI_KEY) return { ok: false, error: 'AI not available in this build' };
-  try {
-    const body = JSON.stringify({
-      model: 'google/gemini-2.0-flash-exp:free',
-      messages: [{ role: 'system', content: AI_SYSTEM }, ...messages],
-      max_tokens: 1024,
-      temperature: 0.65,
-    });
-
-    const resp = await new Promise<string>((resolve, reject) => {
-      const req = https.request({
-        hostname: 'openrouter.ai',
-        path: '/api/v1/chat/completions',
-        method: 'POST',
-        timeout: 20000,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GEMINI_KEY}`,
-          'Content-Length': Buffer.byteLength(body),
-        },
-      }, res => {
-        let data = '';
-        res.on('data', chunk => { data += chunk; });
-        res.on('end', () => resolve(data));
-      });
-      req.on('timeout', () => { req.destroy(new Error('Request timed out')); });
-      req.on('error', reject);
-      req.write(body);
-      req.end();
-    });
-
-    const json = JSON.parse(resp);
-    if (json.error) return { ok: false, error: json.error.message ?? String(json.error) };
-    const text = json.choices?.[0]?.message?.content ?? '';
-    return text ? { ok: true, text } : { ok: false, error: 'No response from AI' };
-  } catch (err: any) {
-    return { ok: false, error: err.message };
+  let lastError = 'No response from AI';
+  for (const model of AI_FALLBACK_MODELS) {
+    try {
+      const json = await callOpenRouter(model, messages);
+      if (json.error) {
+        lastError = json.error.message ?? String(json.error);
+        if (json.error.code === 429) continue; // rate-limited — try next model
+        break;
+      }
+      const text = json.choices?.[0]?.message?.content ?? '';
+      if (text) return { ok: true, text };
+      lastError = 'No response from AI';
+    } catch (err: any) {
+      lastError = err.message;
+    }
   }
+  return { ok: false, error: lastError };
 });
 
 // ── IPC: overlay mod state (reads/writes game window's localStorage) ──────────

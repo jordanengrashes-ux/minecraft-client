@@ -4,10 +4,11 @@
   <meta charset="UTF-8" />
   <title>Voxel Client</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background: #0a0a0f; color: #fff;
-      font-family: 'Segoe UI', sans-serif;
+      background: #0d0d0d; color: #ffffff;
+      font-family: 'Roboto', sans-serif;
       height: 100vh; display: flex; flex-direction: column;
       align-items: center; justify-content: center; user-select: none;
     }
@@ -15,63 +16,64 @@
       position: fixed; top: 0; left: 0; right: 0; height: 32px;
       display: flex; align-items: center; justify-content: flex-end;
       padding: 0 8px; -webkit-app-region: drag; z-index: 100;
+      background: #080808; border-bottom: 1px solid #1e1e1e;
     }
     .tbtn {
       -webkit-app-region: no-drag; background: none; border: none;
-      color: #888; font-size: 16px; cursor: pointer; padding: 4px 10px; border-radius: 4px;
+      color: #444444; font-size: 16px; cursor: pointer; padding: 4px 10px; border-radius: 4px;
+      transition: background 0.1s, color 0.1s;
     }
-    .tbtn:hover { background: rgba(255,255,255,0.1); color: #fff; }
-    #close:hover { background: #c42b1c; color: #fff; }
+    .tbtn:hover { background: #1e1e1e; color: #ffffff; }
+    #close:hover { background: #f5a623; color: #000000; }
 
     .logo {
       font-size: 48px; font-weight: 900; letter-spacing: 4px;
-      background: linear-gradient(135deg, #4cff91, #00c8ff);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      color: #f5a623;
       margin-bottom: 8px;
     }
-    .subtitle { color: #666; font-size: 13px; margin-bottom: 40px; letter-spacing: 1px; }
+    .subtitle { color: #444444; font-size: 13px; margin-bottom: 40px; letter-spacing: 1px; }
     .card {
-      background: #111118; border: 1px solid #222; border-radius: 16px;
+      background: #111111; border: 1px solid #222222; border-radius: 12px;
       padding: 36px 40px; width: 360px;
     }
     .tab-row { display: flex; margin-bottom: 28px; gap: 4px; }
     .tab {
-      flex: 1; padding: 8px; background: none; border: 1px solid #333;
-      color: #666; font-size: 13px; cursor: pointer; border-radius: 8px; transition: all 0.2s;
+      flex: 1; padding: 8px; background: none; border: 1px solid #222222;
+      color: #444444; font-size: 13px; cursor: pointer; border-radius: 6px; transition: all 0.2s;
     }
-    .tab.active { background: #1a1a2e; border-color: #4cff91; color: #4cff91; }
+    .tab.active { background: #1a1a1a; border-color: #f5a623; color: #f5a623; }
     input {
-      width: 100%; padding: 12px 14px; background: #0d0d15;
-      border: 1px solid #2a2a3a; border-radius: 8px; color: #fff;
+      width: 100%; padding: 12px 14px; background: #080808;
+      border: 1px solid #222222; border-radius: 6px; color: #ffffff;
       font-size: 14px; margin-bottom: 14px; outline: none; transition: border-color 0.2s;
     }
-    input:focus { border-color: #4cff91; }
+    input:focus { border-color: #f5a623; }
     .btn {
       width: 100%; padding: 13px;
-      background: linear-gradient(135deg, #4cff91, #00c8ff);
-      border: none; border-radius: 8px; color: #000; font-weight: 700;
+      background: #f5a623;
+      border: none; border-radius: 7px; color: #000000; font-weight: 700;
       font-size: 15px; cursor: pointer; margin-top: 4px; transition: opacity 0.2s;
     }
     .btn:hover { opacity: 0.9; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .err { color: #ff6666; font-size: 13px; margin-top: 12px; text-align: center; min-height: 20px; font-weight: 500; }
-    .divider { border: none; border-top: 1px solid #222; margin: 20px 0; }
+    .err { color: #f5a623; font-size: 13px; margin-top: 12px; text-align: center; min-height: 20px; font-weight: 500; }
+    .divider { border: none; border-top: 1px solid #222222; margin: 20px 0; }
     .google-btn {
-      width: 100%; padding: 11px; background: #1a1a2a; border: 1px solid #333;
-      border-radius: 8px; color: #fff; font-size: 14px; cursor: pointer;
+      width: 100%; padding: 11px; background: #141414; border: 1px solid #222222;
+      border-radius: 7px; color: #ffffff; font-size: 14px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 10px;
       transition: background 0.2s;
     }
-    .google-btn:hover { background: #222233; }
+    .google-btn:hover { background: #1a1a1a; }
     .guest-btn {
-      width: 100%; padding: 11px; background: none; border: 1px solid #333;
-      border-radius: 8px; color: #555; font-size: 13px; cursor: pointer;
+      width: 100%; padding: 11px; background: none; border: 1px solid #222222;
+      border-radius: 7px; color: #444444; font-size: 13px; cursor: pointer;
       transition: border-color 0.2s, color 0.2s; margin-top: 8px;
     }
-    .guest-btn:hover { border-color: #555; color: #aaa; }
+    .guest-btn:hover { border-color: #444444; color: #ffffff; }
     #guest-name-wrap { display: none; margin-top: 10px; }
     #loading-veil {
-      position: fixed; inset: 0; background: #0a0a0f; z-index: 9999;
+      position: fixed; inset: 0; background: #0d0d0d; z-index: 9999;
       transition: opacity 0.25s; pointer-events: all;
     }
     #loading-veil.done { opacity: 0; pointer-events: none; }

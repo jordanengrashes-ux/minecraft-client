@@ -3,3 +3,4 @@ release/
 dist/
 dist-electron/
 .vercel
+resources/

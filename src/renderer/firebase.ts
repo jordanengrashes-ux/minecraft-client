@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  updateProfile, GoogleAuthProvider, signInWithPopup, signOut,
+  updateProfile, GoogleAuthProvider, signInWithPopup, signInWithCredential, signOut,
   browserLocalPersistence, setPersistence,
 } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
@@ -38,6 +38,15 @@ export async function loginGoogle() {
   const provider = new GoogleAuthProvider();
   const { user } = await signInWithPopup(auth, provider);
   return { uid: user.uid, name: user.displayName || 'Player', email: user.email || '' };
+}
+
+// Used in Electron: Google blocks its OAuth screen inside embedded browser
+// windows, so the ID token is obtained via the system browser (see main.ts)
+// and exchanged for a Firebase credential here.
+export async function loginGoogleWithIdToken(idToken: string) {
+  const credential = GoogleAuthProvider.credential(idToken);
+  const { user } = await signInWithCredential(auth, credential);
+  return { uid: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Player', email: user.email || '' };
 }
 
 export { signOut };

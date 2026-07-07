@@ -2,6 +2,7 @@
 
 import { ref, set, push, remove, onValue, onChildAdded, query, limitToLast, serverTimestamp, onDisconnect, update, get, increment } from 'firebase/database';
 import { rtdb } from './firebase';
+import { auth, signOut } from './firebase';
 
 
 const mc     = (window as any).mc;
@@ -29,6 +30,12 @@ const logClose      = document.getElementById('log-close') as HTMLButtonElement;
 const fabricToggle      = document.getElementById('fabric-toggle') as HTMLInputElement;
 const fabricStatus      = document.getElementById('fabric-status')!;
 const mcForceQuitBtn    = document.getElementById('mc-force-quit-btn') as HTMLButtonElement;
+const offlineToggle   = document.getElementById('offline-toggle') as HTMLInputElement;
+const offlineNameRow  = document.getElementById('offline-name-row')!;
+const offlineUsername = document.getElementById('offline-username') as HTMLInputElement;
+const offlineBanner   = document.getElementById('offline-banner')!;
+const vsyncToggle       = document.getElementById('vsync-toggle')      as HTMLInputElement | null;
+const shaderpackSelect  = document.getElementById('shaderpack-select') as HTMLSelectElement | null;
 
 declare const __APP_VERSION__: string;
 const appVersionEl = document.getElementById('app-version');
@@ -40,19 +47,39 @@ let logVisible = false;
 const recentLines: string[] = [];
 
 // ── User data from Electron ────────────────────────────────────────────────────
+function applyAccountName(name: string) {
+  userName.textContent = name || 'Player';
+  // Prefill the offline/Minecraft username with the account name the first
+  // time — after that the user's own edits (saved below) take priority.
+  if (!localStorage.getItem('voxel_offline_username') && name) {
+    offlineUsername.value = name;
+  }
+}
+
 if ((window as any).electron) {
   (window as any).electron.onUserData((d: any) => {
-    userName.textContent = d.name || 'Player';
+    applyAccountName(d.name || 'Player');
     if (d.email) initAdminPanel(d.email);
   });
 } else {
   const stored = sessionStorage.getItem('userData');
   if (stored) {
     const p = JSON.parse(stored);
-    userName.textContent = p.name || 'Player';
+    applyAccountName(p.name || 'Player');
     if (p.email) setTimeout(() => initAdminPanel(p.email), 0);
   }
 }
+
+// ── Log out ─────────────────────────────────────────────────────────────────
+document.getElementById('logout-btn')?.addEventListener('click', async () => {
+  try { await signOut(auth); } catch {}
+  if ((window as any).electron?.logout) {
+    (window as any).electron.logout();
+  } else {
+    sessionStorage.removeItem('userData');
+    window.location.href = './login.html';
+  }
+});
 
 const mcSwitchBtn = document.getElementById('mc-switch-btn') as HTMLButtonElement | null;
 
@@ -231,10 +258,9 @@ function setProgress(pct: number | null) {
 }
 
 // ── Offline mode toggle ───────────────────────────────────────────────────────
-const offlineToggle   = document.getElementById('offline-toggle') as HTMLInputElement;
-const offlineNameRow  = document.getElementById('offline-name-row')!;
-const offlineUsername = document.getElementById('offline-username') as HTMLInputElement;
-const offlineBanner   = document.getElementById('offline-banner')!;
+offlineUsername.addEventListener('input', () => {
+  localStorage.setItem('voxel_offline_username', offlineUsername.value.trim());
+});
 
 function applyOfflineState(on: boolean) {
   offlineNameRow.style.display   = on ? 'block'  : 'none';
@@ -273,16 +299,33 @@ fabricToggle.addEventListener('change', () => {
   updateModsBadge();
 });
 
+vsyncToggle?.addEventListener('change', () => {
+  localStorage.setItem('voxel_vsync', String(vsyncToggle!.checked));
+});
+shaderpackSelect?.addEventListener('change', () => {
+  localStorage.setItem('voxel_shaderpack', shaderpackSelect!.value);
+});
+
 // ── Restore saved settings on launch ─────────────────────────────────────────
 {
-  const savedFabric  = localStorage.getItem('voxel_fabric_on')    === 'true';
-  const savedOffline = localStorage.getItem('voxel_offline_mode') === 'true';
+  const savedFabric = localStorage.getItem('voxel_fabric_on') === 'true';
+  // Default to offline/guest mode so Play works without a Microsoft account —
+  // only honor an explicit "false" the user previously chose.
+  const offlineModeRaw = localStorage.getItem('voxel_offline_mode');
+  const savedOffline = offlineModeRaw === null ? true : offlineModeRaw === 'true';
+  const savedUsername = localStorage.getItem('voxel_offline_username');
+  if (savedUsername) offlineUsername.value = savedUsername;
   if (savedFabric)  fabricToggle.checked = true;
-  if (savedOffline) { offlineToggle.checked = true; applyOfflineState(true); }
+  offlineToggle.checked = savedOffline;
+  applyOfflineState(savedOffline);
   const savedMemory = localStorage.getItem('voxel_mc_memory');
   if (savedMemory) { mcMemory.value = savedMemory; mcMemoryVal.textContent = savedMemory; }
   const savedJava = localStorage.getItem('voxel_java_version');
   if (savedJava && javaVersionSel) javaVersionSel.value = savedJava;
+  const savedVsync = localStorage.getItem('voxel_vsync');
+  if (vsyncToggle) vsyncToggle.checked = savedVsync !== null ? savedVsync === 'true' : true;
+  const savedShader = localStorage.getItem('voxel_shaderpack');
+  if (shaderpackSelect && savedShader !== null) shaderpackSelect.value = savedShader;
   updateModsBadge();
 }
 
@@ -359,6 +402,12 @@ mcPlayBtn.addEventListener('click', async () => {
   logToggle.style.display = 'inline';
   openLog();
 
+  // Auto-update CurseForge mods before launch, if enabled
+  if (modAutoUpdateToggle.checked) {
+    setStatus('Checking mods for updates…', 'yellow');
+    await runModUpdateCheck(version, true);
+  }
+
   // Install Fabric if toggled on
   if (fabricToggle.checked) {
     fabricStatus.textContent = 'Installing Fabric…';
@@ -376,9 +425,11 @@ mcPlayBtn.addEventListener('click', async () => {
 
   addLog(`Launching Minecraft ${version} with ${maxMem}GB RAM, Java ${javaVersion}…`);
 
+  const vsync      = vsyncToggle?.checked !== false;
+  const shaderpack = shaderpackSelect?.value ?? '';
   const res = offlineToggle.checked
-    ? await mc.launchOffline({ version, maxMem, username: offlineUsername.value.trim() || 'Player', javaVersion })
-    : await mc.launch({ version, maxMem, javaVersion });
+    ? await mc.launchOffline({ version, maxMem, username: offlineUsername.value.trim() || 'Player', javaVersion, vsync, shaderpack })
+    : await mc.launch({ version, maxMem, javaVersion, vsync, shaderpack });
   if (!res.ok) {
     setStatus(`Launch failed: ${res.error}`, 'red');
     addLog(`Error: ${res.error}`, 'error');
@@ -943,13 +994,106 @@ tpSearch.addEventListener('input', () => {
 });
 
 // ── Installed mods (persisted) ────────────────────────────────────────────────
-interface InstalledMod { filename: string; name: string; mcVersion?: string; disabled?: boolean; }
+interface InstalledMod { filename: string; name: string; mcVersion?: string; disabled?: boolean; cfId?: number; fileId?: number; }
 function loadInstalledMods(): Record<string, InstalledMod> {
   try { return JSON.parse(localStorage.getItem('voxel_installed_mods') || '{}'); } catch { return {}; }
 }
 function saveInstalledMods(data: Record<string, InstalledMod>) {
   localStorage.setItem('voxel_installed_mods', JSON.stringify(data));
 }
+
+// ── Mod auto-update (CurseForge-sourced mods) ─────────────────────────────────
+const modUpdateStatusEl = document.getElementById('mod-update-status') as HTMLElement;
+const modUpdateAllBtn   = document.getElementById('mod-update-all-btn') as HTMLButtonElement;
+const modAutoUpdateToggle = document.getElementById('mod-autoupdate-toggle') as HTMLInputElement;
+
+function showModUpdateStatus(msg: string, autoHide = true) {
+  modUpdateStatusEl.textContent = msg;
+  modUpdateStatusEl.style.display = msg ? 'block' : 'none';
+  if (msg && autoHide) setTimeout(() => { modUpdateStatusEl.style.display = 'none'; }, 6000);
+}
+
+// Checks every installed CurseForge mod against `mcVer`. Mods with no
+// compatible file for that version get disabled (with an on-screen notice)
+// instead of silently failing at launch; outdated-but-compatible mods are
+// re-downloaded in place.
+async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
+  const cfApi = (window as any).curseforge;
+  if (!cfApi?.checkUpdates || !mc) return;
+
+  const installed = loadInstalledMods();
+  const entries = Object.entries(installed).filter(([slug, m]) => slug.startsWith('cf_') && m.cfId != null);
+  if (entries.length === 0) {
+    if (!silent) showModUpdateStatus('No CurseForge mods installed.');
+    return;
+  }
+
+  if (!silent) showModUpdateStatus('Checking for mod updates…', false);
+  const res = await cfApi.checkUpdates(entries.map(([, m]) => ({ modId: m.cfId, fileId: m.fileId ?? 0 })), mcVer);
+  if (!res?.ok) {
+    showModUpdateStatus(`Couldn't check for updates: ${res?.error || 'unknown error'}`);
+    return;
+  }
+
+  let updated = 0, disabled = 0, upToDate = 0;
+  for (const [slug, mod] of entries) {
+    const result = res.results.find((r: any) => r.modId === mod.cfId);
+    if (!result) continue;
+
+    if (!result.compatible) {
+      if (!mod.disabled) {
+        try { await mc.toggleMod({ filename: mod.filename, enable: false }); } catch {}
+        installed[slug] = { ...mod, disabled: true };
+        enabledMods.delete(slug);
+        disabled++;
+        showModUpdateStatus(`"${mod.name}" isn't compatible with ${mcVer} — it's been turned off.`, false);
+      }
+      continue;
+    }
+
+    if (result.upToDate) { upToDate++; continue; }
+
+    try {
+      const installRes = await mc.installMod({ url: result.url, filename: result.filename });
+      if (!installRes.ok) throw new Error(installRes.error);
+      if (result.filename !== mod.filename) {
+        try { await mc.removeMod({ filename: mod.filename }); } catch {}
+      }
+      installed[slug] = { ...mod, filename: result.filename, fileId: result.fileId };
+      updated++;
+    } catch {
+      // Leave the existing file in place if the re-download fails
+    }
+  }
+
+  saveInstalledMods(installed);
+  updateModsBadge();
+
+  if (!silent || updated > 0 || disabled > 0) {
+    const parts = [];
+    if (updated)  parts.push(`${updated} updated`);
+    if (disabled) parts.push(`${disabled} disabled (incompatible)`);
+    if (upToDate) parts.push(`${upToDate} up to date`);
+    showModUpdateStatus(parts.length ? parts.join(' · ') : 'All mods up to date.');
+  }
+}
+
+modUpdateAllBtn.addEventListener('click', async () => {
+  modUpdateAllBtn.disabled = true;
+  const label = modUpdateAllBtn.textContent;
+  modUpdateAllBtn.textContent = 'Checking…';
+  try {
+    await runModUpdateCheck(mcVersion.value);
+  } finally {
+    modUpdateAllBtn.disabled = false;
+    modUpdateAllBtn.textContent = label || 'Update All Mods';
+  }
+});
+
+modAutoUpdateToggle.addEventListener('change', () => {
+  localStorage.setItem('voxel_mod_autoupdate', String(modAutoUpdateToggle.checked));
+});
+modAutoUpdateToggle.checked = localStorage.getItem('voxel_mod_autoupdate') === 'true';
 
 // ── Installed modpacks (persisted) ───────────────────────────────────────────
 interface InstalledModpack { projectId: string; title: string; mcVersion: string; filenames: string[] }
@@ -1828,7 +1972,7 @@ async function searchCurseForge(query: string) {
           const installRes = await mc.installMod({ url: dlRes.url, filename: dlRes.filename });
           if (!installRes.ok) throw new Error(installRes.error);
           const ins = loadInstalledMods();
-          ins[`cf_${mod.id}`] = { filename: dlRes.filename, name: mod.name, mcVersion: ver, cfId: mod.id } as any;
+          ins[`cf_${mod.id}`] = { filename: dlRes.filename, name: mod.name, mcVersion: ver, cfId: mod.id, fileId: dlRes.fileId };
           saveInstalledMods(ins);
           card.className = 'mod-card enabled';
           statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
@@ -4156,18 +4300,55 @@ function initChat() {
     if (atBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
   });
 
-  // Send message
+  // Send message — rate-limited: 1s cooldown between messages + a rolling
+  // per-minute word budget, both client-side, to keep chat from being flooded.
+  const rateNotice = document.getElementById('chat-rate-notice')!;
+  let rateNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+  function showRateNotice(msg: string) {
+    rateNotice.textContent = msg;
+    rateNotice.style.display = 'block';
+    if (rateNoticeTimer) clearTimeout(rateNoticeTimer);
+    rateNoticeTimer = setTimeout(() => { rateNotice.style.display = 'none'; }, 2500);
+  }
+
+  const SEND_COOLDOWN_MS = 1000;
+  const WORD_LIMIT_PER_MIN = 100;
+  let lastSendTs = 0;
+  let recentSends: { ts: number; words: number }[] = [];
+
   const send = () => {
     const text = inputEl.value.trim();
     if (!text) return;
     const to = chatTimeouts[myName];
     if (to && Date.now() < to.until) return;
+
+    const now = Date.now();
+    if (now - lastSendTs < SEND_COOLDOWN_MS) {
+      showRateNotice('Slow down — wait a second between messages.');
+      return;
+    }
+    recentSends = recentSends.filter(e => now - e.ts < 60000);
+    const wordsInText = text.split(/\s+/).filter(Boolean).length;
+    const wordsUsed = recentSends.reduce((sum, e) => sum + e.words, 0);
+    if (wordsUsed + wordsInText > WORD_LIMIT_PER_MIN) {
+      showRateNotice("You've hit the chat word limit for this minute — try again shortly.");
+      return;
+    }
+
+    lastSendTs = now;
+    recentSends.push({ ts: now, words: wordsInText });
     inputEl.value = '';
     push(ref(rtdb, 'voxel_chat/messages'), { user: getChatUsername(), text, ts: Date.now() }).catch(() => {});
     setTimeout(() => { msgsEl.scrollTop = msgsEl.scrollHeight; }, 80);
   };
   sendBtn.addEventListener('click', send);
   inputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+
+  // Admin: clear all global chat messages
+  document.getElementById('chat-clear-btn')!.addEventListener('click', async () => {
+    if (!confirm('Clear all messages in Global Chat for everyone?')) return;
+    await set(ref(rtdb, 'voxel_chat/messages'), null).catch(() => {});
+  });
 
   // Voice channel buttons
   document.getElementById('chat-voice-join-btn')!.addEventListener('click', () => joinVoiceChannel());

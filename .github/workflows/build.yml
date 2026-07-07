@@ -30,10 +30,12 @@ jobs:
       - name: Inject API keys
         shell: pwsh
         run: |
-          $gemini = "${{ secrets.GEMINI_API_KEY }}"
-          $cf     = "${{ secrets.CF_API_KEY }}"
+          $gemini    = "${{ secrets.GEMINI_API_KEY }}"
+          $cf        = "${{ secrets.CF_API_KEY }}"
+          $googleId  = "${{ secrets.GOOGLE_CLIENT_ID }}"
+          $googleSec = "${{ secrets.GOOGLE_CLIENT_SECRET }}"
           $enc    = New-Object System.Text.UTF8Encoding $false
-          $content = "export const GEMINI_KEY = '$gemini';`nexport const CF_API_KEY = '$cf';"
+          $content = "export const GEMINI_KEY = '$gemini';`nexport const CF_API_KEY = '$cf';`nexport const GOOGLE_CLIENT_ID = '$googleId';`nexport const GOOGLE_CLIENT_SECRET = '$googleSec';"
           [System.IO.File]::WriteAllText((Join-Path $PWD "src/main/ai-key.ts"), $content, $enc)
       - run: npm ci
       - run: npm run build && npx electron-builder --win --publish never

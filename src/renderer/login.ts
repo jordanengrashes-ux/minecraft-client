@@ -1,4 +1,4 @@
-import { loginEmail, registerEmail, loginGoogle, auth } from './firebase';
+import { loginEmail, registerEmail, loginGoogle, loginGoogleWithIdToken, auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const errEl       = document.getElementById('err-msg')      as HTMLElement;
@@ -131,18 +131,30 @@ btnRegister.addEventListener('click', async () => {
 // ── Google ────────────────────────────────────────────────────────────────────
 btnGoogle.addEventListener('click', async () => {
   btnGoogle.disabled = true;
+  const label = btnGoogle.textContent;
   try {
-    onSuccess(await loginGoogle());
+    if (window.electron?.googleAuth) {
+      // Electron: Google blocks its consent screen inside embedded windows,
+      // so it opens in the system browser and we catch the redirect there.
+      btnGoogle.textContent = 'Waiting for browser…';
+      const res = await window.electron.googleAuth();
+      if (!res.ok) throw new Error(res.error);
+      onSuccess(await loginGoogleWithIdToken(res.idToken));
+    } else {
+      onSuccess(await loginGoogle());
+    }
   } catch (e: any) {
-    showErr(friendlyError(e.code));
+    showErr(e.code ? friendlyError(e.code) : (e.message || 'Google sign-in failed.'));
     btnGoogle.disabled = false;
+    btnGoogle.textContent = label || 'Continue with Google';
   }
 });
 
 // ── Guest ─────────────────────────────────────────────────────────────────────
 btnGuest.addEventListener('click', () => {
-  guestWrap.style.display = guestWrap.style.display === 'none' ? '' : 'none';
-  if (guestWrap.style.display !== 'none') guestInput.focus();
+  const isOpen = guestWrap.style.display === 'block';
+  guestWrap.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) guestInput.focus();
 });
 function doGuest() {
   const name = guestInput.value.trim() || 'Guest';
@@ -183,6 +195,7 @@ declare global {
       saveFirebaseUser?: (d: object) => void;
       loadFirebaseUser?: () => Promise<{ uid: string; name: string; email?: string } | null>;
       clearFirebaseUser?:() => void;
+      googleAuth?:       () => Promise<{ ok: boolean; idToken?: string; error?: string }>;
     };
   }
 }
