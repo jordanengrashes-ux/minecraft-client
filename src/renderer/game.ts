@@ -4500,10 +4500,35 @@ function initChat() {
   sendBtn.addEventListener('click', send);
   inputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
 
-  // Admin: clear all global chat messages
-  document.getElementById('chat-clear-btn')!.addEventListener('click', async () => {
-    if (!confirm('Clear all messages in Global Chat for everyone?')) return;
-    await set(ref(rtdb, 'voxel_chat/messages'), null).catch(() => {});
+  // Admin: clear all global chat messages — click-to-arm, click again to
+  // confirm, instead of window.confirm() (unreliable in frameless windows).
+  const clearChatBtn = document.getElementById('chat-clear-btn') as HTMLButtonElement;
+  let clearChatArmed = false;
+  let clearChatArmTimer: ReturnType<typeof setTimeout> | null = null;
+  clearChatBtn.addEventListener('click', async () => {
+    if (!clearChatArmed) {
+      clearChatArmed = true;
+      clearChatBtn.textContent = 'Click again to confirm';
+      clearChatBtn.style.color = '#f85149';
+      clearChatArmTimer = setTimeout(() => {
+        clearChatArmed = false;
+        clearChatBtn.textContent = 'Clear Chat';
+        clearChatBtn.style.color = '#aaaaaa';
+      }, 3000);
+      return;
+    }
+    if (clearChatArmTimer) clearTimeout(clearChatArmTimer);
+    clearChatArmed = false;
+    clearChatBtn.disabled = true;
+    clearChatBtn.textContent = 'Clearing…';
+    try {
+      await remove(ref(rtdb, 'voxel_chat/messages'));
+    } catch (err: any) {
+      showRateNotice(`Failed to clear chat: ${err.message}`);
+    }
+    clearChatBtn.disabled = false;
+    clearChatBtn.textContent = 'Clear Chat';
+    clearChatBtn.style.color = '#aaaaaa';
   });
 
   // Voice channel buttons
