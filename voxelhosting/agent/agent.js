@@ -46,7 +46,7 @@ const DATA_DIR = path.join(__dirname, 'servers');
 const FOLDER_MAP = {
   plugins: 'plugins',
   mods: 'mods',
-  world: '.', // world zips get extracted next to server.jar
+  world: 'world-uploads', // uploaded world zips; extract manually into the server dir
   datapacks: 'datapacks',
   resourcepacks: 'resourcepacks',
 };
@@ -134,6 +134,13 @@ function writeServerProperties(dir, cfg) {
     'white-list=false',
   ].join('\n') + '\n';
   fs.writeFileSync(path.join(dir, 'server.properties'), props);
+}
+
+async function initServer(serverId, cfg) {
+  const dir = serverDir(serverId);
+  writeServerProperties(dir, cfg);
+  await log(serverId, `[Agent] Server folder created for "${cfg.name}". Files are ready in the Files tab.`);
+  for (const folder of Object.keys(FOLDER_MAP)) await listFiles(serverId, folder);
 }
 
 async function startServer(serverId, cfg) {
@@ -228,6 +235,7 @@ function watchServerCommands(serverId, cfgRef) {
     const { action, ...extra } = snap.val() || {};
     remove(ref(rtdb, `vhServers/${serverId}/cmd/${snap.key}`)).catch(() => {});
     switch (action) {
+      case 'init': await initServer(serverId, cfgRef()); break;
       case 'start': await startServer(serverId, cfgRef()); break;
       case 'stop': await stopServer(serverId); break;
       case 'command': sendCommand(serverId, extra.text); break;
