@@ -1372,6 +1372,7 @@ ipcMain.handle('mc-install-modpack', async (_e: any, opts: { projectId: string }
       filenames: installed,
       mcVersion: (index.dependencies?.minecraft ?? '') as string,
       fabricVersion: (index.dependencies?.['fabric-loader'] ?? '') as string,
+      versionId: versions[0].id as string,
     };
   } catch (err: any) {
     return { ok: false, error: err.message };

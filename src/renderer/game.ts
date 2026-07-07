@@ -1164,12 +1164,35 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
   saveInstalledMods(installed);
   updateModsBadge();
 
-  if (!silent || updated > 0 || disabled > 0) {
+  // Modpacks: check the installed pack (usually just one — installing a new
+  // one already removes the previous) for a newer Modrinth release.
+  let modpackUpdated = false;
+  const packs = loadInstalledModpacks();
+  for (const [projectId, pack] of Object.entries(packs)) {
+    try {
+      const res = await fetch(`https://api.modrinth.com/v2/project/${projectId}/version?limit=5`);
+      if (!res.ok) continue;
+      const versions: any[] = await res.json();
+      if (!Array.isArray(versions) || !versions.length) continue;
+      if (versions[0].id === pack.versionId) continue;
+
+      const result = await mc.installModpack({ projectId });
+      if (!result.ok) continue;
+      packs[projectId] = { projectId, title: pack.title, mcVersion: result.mcVersion, filenames: result.filenames, versionId: result.versionId };
+      modpackUpdated = true;
+    } catch {
+      // Leave the modpack as-is if the check/update fails
+    }
+  }
+  if (modpackUpdated) saveInstalledModpacks(packs);
+
+  if (!silent || updated > 0 || disabled > 0 || modpackUpdated) {
     const parts = [];
-    if (updated)     parts.push(`${updated} updated`);
-    if (disabled)    parts.push(`${disabled} disabled (incompatible: ${disabledNames.slice(0, 3).join(', ')}${disabledNames.length > 3 ? `, +${disabledNames.length - 3} more` : ''})`);
-    if (upToDate)    parts.push(`${upToDate} up to date`);
-    if (checkFailed) parts.push(`${checkFailed} couldn't be checked`);
+    if (updated)       parts.push(`${updated} updated`);
+    if (disabled)      parts.push(`${disabled} disabled (incompatible: ${disabledNames.slice(0, 3).join(', ')}${disabledNames.length > 3 ? `, +${disabledNames.length - 3} more` : ''})`);
+    if (upToDate)      parts.push(`${upToDate} up to date`);
+    if (checkFailed)   parts.push(`${checkFailed} couldn't be checked`);
+    if (modpackUpdated) parts.push('modpack updated');
     showModUpdateStatus(parts.length ? parts.join(' · ') : 'All mods up to date.');
   }
 }
@@ -1189,10 +1212,15 @@ modUpdateAllBtn.addEventListener('click', async () => {
 modAutoUpdateToggle.addEventListener('change', () => {
   localStorage.setItem('voxel_mod_autoupdate', String(modAutoUpdateToggle.checked));
 });
-modAutoUpdateToggle.checked = localStorage.getItem('voxel_mod_autoupdate') === 'true';
+// Default to on so mods/modpacks stay current without any manual step —
+// only honor an explicit "false" the user previously chose.
+{
+  const autoUpdateRaw = localStorage.getItem('voxel_mod_autoupdate');
+  modAutoUpdateToggle.checked = autoUpdateRaw === null ? true : autoUpdateRaw === 'true';
+}
 
 // ── Installed modpacks (persisted) ───────────────────────────────────────────
-interface InstalledModpack { projectId: string; title: string; mcVersion: string; filenames: string[] }
+interface InstalledModpack { projectId: string; title: string; mcVersion: string; filenames: string[]; versionId?: string }
 const INSTALLED_MODPACKS_KEY = 'voxel_installed_modpacks';
 function loadInstalledModpacks(): Record<string, InstalledModpack> {
   try { return JSON.parse(localStorage.getItem(INSTALLED_MODPACKS_KEY) || '{}'); } catch { return {}; }
@@ -1431,7 +1459,7 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
       const result = await mc.installModpack({ projectId: mod.project_id });
       if (!result.ok) throw new Error(result.error);
       const updated = loadInstalledModpacks();
-      updated[mod.project_id] = { projectId: mod.project_id, title: mod.title, mcVersion: result.mcVersion, filenames: result.filenames };
+      updated[mod.project_id] = { projectId: mod.project_id, title: mod.title, mcVersion: result.mcVersion, filenames: result.filenames, versionId: result.versionId };
       saveInstalledModpacks(updated);
       statusEl.textContent = '✓';
       statusEl.style.color = '#f5a623';
@@ -1467,7 +1495,7 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
         const result = await mc.installModpack({ projectId: mod.project_id });
         if (!result.ok) throw new Error(result.error);
         const updated = loadInstalledModpacks();
-        updated[mod.project_id] = { projectId: mod.project_id, title: mod.title, mcVersion: result.mcVersion, filenames: result.filenames };
+        updated[mod.project_id] = { projectId: mod.project_id, title: mod.title, mcVersion: result.mcVersion, filenames: result.filenames, versionId: result.versionId };
         saveInstalledModpacks(updated);
         card.className = 'mod-card enabled';
         statusEl.textContent = '✓';
