@@ -30,10 +30,13 @@ jobs:
       - name: Inject API keys
         shell: pwsh
         run: |
-          $gemini    = "${{ secrets.GEMINI_API_KEY }}"
-          $cf        = "${{ secrets.CF_API_KEY }}"
-          $googleId  = "${{ secrets.GOOGLE_CLIENT_ID }}"
-          $googleSec = "${{ secrets.GOOGLE_CLIENT_SECRET }}"
+          # Single-quoted: CF_API_KEY is bcrypt-shaped ($2a$10$...) and double
+          # quotes would make PowerShell try to interpolate $2a/$10 as variables,
+          # silently mangling the key.
+          $gemini    = '${{ secrets.GEMINI_API_KEY }}'
+          $cf        = '${{ secrets.CF_API_KEY }}'
+          $googleId  = '${{ secrets.GOOGLE_CLIENT_ID }}'
+          $googleSec = '${{ secrets.GOOGLE_CLIENT_SECRET }}'
           $enc    = New-Object System.Text.UTF8Encoding $false
           $content = "export const GEMINI_KEY = '$gemini';`nexport const CF_API_KEY = '$cf';`nexport const GOOGLE_CLIENT_ID = '$googleId';`nexport const GOOGLE_CLIENT_SECRET = '$googleSec';"
           [System.IO.File]::WriteAllText((Join-Path $PWD "src/main/ai-key.ts"), $content, $enc)

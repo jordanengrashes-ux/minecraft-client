@@ -1112,24 +1112,22 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
     for (const [slug, r] of modrinthResults) results.set(slug, r);
   }
 
-  let updated = 0, disabled = 0, upToDate = 0, checkFailed = 0;
-  const disabledNames: string[] = [];
+  let updated = 0, removedCount = 0, upToDate = 0, checkFailed = 0;
+  const removedNames: string[] = [];
   for (const [slug, mod] of allEntries) {
     const result = results.get(slug);
     if (!result) continue;
 
     // A failed/rate-limited check is NOT the same as confirmed incompatibility
-    // — leave the mod alone rather than disabling it on a network hiccup.
+    // — leave the mod alone rather than removing it on a network hiccup.
     if (result.checkFailed) { checkFailed++; continue; }
 
     if (!result.compatible) {
-      if (!mod.disabled) {
-        try { await mc.toggleMod({ filename: mod.filename, enable: false }); } catch {}
-        installed[slug] = { ...mod, disabled: true };
-        enabledMods.delete(slug);
-        disabled++;
-        disabledNames.push(mod.name);
-      }
+      try { await mc.removeMod({ filename: mod.filename }); } catch {}
+      delete installed[slug];
+      enabledMods.delete(slug);
+      removedCount++;
+      removedNames.push(mod.name);
       continue;
     }
 
@@ -1186,12 +1184,12 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
   }
   if (modpackUpdated) saveInstalledModpacks(packs);
 
-  if (!silent || updated > 0 || disabled > 0 || modpackUpdated) {
+  if (!silent || updated > 0 || removedCount > 0 || modpackUpdated) {
     const parts = [];
-    if (updated)       parts.push(`${updated} updated`);
-    if (disabled)      parts.push(`${disabled} disabled (incompatible: ${disabledNames.slice(0, 3).join(', ')}${disabledNames.length > 3 ? `, +${disabledNames.length - 3} more` : ''})`);
-    if (upToDate)      parts.push(`${upToDate} up to date`);
-    if (checkFailed)   parts.push(`${checkFailed} couldn't be checked`);
+    if (updated)        parts.push(`${updated} updated`);
+    if (removedCount)   parts.push(`${removedCount} removed (incompatible: ${removedNames.slice(0, 3).join(', ')}${removedNames.length > 3 ? `, +${removedNames.length - 3} more` : ''})`);
+    if (upToDate)       parts.push(`${upToDate} up to date`);
+    if (checkFailed)    parts.push(`${checkFailed} couldn't be checked`);
     if (modpackUpdated) parts.push('modpack updated');
     showModUpdateStatus(parts.length ? parts.join(' · ') : 'All mods up to date.');
   }
