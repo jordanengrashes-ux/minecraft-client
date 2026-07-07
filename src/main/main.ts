@@ -949,6 +949,92 @@ ipcMain.handle('mc-launch-bedrock', async () => {
   }
 });
 
+function bedrockComMojangDir(): string {
+  return path.join(process.env.LOCALAPPDATA || '', 'Packages', 'Microsoft.MinecraftUWP_8wekyb3d8bbwe', 'LocalState', 'games', 'com.mojang');
+}
+
+// ── IPC: Bedrock addon install/list/remove (toggle-style, like Java mods) ─────
+// Bedrock has no single "enabled mods" list like Fabric — install/uninstall
+// here means the pack's files exist under com.mojang, available to enable
+// per-world from Bedrock's own UI (there's no supported way to do per-world
+// activation externally).
+ipcMain.handle('mc-install-bedrock-pack', async (_e, opts: { url: string; name: string }) => {
+  try {
+    const comMojang = bedrockComMojangDir();
+    if (!fs.existsSync(comMojang)) throw new Error('Bedrock Edition is not installed');
+
+    const tmpDir = path.join(app.getPath('temp'), 'voxel-bedrock-packs');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpFile = path.join(tmpDir, `dl-${Date.now()}.zip`);
+    await downloadFileTo(opts.url, tmpFile);
+    const buf = fs.readFileSync(tmpFile);
+    try { fs.unlinkSync(tmpFile); } catch {}
+
+    const stagingDir = path.join(tmpDir, `staging-${Date.now()}`);
+    extractZipAll(buf, stagingDir);
+
+    // manifest.json is usually at the archive root, sometimes one folder in
+    function findManifestDir(dir: string, depth = 0): string | null {
+      if (fs.existsSync(path.join(dir, 'manifest.json'))) return dir;
+      if (depth >= 2) return null;
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          const found = findManifestDir(path.join(dir, entry.name), depth + 1);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    const packRoot = findManifestDir(stagingDir);
+    if (!packRoot) { fs.rmSync(stagingDir, { recursive: true, force: true }); throw new Error('No manifest.json found in this pack'); }
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(packRoot, 'manifest.json'), 'utf-8'));
+    const isBehavior = (manifest.modules || []).some((m: any) => m.type === 'data');
+    const packType = isBehavior ? 'behavior_packs' : 'resource_packs';
+    const packId = (manifest.header?.uuid || opts.name).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const destDir = path.join(comMojang, packType, packId);
+
+    fs.rmSync(destDir, { recursive: true, force: true });
+    copyDirRecursive(packRoot, destDir);
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+
+    return { ok: true, packId, packType, name: manifest.header?.name || opts.name };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mc-list-bedrock-packs', async () => {
+  const comMojang = bedrockComMojangDir();
+  const packs: { packId: string; packType: string; name: string }[] = [];
+  try {
+    for (const packType of ['resource_packs', 'behavior_packs']) {
+      const dir = path.join(comMojang, packType);
+      if (!fs.existsSync(dir)) continue;
+      for (const packId of fs.readdirSync(dir)) {
+        const manifestPath = path.join(dir, packId, 'manifest.json');
+        if (!fs.existsSync(manifestPath)) continue;
+        try {
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+          packs.push({ packId, packType, name: manifest.header?.name || packId });
+        } catch {}
+      }
+    }
+    return { ok: true, packs };
+  } catch (err: any) {
+    return { ok: false, error: err.message, packs };
+  }
+});
+
+ipcMain.handle('mc-remove-bedrock-pack', async (_e, opts: { packId: string; packType: string }) => {
+  try {
+    fs.rmSync(path.join(bedrockComMojangDir(), opts.packType, opts.packId), { recursive: true, force: true });
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
 // ── IPC: skin upload ──────────────────────────────────────────────────────────
 ipcMain.handle('mc-upload-skin', async (_e, opts: { base64: string; variant: 'classic' | 'slim' }) => {
   if (!mcAuthToken?.access_token) return { ok: false, error: 'Not authenticated' };
@@ -1014,6 +1100,47 @@ function extractFromZip(buf: Buffer, target: string): Promise<Buffer> {
     pos += 46 + fnLen + extraLen + commentLen;
   }
   return Promise.reject(new Error(`'${target}' not found in archive`));
+}
+
+// Full ZIP extraction (all entries) — used for Bedrock .mcpack/.mcaddon
+// installs, which need the whole pack directory, not just one file.
+function extractZipAll(buf: Buffer, destDir: string): void {
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= 0; i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('Not a valid ZIP file');
+  const cdOffset = buf.readUInt32LE(eocd + 16);
+  const cdSize   = buf.readUInt32LE(eocd + 12);
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const zlibMod = require('zlib');
+  let pos = cdOffset;
+  while (pos < cdOffset + cdSize) {
+    if (buf.readUInt32LE(pos) !== 0x02014b50) break;
+    const method     = buf.readUInt16LE(pos + 10);
+    const compSize   = buf.readUInt32LE(pos + 20);
+    const fnLen      = buf.readUInt16LE(pos + 28);
+    const extraLen   = buf.readUInt16LE(pos + 30);
+    const commentLen = buf.readUInt16LE(pos + 32);
+    const lhOffset   = buf.readUInt32LE(pos + 42);
+    const name       = buf.slice(pos + 46, pos + 46 + fnLen).toString('utf-8');
+
+    if (!name.endsWith('/') && !name.includes('..')) {
+      const lhFnLen    = buf.readUInt16LE(lhOffset + 26);
+      const lhExtraLen = buf.readUInt16LE(lhOffset + 28);
+      const dataStart  = lhOffset + 30 + lhFnLen + lhExtraLen;
+      const compressed = buf.slice(dataStart, dataStart + compSize);
+      const data = method === 0 ? compressed
+        : method === 8 ? zlibMod.inflateRawSync(compressed)
+        : null;
+      if (data) {
+        const outPath = path.join(destDir, name);
+        fs.mkdirSync(path.dirname(outPath), { recursive: true });
+        fs.writeFileSync(outPath, data);
+      }
+    }
+    pos += 46 + fnLen + extraLen + commentLen;
+  }
 }
 
 function downloadFileTo(url: string, dest: string, onPct?: (p: number) => void): Promise<void> {
@@ -1300,8 +1427,14 @@ ipcMain.handle('mc-install-mod', async (_e, opts: { url: string; filename: strin
 
 ipcMain.handle('mc-list-mods', async () => {
   const modsDir = path.join(app.getPath('userData'), '.minecraft', 'mods');
+  const disabledDir = path.join(modsDir, '.disabled');
   try {
-    return fs.existsSync(modsDir) ? fs.readdirSync(modsDir).filter((f: string) => f.endsWith('.jar')) : [];
+    const active   = fs.existsSync(modsDir) ? fs.readdirSync(modsDir).filter((f: string) => f.endsWith('.jar')) : [];
+    // Disabled mods live in a subfolder, not deleted — they must still count
+    // as "on disk" or the renderer's disk-sync wipes them from its saved
+    // installed-mods list on every launch.
+    const disabled = fs.existsSync(disabledDir) ? fs.readdirSync(disabledDir).filter((f: string) => f.endsWith('.jar')) : [];
+    return [...active, ...disabled];
   } catch { return []; }
 });
 
@@ -1918,9 +2051,10 @@ ipcMain.handle('ai-chat', async (_e, messages: { role: string; content: string }
     try {
       const json = await callOpenRouter(model, messages);
       if (json.error) {
+        // Any error (rate-limited, deprecated model, bad request, etc.) —
+        // move on to the next fallback model rather than giving up entirely.
         lastError = json.error.message ?? String(json.error);
-        if (json.error.code === 429) continue; // rate-limited — try next model
-        break;
+        continue;
       }
       const text = json.choices?.[0]?.message?.content ?? '';
       if (text) return { ok: true, text };

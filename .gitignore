@@ -3,4 +3,8 @@ release/
 dist/
 dist-electron/
 .vercel
-resources/
+# Bundled JRE is huge and downloaded fresh each build — everything else
+# under resources/ (cosmetics mod jar, shaderpacks) needs to actually ship.
+resources/java21/
+fabric-mod/.gradle/
+fabric-mod/build/

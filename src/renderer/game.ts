@@ -12,6 +12,12 @@ const server = (window as any).server;
 const userName      = document.getElementById('user-name')!;
 const mcIgnBadge    = document.getElementById('mc-username-badge')!;
 const mcIgnSpan     = document.getElementById('mc-ign')!;
+// Prefer the Minecraft IGN (only set after Microsoft auth) but fall back to
+// the app account/guest name — mcIgnSpan is blank for guest/offline users,
+// so using it alone showed a raw UID or nothing in friends' lists.
+function myDisplayName(): string {
+  return mcIgnSpan.textContent || userName.textContent || 'Player';
+}
 const mcAuthBtn     = document.getElementById('mc-auth-btn') as HTMLButtonElement;
 const mcPlayBtn     = document.getElementById('mc-play-btn') as HTMLButtonElement;
 const mcVersion     = document.getElementById('mc-version') as HTMLSelectElement;
@@ -577,6 +583,7 @@ const filesPanelEl        = document.getElementById('files-panel')!;
 const navCustomize        = document.getElementById('nav-customize')!;
 const navSettings         = document.getElementById('nav-settings')!;
 const navServer         = document.getElementById('nav-server')!;
+const navMyServer       = document.getElementById('nav-my-server')!;
 const navCosmetics      = document.getElementById('nav-cosmetics')!;
 const navFriends        = document.getElementById('nav-friends')!;
 const serverPanelEl     = document.getElementById('server-panel')!;
@@ -589,7 +596,7 @@ const navAi       = document.getElementById('nav-ai')!;
 const cfPanelEl   = document.getElementById('curseforge-panel')!;
 const navCf       = document.getElementById('nav-curseforge')!;
 const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, cfPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl, chatPanelEl, aiPanelEl];
-const allNavs   = [navPlay, navBedrock, navMods, navCf, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navServer, navCosmetics, navFriends, navCustomize, navSettings, navChat, navAi];
+const allNavs   = [navPlay, navBedrock, navMods, navCf, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navMyServer, navCosmetics, navFriends, navCustomize, navSettings, navChat, navAi];
 
 function showPanel(panel: HTMLElement, nav: HTMLElement) {
   allPanels.forEach(p => p.style.display = 'none');
@@ -605,10 +612,14 @@ navPvp           .addEventListener('click', () => { showPanel(pvpPanelEl,       
 navBedrockMods   .addEventListener('click', () => { showPanel(bedrockModsPanelEl,  navBedrockMods); if (!bedrockModsPanelEl.dataset.loaded) { searchBedrockMods(''); bedrockModsPanelEl.dataset.loaded = '1'; } });
 navResourcePacks .addEventListener('click', () => { showPanel(resourcePacksPanelEl,navResourcePacks); if (!resourcePacksPanelEl.dataset.loaded) { initResourcePacks(); resourcePacksPanelEl.dataset.loaded = '1'; } });
 navSkins         .addEventListener('click', () => { showPanel(skinsPanelEl,        navSkins); if (!skinsPanelEl.dataset.loaded) { initSkins(); skinsPanelEl.dataset.loaded = '1'; } });
-navScreenshots   .addEventListener('click', () => { showPanel(screenshotsPanelEl,  navScreenshots); if (!screenshotsPanelEl.dataset.loaded) { initScreenshots(); screenshotsPanelEl.dataset.loaded = '1'; } });
+navScreenshots   .addEventListener('click', () => { showPanel(screenshotsPanelEl,  navScreenshots); initScreenshots(); });
 navAccounts      .addEventListener('click', () => { showPanel(accountsPanelEl,     navAccounts); if (!accountsPanelEl.dataset.loaded) { initAccounts(); accountsPanelEl.dataset.loaded = '1'; } });
 navFiles         .addEventListener('click', () => { showPanel(filesPanelEl,        navFiles);  if (!filesPanelEl.dataset.loaded)  { initFiles(); filesPanelEl.dataset.loaded = '1'; } });
-navServer        .addEventListener('click', () => { showPanel(serverPanelEl, navServer); });
+navServer        .addEventListener('click', () => {
+  const url = 'https://voxelhosting.vercel.app/';
+  (window as any).electron?.openExternal?.(url) || window.open(url);
+});
+navMyServer      .addEventListener('click', () => { showPanel(serverPanelEl, navMyServer); });
 navCosmetics     .addEventListener('click', () => { showPanel(cosmeticsPanelEl,    navCosmetics); if (!cosmeticsPanelEl.dataset.loaded) { initCosmetics(); cosmeticsPanelEl.dataset.loaded = '1'; } });
 navFriends       .addEventListener('click', () => { showPanel(friendsPanelEl,      navFriends);   if (!friendsPanelEl.dataset.loaded) { initFriendsPanel(); friendsPanelEl.dataset.loaded = '1'; } });
 navCustomize     .addEventListener('click', () => { showPanel(customizePanelEl,    navCustomize); if (!customizePanelEl.dataset.loaded) { initCustomize(); searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
@@ -723,10 +734,17 @@ const bedrockModsLoading = document.getElementById('bedrock-mods-loading')!;
 const bedrockModsSearch  = document.getElementById('bedrock-mods-search') as HTMLInputElement;
 let bedrockModsTimer: ReturnType<typeof setTimeout> | null = null;
 
+let bedrockInstalledPacks: { packId: string; packType: string; name: string }[] = [];
+async function refreshBedrockInstalled() {
+  const res = await (window as any).mc?.listBedrockPacks?.();
+  bedrockInstalledPacks = res?.ok ? res.packs : [];
+}
+
 async function searchBedrockMods(query: string) {
   bedrockModsLoading.style.display = 'flex';
   bedrockModsList.innerHTML = '';
   try {
+    await refreshBedrockInstalled();
     const facets = JSON.stringify([['project_type:resourcepack', 'project_type:shader']]);
     const params = new URLSearchParams({
       query, facets, limit: '50',
@@ -742,8 +760,9 @@ async function searchBedrockMods(query: string) {
     const frag = document.createDocumentFragment();
     data.hits.forEach(h => {
       const isShader = h.categories.includes('shaders');
+      const isOn = bedrockInstalledPacks.some(p => p.name === h.title);
       const card = document.createElement('div');
-      card.className = 'mod-card';
+      card.className = 'mod-card' + (isOn ? ' enabled' : '');
       const iconHtml = h.icon_url
         ? `<img src="${h.icon_url}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
         : `<div class="mod-icon"></div>`;
@@ -751,7 +770,6 @@ async function searchBedrockMods(query: string) {
         const cls = ['shaders'].includes(cat) ? 'visual' : ['optimization','performance'].includes(cat) ? 'perf' : 'util';
         return `<span class="mod-tag ${cls}">${cat}</span>`;
       }).join('') + `<span class="mod-tag" style="margin-left:auto">⬇ ${fmtDownloads(h.downloads)}</span>`;
-      const linkType = isShader ? 'shader' : 'resourcepack';
       card.innerHTML = `${iconHtml}
         <div class="mod-info">
           <div class="mod-name">${h.title}</div>
@@ -759,9 +777,50 @@ async function searchBedrockMods(query: string) {
           <div class="mod-tags">${tagHtml}</div>
         </div>
         <div class="mod-right">
-          <a href="https://modrinth.com/${linkType}/${h.project_id}" target="_blank"
-            style="padding:7px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:12px;text-decoration:none;white-space:nowrap;">Get →</a>
+          <div class="mod-version"></div>
+          <label class="toggle">
+            <input type="checkbox" ${isOn ? 'checked' : ''} />
+            <span class="toggle-slider"></span>
+          </label>
         </div>`;
+
+      const input    = card.querySelector('input') as HTMLInputElement;
+      const statusEl = card.querySelector('.mod-version') as HTMLElement;
+      if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+
+      input.addEventListener('change', async e => {
+        const checked = (e.target as HTMLInputElement).checked;
+        input.disabled = true;
+        if (checked) {
+          statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
+          try {
+            const vRes = await fetch(`https://api.modrinth.com/v2/project/${h.project_id}/version?limit=5`);
+            const versions: any[] = await vRes.json();
+            if (!Array.isArray(versions) || !versions.length) throw new Error('No downloadable version found');
+            const file = versions[0].files.find((f: any) => f.primary) ?? versions[0].files[0];
+            if (!file) throw new Error('No download file found');
+            const install = await (window as any).mc.installBedrockPack({ url: file.url, name: h.title });
+            if (!install.ok) throw new Error(install.error);
+            card.className = 'mod-card enabled';
+            statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+            await refreshBedrockInstalled();
+          } catch (err: any) {
+            input.checked = false; card.className = 'mod-card';
+            statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+            statusEl.title = err.message.includes('manifest.json')
+              ? 'Not a Bedrock-format pack (Modrinth mostly hosts Java Edition content)'
+              : err.message;
+          }
+        } else {
+          const pack = bedrockInstalledPacks.find(p => p.name === h.title);
+          if (pack) await (window as any).mc.removeBedrockPack({ packId: pack.packId, packType: pack.packType });
+          card.className = 'mod-card';
+          statusEl.textContent = '';
+          await refreshBedrockInstalled();
+        }
+        input.disabled = false;
+      });
+
       frag.appendChild(card);
     });
     bedrockModsList.appendChild(frag);
@@ -2849,7 +2908,7 @@ function renderFriendRequests(uid: string, data: Record<string, any>) {
     card.querySelector('.req-accept')!.addEventListener('click', async () => {
       // Add to each other's list
       await set(ref(rtdb, `voxel_friends/${uid}/list/${fromUid}`), { name: info.name, addedAt: serverTimestamp() });
-      await set(ref(rtdb, `voxel_friends/${fromUid}/list/${uid}`), { name: mcIgnSpan.textContent || '', addedAt: serverTimestamp() });
+      await set(ref(rtdb, `voxel_friends/${fromUid}/list/${uid}`), { name: myDisplayName(), addedAt: serverTimestamp() });
       // Clear requests
       await set(ref(rtdb, `voxel_friends/${uid}/requests/incoming/${fromUid}`), null);
       await set(ref(rtdb, `voxel_friends/${fromUid}/requests/outgoing/${uid}`), null);
@@ -2886,7 +2945,7 @@ async function sendFriendRequest(uid: string, targetName: string) {
   const alreadySnap = await get(ref(rtdb, `voxel_friends/${uid}/list/${targetUid}`));
   if (alreadySnap.exists()) { statusEl.style.color = '#f6c356'; statusEl.textContent = 'Already friends'; addBtn.disabled = false; return; }
   // Send request
-  await set(ref(rtdb, `voxel_friends/${targetUid}/requests/incoming/${uid}`), { name: mcIgnSpan.textContent || uid, sentAt: serverTimestamp() });
+  await set(ref(rtdb, `voxel_friends/${targetUid}/requests/incoming/${uid}`), { name: myDisplayName(), sentAt: serverTimestamp() });
   await set(ref(rtdb, `voxel_friends/${uid}/requests/outgoing/${targetUid}`), { name: target.name, sentAt: serverTimestamp() });
   statusEl.style.color = '#f5a623';
   statusEl.textContent = `Request sent to ${target.name}`;
@@ -2937,8 +2996,28 @@ function renderCapeGrid() {
       </div>`;
     const canvas = card.querySelector('canvas') as HTMLCanvasElement;
     const ctx2   = canvas.getContext('2d')!;
-    ctx2.fillStyle = cape.top; ctx2.fillRect(0, 0, 80, 32);
-    ctx2.fillStyle = cape.bot; ctx2.fillRect(0, 32, 80, 32);
+    // Cloth-like gradient instead of two flat color blocks, plus a collar
+    // band and vertical fold lines so it actually reads as a cape swatch.
+    const grad = ctx2.createLinearGradient(0, 0, 0, 64);
+    grad.addColorStop(0,    cape.top);
+    grad.addColorStop(0.48, cape.top);
+    grad.addColorStop(0.52, cape.bot);
+    grad.addColorStop(1,    cape.bot);
+    ctx2.fillStyle = grad;
+    ctx2.fillRect(0, 0, 80, 64);
+    ctx2.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx2.fillRect(0, 0, 80, 6);
+    ctx2.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx2.lineWidth = 1;
+    for (let x = 14; x < 80; x += 16) {
+      ctx2.beginPath(); ctx2.moveTo(x, 6); ctx2.lineTo(x, 64); ctx2.stroke();
+    }
+    const shine = ctx2.createLinearGradient(0, 0, 80, 0);
+    shine.addColorStop(0, 'rgba(255,255,255,0.08)');
+    shine.addColorStop(0.5, 'rgba(255,255,255,0)');
+    shine.addColorStop(1, 'rgba(0,0,0,0.12)');
+    ctx2.fillStyle = shine;
+    ctx2.fillRect(0, 0, 80, 64);
     const btn = card.querySelector('button');
     if (!btn) { grid.appendChild(card); continue; }
     btn.addEventListener('click', async () => {
@@ -2959,7 +3038,7 @@ function renderCapeGrid() {
       }
       // Equip — store under MC UUID (Fabric mod) or Firebase UID (launcher only)
       try {
-        await set(ref(rtdb, `voxel_capes/${capeKey}`), { cape_id: cape.id, enabled: true, username: mcIgnSpan.textContent || '' });
+        await set(ref(rtdb, `voxel_capes/${capeKey}`), { cape_id: cape.id, enabled: true, username: myDisplayName() });
         equippedCapeId = cape.id;
         if (equippedNameEl) equippedNameEl.textContent = cape.name;
         if (preview) preview.style.background = `linear-gradient(to bottom, ${cape.top}, ${cape.bot})`;
@@ -3419,6 +3498,9 @@ if ((window as any).electron) {
       initTokens(myUid);
       initPresence(myUid);
       initFriends(myUid);
+      // So guests/offline-account users (no Microsoft auth) can still be
+      // found by name when someone sends them a friend request.
+      registerUserIndex(myUid, myDisplayName());
     }
     if (d.email) initAdminPanel(d.email);
   });
@@ -4111,26 +4193,26 @@ function appendChatMessage(m: { user: string; text: string; ts: number; type?: s
     `<span style="font-size:10px;color:#484f58;">${isMe ? '' : escHtml(m.user) + adminBadge + ' · '}${time}</span>` +
     `<div style="background:${isMe ? 'rgba(245,166,35,0.15)' : '#141414'};border:1px solid ${isMe ? 'rgba(245,166,35,0.28)' : '#222222'};border-radius:10px;padding:6px 11px;font-size:13px;color:#ffffff;word-break:break-word;">${escHtml(m.text)}</div>`;
 
-  if (!isMe) {
-    // Show skin face for others, colored initial as fallback
-    const avatarColor = usernameColor(m.user);
-    const initial = (m.user[0] || '?').toUpperCase();
-    const avatarWrap = document.createElement('div');
-    avatarWrap.style.cssText = 'flex-shrink:0;width:24px;height:24px;position:relative;';
-    const img = document.createElement('img');
-    img.src = `https://minotar.net/avatar/${encodeURIComponent(m.user)}/24`;
-    img.style.cssText = 'width:24px;height:24px;border-radius:50%;image-rendering:pixelated;display:block;';
-    const fallback = document.createElement('span');
-    fallback.className = 'chat-msg-avatar';
-    fallback.style.cssText = `display:none;background:${avatarColor};`;
-    fallback.textContent = initial;
-    img.onerror = () => { img.style.display = 'none'; fallback.style.display = 'flex'; };
-    avatarWrap.appendChild(img);
-    avatarWrap.appendChild(fallback);
-    row.appendChild(avatarWrap);
-  }
+  // Show a chat head for every message, including your own (previously only
+  // other players' messages got an avatar).
+  const avatarColor = usernameColor(m.user);
+  const initial = (m.user[0] || '?').toUpperCase();
+  const avatarWrap = document.createElement('div');
+  avatarWrap.style.cssText = 'flex-shrink:0;width:24px;height:24px;position:relative;';
+  const img = document.createElement('img');
+  img.src = `https://minotar.net/avatar/${encodeURIComponent(m.user)}/24`;
+  img.style.cssText = 'width:24px;height:24px;border-radius:50%;image-rendering:pixelated;display:block;';
+  const fallback = document.createElement('span');
+  fallback.className = 'chat-msg-avatar';
+  fallback.style.cssText = `display:none;background:${avatarColor};`;
+  fallback.textContent = initial;
+  img.onerror = () => { img.style.display = 'none'; fallback.style.display = 'flex'; };
+  avatarWrap.appendChild(img);
+  avatarWrap.appendChild(fallback);
 
-  row.appendChild(bubble);
+  if (isMe) row.appendChild(bubble);
+  row.appendChild(avatarWrap);
+  if (!isMe) row.appendChild(bubble);
   container.appendChild(row);
 }
 
