@@ -1427,13 +1427,17 @@ ipcMain.handle('cf-get-download-url', async (_e, opts: { modId: number; mcVersio
 // for that version/loader at all — the caller disables the mod in that case).
 ipcMain.handle('cf-check-updates', async (_e, mods: { modId: number; fileId: number }[], mcVersion: string) => {
   if (!CF_API_KEY) return { ok: false, error: 'No CurseForge API key configured' };
-  const results = await Promise.all(mods.map(async (m) => {
+
+  async function checkOne(m: { modId: number; fileId: number }) {
     try {
       const params = new URLSearchParams({ gameVersion: mcVersion || '1.21.4', modLoaderType: '4', pageSize: '5' });
       const res = await fetch(`${CF_BASE}/mods/${m.modId}/files?${params}`, { headers: cfHeaders() });
-      if (!res.ok) throw new Error(`CurseForge API error ${res.status}`);
+      if (res.status === 429) return { modId: m.modId, checkFailed: true, error: 'Rate limited' };
+      if (!res.ok) return { modId: m.modId, checkFailed: true, error: `CurseForge API error ${res.status}` };
       const data: any = await res.json();
       const files: any[] = data.data ?? [];
+      // An empty result confirms no file exists for this version/loader —
+      // genuinely incompatible, as opposed to a network/rate-limit failure.
       if (!files.length) return { modId: m.modId, compatible: false };
       const latest = files[0];
       const id = latest.id as number;
@@ -1444,9 +1448,19 @@ ipcMain.handle('cf-check-updates', async (_e, mods: { modId: number; fileId: num
         fileId: id, filename: latest.fileName, url,
       };
     } catch (err: any) {
-      return { modId: m.modId, compatible: false, error: err.message };
+      return { modId: m.modId, checkFailed: true, error: err.message };
     }
-  }));
+  }
+
+  // Batch with a small concurrency limit instead of firing everything at
+  // once — CurseForge rate-limits bursts, which previously got misread as
+  // "no compatible file exists" and disabled mods that were actually fine.
+  const results: any[] = [];
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < mods.length; i += BATCH_SIZE) {
+    const batch = mods.slice(i, i + BATCH_SIZE);
+    results.push(...await Promise.all(batch.map(checkOne)));
+  }
   return { ok: true, results };
 });
 

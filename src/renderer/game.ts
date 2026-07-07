@@ -1052,10 +1052,15 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
     return;
   }
 
-  let updated = 0, disabled = 0, upToDate = 0;
+  let updated = 0, disabled = 0, upToDate = 0, checkFailed = 0;
+  const disabledNames: string[] = [];
   for (const [slug, mod] of entries) {
     const result = res.results.find((r: any) => r.modId === mod.cfId);
     if (!result) continue;
+
+    // A failed/rate-limited check is NOT the same as confirmed incompatibility
+    // — leave the mod alone rather than disabling it on a network hiccup.
+    if (result.checkFailed) { checkFailed++; continue; }
 
     if (!result.compatible) {
       if (!mod.disabled) {
@@ -1063,9 +1068,18 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
         installed[slug] = { ...mod, disabled: true };
         enabledMods.delete(slug);
         disabled++;
-        showModUpdateStatus(`"${mod.name}" isn't compatible with ${mcVer} — it's been turned off.`, false);
+        disabledNames.push(mod.name);
       }
       continue;
+    }
+
+    // A compatible file was found for a previously-disabled mod — re-enable
+    // it (covers both a genuine version change and mods that were wrongly
+    // disabled by a past bug in this check).
+    if (mod.disabled) {
+      try { await mc.toggleMod({ filename: mod.filename, enable: true }); } catch {}
+      installed[slug] = { ...mod, disabled: false };
+      enabledMods.add(slug);
     }
 
     if (result.upToDate) { upToDate++; continue; }
@@ -1088,9 +1102,10 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
 
   if (!silent || updated > 0 || disabled > 0) {
     const parts = [];
-    if (updated)  parts.push(`${updated} updated`);
-    if (disabled) parts.push(`${disabled} disabled (incompatible)`);
-    if (upToDate) parts.push(`${upToDate} up to date`);
+    if (updated)     parts.push(`${updated} updated`);
+    if (disabled)    parts.push(`${disabled} disabled (incompatible: ${disabledNames.slice(0, 3).join(', ')}${disabledNames.length > 3 ? `, +${disabledNames.length - 3} more` : ''})`);
+    if (upToDate)    parts.push(`${upToDate} up to date`);
+    if (checkFailed) parts.push(`${checkFailed} couldn't be checked`);
     showModUpdateStatus(parts.length ? parts.join(' · ') : 'All mods up to date.');
   }
 }
