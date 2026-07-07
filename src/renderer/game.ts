@@ -27,7 +27,7 @@ const logCopy       = document.getElementById('log-copy') as HTMLButtonElement;
 const logPanel      = document.getElementById('log-panel')!;
 const logBody       = document.getElementById('log-body')!;
 const logClose      = document.getElementById('log-close') as HTMLButtonElement;
-const fabricToggle      = document.getElementById('fabric-toggle') as HTMLInputElement;
+const modLoaderSelect   = document.getElementById('modloader-select') as HTMLSelectElement;
 const fabricStatus      = document.getElementById('fabric-status')!;
 const mcForceQuitBtn    = document.getElementById('mc-force-quit-btn') as HTMLButtonElement;
 const offlineToggle   = document.getElementById('offline-toggle') as HTMLInputElement;
@@ -285,17 +285,17 @@ function updateModsBadge() {
   const count = Object.keys(loadInstalledMods()).length;
   if (count === 0) { modsBadge.style.display = 'none'; return; }
   modsBadge.style.display    = 'inline-block';
-  const fabricOn = fabricToggle.checked;
-  modsBadge.textContent     = fabricOn
+  const loaderOn = modLoaderSelect.value !== 'none';
+  modsBadge.textContent     = loaderOn
     ? `✓ ${count} mod${count !== 1 ? 's' : ''} ready`
-    : `${count} mod${count !== 1 ? 's' : ''} installed — enable Fabric above`;
-  modsBadge.style.color      = fabricOn ? '#f5a623'                  : '#f6c356';
-  modsBadge.style.background = fabricOn ? 'rgba(245,166,35,0.10)'     : 'rgba(246,195,86,0.10)';
-  modsBadge.style.borderColor= fabricOn ? 'rgba(245,166,35,0.30)'     : 'rgba(246,195,86,0.35)';
+    : `${count} mod${count !== 1 ? 's' : ''} installed — enable a mod loader above`;
+  modsBadge.style.color      = loaderOn ? '#f5a623'                  : '#f6c356';
+  modsBadge.style.background = loaderOn ? 'rgba(245,166,35,0.10)'     : 'rgba(246,195,86,0.10)';
+  modsBadge.style.borderColor= loaderOn ? 'rgba(245,166,35,0.30)'     : 'rgba(246,195,86,0.35)';
 }
 
-fabricToggle.addEventListener('change', () => {
-  localStorage.setItem('voxel_fabric_on', String(fabricToggle.checked));
+modLoaderSelect.addEventListener('change', () => {
+  localStorage.setItem('voxel_modloader', modLoaderSelect.value);
   updateModsBadge();
 });
 
@@ -308,14 +308,16 @@ shaderpackSelect?.addEventListener('change', () => {
 
 // ── Restore saved settings on launch ─────────────────────────────────────────
 {
-  const savedFabric = localStorage.getItem('voxel_fabric_on') === 'true';
+  const savedLoader = localStorage.getItem('voxel_modloader');
+  // Legacy fallback from before the loader dropdown existed
+  if (savedLoader) modLoaderSelect.value = savedLoader;
+  else if (localStorage.getItem('voxel_fabric_on') === 'true') modLoaderSelect.value = 'fabric';
   // Default to offline/guest mode so Play works without a Microsoft account —
   // only honor an explicit "false" the user previously chose.
   const offlineModeRaw = localStorage.getItem('voxel_offline_mode');
   const savedOffline = offlineModeRaw === null ? true : offlineModeRaw === 'true';
   const savedUsername = localStorage.getItem('voxel_offline_username');
   if (savedUsername) offlineUsername.value = savedUsername;
-  if (savedFabric)  fabricToggle.checked = true;
   offlineToggle.checked = savedOffline;
   applyOfflineState(savedOffline);
   const savedMemory = localStorage.getItem('voxel_mc_memory');
@@ -408,8 +410,10 @@ mcPlayBtn.addEventListener('click', async () => {
     await runModUpdateCheck(version, true);
   }
 
-  // Install Fabric if toggled on
-  if (fabricToggle.checked) {
+  // Install the selected mod loader
+  let forgePath: string | undefined;
+  const loader = modLoaderSelect.value;
+  if (loader === 'fabric') {
     fabricStatus.textContent = 'Installing Fabric…';
     fabricStatus.style.color = '#f5a623';
     const fab = await mc.installFabric({ mcVersion: version });
@@ -418,7 +422,20 @@ mcPlayBtn.addEventListener('click', async () => {
       fabricStatus.textContent = `Fabric ${fab.loaderVersion}`;
       fabricStatus.style.color = '#f5a623';
     } else {
-      fabricStatus.textContent = `Fabric install failed — launching vanilla`;
+      fabricStatus.textContent = `Fabric install failed (${fab.error}) — launching vanilla`;
+      fabricStatus.style.color = '#f6c356';
+    }
+  } else if (loader === 'forge' || loader === 'neoforge') {
+    const label = loader === 'forge' ? 'Forge' : 'NeoForge';
+    fabricStatus.textContent = `Installing ${label}…`;
+    fabricStatus.style.color = '#f5a623';
+    const res = loader === 'forge' ? await mc.installForge({ mcVersion: version }) : await mc.installNeoForge({ mcVersion: version });
+    if (res.ok) {
+      forgePath = res.installerPath;
+      fabricStatus.textContent = `${label} ${res.loaderVersion}`;
+      fabricStatus.style.color = '#f5a623';
+    } else {
+      fabricStatus.textContent = `${label} install failed (${res.error}) — launching vanilla`;
       fabricStatus.style.color = '#f6c356';
     }
   }
@@ -428,8 +445,8 @@ mcPlayBtn.addEventListener('click', async () => {
   const vsync      = vsyncToggle?.checked !== false;
   const shaderpack = shaderpackSelect?.value ?? '';
   const res = offlineToggle.checked
-    ? await mc.launchOffline({ version, maxMem, username: offlineUsername.value.trim() || 'Player', javaVersion, vsync, shaderpack })
-    : await mc.launch({ version, maxMem, javaVersion, vsync, shaderpack });
+    ? await mc.launchOffline({ version, maxMem, username: offlineUsername.value.trim() || 'Player', javaVersion, vsync, shaderpack, forgePath })
+    : await mc.launch({ version, maxMem, javaVersion, vsync, shaderpack, forgePath });
   if (!res.ok) {
     setStatus(`Launch failed: ${res.error}`, 'red');
     addLog(`Error: ${res.error}`, 'error');

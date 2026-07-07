@@ -639,7 +639,34 @@ ipcMain.handle('mc-reauth', async () => {
 });
 
 // ── IPC: launch Minecraft ─────────────────────────────────────────────────────
-ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; javaVersion?: number; vsync?: boolean; shaderpack?: string }) => {
+const FORGEWRAPPER_OVERRIDE = {
+  baseUrl: 'https://github.com/ZekerZhayard/ForgeWrapper/releases/download/',
+  version: '1.5.1',
+  sh1: '90104e9aaa8fbedf6c3d1f6d0b90cabce080b5a9',
+  size: 29892,
+};
+
+// Builds the version/forge/mcPath portion of launcher.launch() options shared
+// between online and offline launch — Fabric uses a pre-merged custom version
+// json, Forge/NeoForge use MCLC's built-in ForgeWrapper support.
+function buildLoaderLaunchOptions(mcRoot: string, version: string, forgePath?: string) {
+  const isFabric = (version || '').startsWith('fabric-loader-');
+  if (isFabric) {
+    const mcVer = version.replace(/^fabric-loader-[\d.]+-/, '');
+    return { version: { number: mcVer, type: 'release' as const, custom: version } };
+  }
+  if (forgePath) {
+    return {
+      version: { number: version || '1.21.4', type: 'release' as const },
+      forge: forgePath,
+      mcPath: path.join(mcRoot, 'versions', version, `${version}.jar`),
+      overridesExtra: { fw: FORGEWRAPPER_OVERRIDE },
+    };
+  }
+  return { version: { number: version || '1.21.4', type: 'release' as const } };
+}
+
+ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; javaVersion?: number; vsync?: boolean; shaderpack?: string; forgePath?: string }) => {
   const requestedJava = opts.javaVersion || 21;
   const javaPromise = (requestedJava === 21 && javaReadyPromise)
     ? javaReadyPromise
@@ -721,16 +748,16 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
       }
     } catch {}
 
-    const isFabric = (opts.version || '').startsWith('fabric-loader-');
-    const mcVer    = isFabric ? opts.version.replace(/^fabric-loader-[\d.]+-/, '') : (opts.version || '1.21.4');
+    const { version, forge, mcPath, overridesExtra } = buildLoaderLaunchOptions(mcRoot, opts.version, opts.forgePath);
 
     mcProcess = launcher.launch({
       authorization: auth,
       root: mcRoot,
-      version: { number: mcVer, type: 'release', ...(isFabric ? { custom: opts.version } : {}) },
+      version,
+      ...(forge ? { forge, mcPath } : {}),
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
-      overrides: { maxSockets: 64, checkHash: false },
+      overrides: { maxSockets: 64, checkHash: false, ...overridesExtra },
     });
     launcher.on('data',     (d: string)  => gameWin?.webContents.send('mc-log',      d));
     launcher.on('progress', (e: any)     => gameWin?.webContents.send('mc-progress', e));
@@ -743,7 +770,7 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
 });
 
 // ── IPC: offline launch ───────────────────────────────────────────────────────
-ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: number; username: string; javaVersion?: number; vsync?: boolean; shaderpack?: string }) => {
+ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: number; username: string; javaVersion?: number; vsync?: boolean; shaderpack?: string; forgePath?: string }) => {
   const requestedJava = opts.javaVersion || 21;
   try {
     const mcRoot   = path.join(app.getPath('userData'), '.minecraft');
@@ -786,16 +813,16 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
       }
     } catch {}
 
-    const isFabricOff = (opts.version || '').startsWith('fabric-loader-');
-    const mcVerOff    = isFabricOff ? opts.version.replace(/^fabric-loader-[\d.]+-/, '') : (opts.version || '1.21.4');
+    const { version, forge, mcPath, overridesExtra } = buildLoaderLaunchOptions(mcRoot, opts.version, opts.forgePath);
 
     mcProcess = launcher.launch({
       authorization: { access_token: 'offline', client_token: 'offline', uuid, name: opts.username, user_properties: '{}', meta: { type: 'mojang', demo: false } },
       root: mcRoot,
-      version: { number: mcVerOff, type: 'release', ...(isFabricOff ? { custom: opts.version } : {}) },
+      version,
+      ...(forge ? { forge, mcPath } : {}),
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
-      overrides: { maxSockets: 64, checkHash: false },
+      overrides: { maxSockets: 64, checkHash: false, ...overridesExtra },
     });
     launcher.on('data',     (d: string) => gameWin?.webContents.send('mc-log',      d));
     launcher.on('progress', (e: any)    => gameWin?.webContents.send('mc-progress', e));
@@ -1550,6 +1577,67 @@ ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
     }
 
     return { ok: true, fabricVersion: fabricId, loaderVersion: loaderVer };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// ── Forge / NeoForge install ───────────────────────────────────────────────────
+// minecraft-launcher-core has built-in modern-Forge support: give it the path
+// to the official installer jar via `forge`, and it downloads a small
+// "ForgeWrapper" helper and does the whole install at launch time. NeoForge
+// kept the same installer format specifically for third-party launcher
+// compatibility, so the same mechanism works for it too. We just need to
+// resolve the right version and download its installer jar.
+ipcMain.handle('mc-install-forge', async (_e, opts: { mcVersion: string }) => {
+  try {
+    const promotions = await fetchJson('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json') as any;
+    const promos = promotions.promos ?? {};
+    const forgeVer = promos[`${opts.mcVersion}-recommended`] || promos[`${opts.mcVersion}-latest`];
+    if (!forgeVer) throw new Error(`No Forge build available for Minecraft ${opts.mcVersion}`);
+    const fullVer = `${opts.mcVersion}-${forgeVer}`;
+
+    const tmpDir = path.join(app.getPath('temp'), 'voxel-loader-installers');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const installerPath = path.join(tmpDir, `forge-${fullVer}-installer.jar`);
+    if (!fs.existsSync(installerPath)) {
+      gameWin?.webContents.send('mc-log', `[Forge] Downloading installer for ${fullVer}…`);
+      const installerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${fullVer}/forge-${fullVer}-installer.jar`;
+      await downloadFileTo(installerUrl, installerPath, (p) => gameWin?.webContents.send('mc-progress', { type: 'forge-download', percent: p }));
+    }
+
+    return { ok: true, installerPath, mcVersion: opts.mcVersion, loaderVersion: forgeVer };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mc-install-neoforge', async (_e, opts: { mcVersion: string }) => {
+  try {
+    // NeoForge versions are numbered like "<minor>.<patch>.<build>" (e.g. 1.21.1 → 21.1.x)
+    const m = opts.mcVersion.match(/^1\.(\d+)(?:\.(\d+))?$/);
+    if (!m) throw new Error(`NeoForge doesn't support Minecraft ${opts.mcVersion}`);
+    const prefix = `${m[1]}.${m[2] || '0'}.`;
+
+    const xml = await new Promise<string>((resolve, reject) => {
+      https.get('https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml', res => {
+        let data = ''; res.on('data', c => data += c); res.on('end', () => resolve(data)); res.on('error', reject);
+      }).on('error', reject);
+    });
+    const versions = [...xml.matchAll(/<version>([^<]+)<\/version>/g)].map(m2 => m2[1]).filter(v => v.startsWith(prefix));
+    if (!versions.length) throw new Error(`No NeoForge build available for Minecraft ${opts.mcVersion}`);
+    const neoVer = versions[versions.length - 1];
+
+    const tmpDir = path.join(app.getPath('temp'), 'voxel-loader-installers');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const installerPath = path.join(tmpDir, `neoforge-${neoVer}-installer.jar`);
+    if (!fs.existsSync(installerPath)) {
+      gameWin?.webContents.send('mc-log', `[NeoForge] Downloading installer for ${neoVer}…`);
+      const installerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoVer}/neoforge-${neoVer}-installer.jar`;
+      await downloadFileTo(installerUrl, installerPath, (p) => gameWin?.webContents.send('mc-progress', { type: 'neoforge-download', percent: p }));
+    }
+
+    return { ok: true, installerPath, mcVersion: opts.mcVersion, loaderVersion: neoVer };
   } catch (err: any) {
     return { ok: false, error: err.message };
   }
