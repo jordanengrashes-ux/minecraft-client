@@ -192,7 +192,12 @@ javaVersionSel.addEventListener('change', () => {
   localStorage.setItem('voxel_java_version', javaVersionSel.value);
   populateVersions();
 });
-mcVersion.addEventListener('change', () => localStorage.setItem('voxel_mc_version', mcVersion.value));
+mcVersion.addEventListener('change', () => {
+  localStorage.setItem('voxel_mc_version', mcVersion.value);
+  // Re-filter mod browse results for the newly selected version
+  if (modsPanelEl.style.display !== 'none') searchModrinth(modsSearch.value.trim());
+  if (cfPanelEl.style.display   !== 'none') searchCurseForge((document.getElementById('cf-search') as HTMLInputElement)?.value.trim() || '');
+});
 
 // ── Memory slider ──────────────────────────────────────────────────────────────
 mcMemory.addEventListener('input', () => {
@@ -1011,7 +1016,7 @@ tpSearch.addEventListener('input', () => {
 });
 
 // ── Installed mods (persisted) ────────────────────────────────────────────────
-interface InstalledMod { filename: string; name: string; mcVersion?: string; disabled?: boolean; cfId?: number; fileId?: number; }
+interface InstalledMod { filename: string; name: string; mcVersion?: string; disabled?: boolean; cfId?: number; fileId?: number; modrinthVersionId?: string; }
 function loadInstalledMods(): Record<string, InstalledMod> {
   try { return JSON.parse(localStorage.getItem('voxel_installed_mods') || '{}'); } catch { return {}; }
 }
@@ -1034,28 +1039,83 @@ function showModUpdateStatus(msg: string, autoHide = true) {
 // compatible file for that version get disabled (with an on-screen notice)
 // instead of silently failing at launch; outdated-but-compatible mods are
 // re-downloaded in place.
+interface ModUpdateResult {
+  compatible: boolean;
+  checkFailed?: boolean;
+  upToDate?: boolean;
+  filename?: string;
+  url?: string;
+  versionKey?: string | number; // fileId (CurseForge) or version id (Modrinth)
+}
+
+async function runBatched<T, R>(items: T[], batchSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    out.push(...await Promise.all(items.slice(i, i + batchSize).map(fn)));
+  }
+  return out;
+}
+
+async function checkModrinthUpdate(projectId: string, mod: InstalledMod, mcVer: string): Promise<ModUpdateResult> {
+  try {
+    const params = new URLSearchParams({ game_versions: `["${mcVer}"]`, loaders: '["fabric"]', limit: '5' });
+    const res = await fetch(`https://api.modrinth.com/v2/project/${projectId}/version?${params}`);
+    if (res.status === 429) return { compatible: false, checkFailed: true };
+    if (!res.ok) return { compatible: false, checkFailed: true };
+    const versions: any[] = await res.json();
+    if (!Array.isArray(versions) || !versions.length) return { compatible: false };
+    const latest = versions[0];
+    const file = latest.files.find((f: any) => f.primary) ?? latest.files[0];
+    if (!file) return { compatible: false };
+    return {
+      compatible: true,
+      upToDate: latest.id === mod.modrinthVersionId,
+      filename: file.filename, url: file.url, versionKey: latest.id,
+    };
+  } catch {
+    return { compatible: false, checkFailed: true };
+  }
+}
+
 async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
   const cfApi = (window as any).curseforge;
-  if (!cfApi?.checkUpdates || !mc) return;
+  if (!mc) return;
 
   const installed = loadInstalledMods();
-  const entries = Object.entries(installed).filter(([slug, m]) => slug.startsWith('cf_') && m.cfId != null);
-  if (entries.length === 0) {
-    if (!silent) showModUpdateStatus('No CurseForge mods installed.');
+  const allEntries = Object.entries(installed);
+  const cfEntries       = allEntries.filter(([slug, m]) => slug.startsWith('cf_') && m.cfId != null);
+  const modrinthEntries = allEntries.filter(([slug, m]) => !slug.startsWith('cf_') && m.cfId == null);
+
+  if (cfEntries.length === 0 && modrinthEntries.length === 0) {
+    if (!silent) showModUpdateStatus('No mods installed.');
     return;
   }
 
   if (!silent) showModUpdateStatus('Checking for mod updates…', false);
-  const res = await cfApi.checkUpdates(entries.map(([, m]) => ({ modId: m.cfId, fileId: m.fileId ?? 0 })), mcVer);
-  if (!res?.ok) {
-    showModUpdateStatus(`Couldn't check for updates: ${res?.error || 'unknown error'}`);
-    return;
+
+  const results = new Map<string, ModUpdateResult>();
+
+  if (cfEntries.length && cfApi?.checkUpdates) {
+    const res = await cfApi.checkUpdates(cfEntries.map(([, m]) => ({ modId: m.cfId, fileId: m.fileId ?? 0 })), mcVer);
+    if (res?.ok) {
+      for (const [slug, mod] of cfEntries) {
+        const r = res.results.find((x: any) => x.modId === mod.cfId);
+        if (r) results.set(slug, { compatible: r.compatible, checkFailed: r.checkFailed, upToDate: r.upToDate, filename: r.filename, url: r.url, versionKey: r.fileId });
+      }
+    } else if (!silent) {
+      showModUpdateStatus(`Couldn't check CurseForge mods: ${res?.error || 'unknown error'}`, false);
+    }
+  }
+
+  if (modrinthEntries.length) {
+    const modrinthResults = await runBatched(modrinthEntries, 5, async ([slug, mod]) => [slug, await checkModrinthUpdate(slug, mod, mcVer)] as const);
+    for (const [slug, r] of modrinthResults) results.set(slug, r);
   }
 
   let updated = 0, disabled = 0, upToDate = 0, checkFailed = 0;
   const disabledNames: string[] = [];
-  for (const [slug, mod] of entries) {
-    const result = res.results.find((r: any) => r.modId === mod.cfId);
+  for (const [slug, mod] of allEntries) {
+    const result = results.get(slug);
     if (!result) continue;
 
     // A failed/rate-limited check is NOT the same as confirmed incompatibility
@@ -1085,12 +1145,16 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
     if (result.upToDate) { upToDate++; continue; }
 
     try {
-      const installRes = await mc.installMod({ url: result.url, filename: result.filename });
+      const installRes = await mc.installMod({ url: result.url!, filename: result.filename! });
       if (!installRes.ok) throw new Error(installRes.error);
       if (result.filename !== mod.filename) {
         try { await mc.removeMod({ filename: mod.filename }); } catch {}
       }
-      installed[slug] = { ...mod, filename: result.filename, fileId: result.fileId };
+      const isCf = slug.startsWith('cf_');
+      installed[slug] = {
+        ...mod, filename: result.filename!,
+        ...(isCf ? { fileId: result.versionKey as number } : { modrinthVersionId: result.versionKey as string }),
+      };
       updated++;
     } catch {
       // Leave the existing file in place if the re-download fails
@@ -1195,6 +1259,34 @@ function fmtDownloads(n: number): string {
   return String(n);
 }
 
+// Populates each browse-list card's build-version badge without hammering
+// the API — cards queue themselves, and the queue drains in small batches.
+const modBuildVerQueue: Array<{ projectId: string; el: HTMLElement }> = [];
+let modBuildVerFlushTimer: ReturnType<typeof setTimeout> | null = null;
+function queueModBuildVersion(projectId: string, el: HTMLElement) {
+  modBuildVerQueue.push({ projectId, el });
+  if (modBuildVerFlushTimer) return;
+  modBuildVerFlushTimer = setTimeout(flushModBuildVerQueue, 80);
+}
+async function flushModBuildVerQueue() {
+  modBuildVerFlushTimer = null;
+  const batch = modBuildVerQueue.splice(0, modBuildVerQueue.length);
+  const ver = mcVersion.value || '26.1.2';
+  await runBatched(batch, 5, async ({ projectId, el }) => {
+    try {
+      const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '5' });
+      const res = await fetch(`https://api.modrinth.com/v2/project/${projectId}/version?${params}`);
+      const versions: any[] = await res.json();
+      if (Array.isArray(versions) && versions.length && versions[0].version_number) {
+        el.textContent = versions[0].version_number;
+        el.style.color = '#f5a623';
+      } else {
+        el.textContent = '';
+      }
+    } catch { el.textContent = ''; }
+  });
+}
+
 function buildModCard(mod: ModrinthHit): HTMLElement {
   const on   = enabledMods.has(mod.project_id);
   const card = document.createElement('div');
@@ -1208,7 +1300,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
     const cls = ['optimization','performance'].includes(cat) ? 'perf'
               : ['shader','decoration','magic'].includes(cat) ? 'visual' : 'util';
     return `<span class="mod-tag ${cls}">${cat}</span>`;
-  }).join('') + `<span class="mod-tag" style="margin-left:auto">⬇ ${fmtDownloads(mod.downloads)}</span>`;
+  }).join('') + `<span class="mod-tag mod-build-ver" style="margin-left:auto;color:#666666;">…</span><span class="mod-tag">⬇ ${fmtDownloads(mod.downloads)}</span>`;
 
   card.innerHTML = `
     ${iconHtml}
@@ -1227,6 +1319,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
 
   const input   = card.querySelector('input') as HTMLInputElement;
   const statusEl = card.querySelector('.mod-version') as HTMLElement;
+  const buildVerEl = card.querySelector('.mod-build-ver') as HTMLElement;
 
   input.addEventListener('change', async e => {
     const checked = (e.target as HTMLInputElement).checked;
@@ -1266,7 +1359,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
             if (depRes.ok) installedNow[dep.project_id] = { filename: df.filename, name: dep.project_id, mcVersion: ver };
           } catch {}
         }
-        installedNow[mod.project_id] = { filename: file.filename, name: mod.title, mcVersion: ver } as any;
+        installedNow[mod.project_id] = { filename: file.filename, name: mod.title, mcVersion: ver, modrinthVersionId: chosenVer.id };
         saveInstalledMods(installedNow);
         enabledMods.add(mod.project_id);
         card.className = 'mod-card enabled';
@@ -1293,6 +1386,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
   });
 
   if (on) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+  queueModBuildVersion(mod.project_id, buildVerEl);
   return card;
 }
 
@@ -1433,9 +1527,10 @@ async function searchModrinth(query: string) {
   modsLoading.style.display = 'flex';
   modsList.innerHTML = '';
   try {
+    const ver = mcVersion.value || '26.1.2';
     const facets = modsTabType === 'mod'
-      ? JSON.stringify([['project_type:mod'], ['client_side:required', 'client_side:optional']])
-      : JSON.stringify([['project_type:modpack']]);
+      ? JSON.stringify([['project_type:mod'], ['client_side:required', 'client_side:optional'], [`versions:${ver}`]])
+      : JSON.stringify([['project_type:modpack'], [`versions:${ver}`]]);
     const params = new URLSearchParams({
       query, facets, limit: '50',
       index: query ? 'relevance' : 'downloads',
@@ -1444,7 +1539,7 @@ async function searchModrinth(query: string) {
     const data = await res.json() as { hits: ModrinthHit[] };
     modsLoading.style.display = 'none';
     if (!data.hits.length) {
-      modsList.innerHTML = `<p style="color:#484f58;padding:20px;text-align:center">No ${modsTabType === 'modpack' ? 'modpacks' : 'mods'} found</p>`;
+      modsList.innerHTML = `<p style="color:#484f58;padding:20px;text-align:center">No ${modsTabType === 'modpack' ? 'modpacks' : 'mods'} found for Minecraft ${ver}</p>`;
       return;
     }
     const frag = document.createDocumentFragment();
@@ -1936,6 +2031,32 @@ function initCurseForge() {
   });
 }
 
+// Same batched-badge pattern as Modrinth's queueModBuildVersion, but peeking
+// CurseForge's file list (a plain GET — doesn't install anything) to show
+// the actual matched build's filename for the selected MC version.
+const cfBuildVerQueue: Array<{ modId: number; mcVersion: string; el: HTMLElement }> = [];
+let cfBuildVerFlushTimer: ReturnType<typeof setTimeout> | null = null;
+function queueCfBuildVersion(modId: number, mcVersion: string, el: HTMLElement) {
+  cfBuildVerQueue.push({ modId, mcVersion, el });
+  if (cfBuildVerFlushTimer) return;
+  cfBuildVerFlushTimer = setTimeout(flushCfBuildVerQueue, 80);
+}
+async function flushCfBuildVerQueue() {
+  cfBuildVerFlushTimer = null;
+  const batch = cfBuildVerQueue.splice(0, cfBuildVerQueue.length);
+  await runBatched(batch, 5, async ({ modId, mcVersion, el }) => {
+    try {
+      const res = await cf.getDownload({ modId, mcVersion });
+      if (res?.ok && res.filename) {
+        el.textContent = res.filename.replace(/\.jar$/i, '');
+        el.style.color = '#f5a623';
+      } else {
+        el.textContent = '';
+      }
+    } catch { el.textContent = ''; }
+  });
+}
+
 async function searchCurseForge(query: string) {
   const list    = document.getElementById('cf-list')!;
   const loading = document.getElementById('cf-loading')!;
@@ -1977,7 +2098,8 @@ async function searchCurseForge(query: string) {
         <div class="mod-desc">${mod.summary}</div>
         <div class="mod-tags">
           <span class="mod-tag" style="background:rgba(241,100,54,0.1);color:#f16436;border-color:rgba(241,100,54,0.3);">CurseForge</span>
-          <span class="mod-tag" style="margin-left:auto">⬇ ${dlCount}</span>
+          <span class="mod-tag cf-build-ver" style="margin-left:auto;color:#666666;">…</span>
+          <span class="mod-tag">⬇ ${dlCount}</span>
         </div>
       </div>
       <div class="mod-right">
@@ -1990,7 +2112,9 @@ async function searchCurseForge(query: string) {
 
     const input   = card.querySelector('input') as HTMLInputElement;
     const statusEl = card.querySelector('.mod-version') as HTMLElement;
+    const cfBuildVerEl = card.querySelector('.cf-build-ver') as HTMLElement;
     if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+    queueCfBuildVersion(mod.id, ver, cfBuildVerEl);
 
     input.addEventListener('change', async e => {
       const checked = (e.target as HTMLInputElement).checked;
