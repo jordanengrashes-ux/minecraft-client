@@ -206,6 +206,7 @@ mcVersion.addEventListener('change', () => {
   // Re-check mod/modpack compatibility immediately against the newly
   // selected version, not just whenever Play happens to get clicked next.
   if (modAutoUpdateToggle.checked && !running) runModUpdateCheck(mcVersion.value, true);
+  updateModsBadge();
 });
 
 // ── Memory slider ──────────────────────────────────────────────────────────────
@@ -294,12 +295,17 @@ offlineToggle.addEventListener('change', () => applyOfflineState(offlineToggle.c
 
 // ── Mods badge (shows installed mod count near the Fabric toggle) ─────────────
 const modsBadge = document.getElementById('mods-badge') as HTMLElement;
+const modsToggleAllBtn = document.getElementById('mods-toggle-all-btn') as HTMLButtonElement;
+
+function modsForCurrentVersion(): [string, InstalledMod][] {
+  return Object.entries(loadInstalledMods()).filter(([, m]) => m.mcVersion === mcVersion.value);
+}
 
 function updateModsBadge() {
   const modCount = Object.keys(loadInstalledMods()).length;
   const packModCount = Object.values(loadInstalledModpacks()).reduce((sum, p) => sum + p.filenames.length, 0);
   const count = modCount + packModCount;
-  if (count === 0) { modsBadge.style.display = 'none'; return; }
+  if (count === 0) { modsBadge.style.display = 'none'; modsToggleAllBtn.style.display = 'none'; return; }
   modsBadge.style.display    = 'inline-block';
   const loaderOn = modLoaderSelect.value !== 'none';
   modsBadge.textContent     = loaderOn
@@ -308,7 +314,28 @@ function updateModsBadge() {
   modsBadge.style.color      = loaderOn ? '#f5a623'                  : '#f6c356';
   modsBadge.style.background = loaderOn ? 'rgba(245,166,35,0.10)'     : 'rgba(246,195,86,0.10)';
   modsBadge.style.borderColor= loaderOn ? 'rgba(245,166,35,0.30)'     : 'rgba(246,195,86,0.35)';
+
+  const currentVerMods = modsForCurrentVersion();
+  if (!currentVerMods.length) { modsToggleAllBtn.style.display = 'none'; return; }
+  modsToggleAllBtn.style.display = 'inline-block';
+  const anyEnabled = currentVerMods.some(([, m]) => !m.disabled);
+  modsToggleAllBtn.textContent = anyEnabled ? 'Disable All' : 'Enable All';
 }
+
+modsToggleAllBtn.addEventListener('click', async () => {
+  modsToggleAllBtn.disabled = true;
+  const mods = modsForCurrentVersion();
+  const shouldEnable = !mods.some(([, m]) => !m.disabled); // currently all disabled -> enable all
+  const installed = loadInstalledMods();
+  for (const [slug, m] of mods) {
+    try { await mc?.toggleMod({ filename: m.filename, enable: shouldEnable, mcVersion: m.mcVersion || mcVersion.value }); } catch {}
+    installed[slug] = { ...m, disabled: !shouldEnable };
+    if (shouldEnable) enabledMods.add(slug); else enabledMods.delete(slug);
+  }
+  saveInstalledMods(installed);
+  updateModsBadge();
+  modsToggleAllBtn.disabled = false;
+});
 
 modLoaderSelect.addEventListener('change', () => {
   localStorage.setItem('voxel_modloader', modLoaderSelect.value);
@@ -352,11 +379,23 @@ shaderpackSelect?.addEventListener('change', () => {
 async function syncModsWithDisk() {
   if (!mc?.listMods) return;
   try {
-    const diskFiles: string[] = await mc.listMods();
     const installed = loadInstalledMods();
+    // Mods live in per-MC-version folders now — check each mod against its
+    // own recorded version's disk listing, not one shared listing.
+    const versionGroups = new Map<string, string[]>();
+    for (const mod of Object.values(installed)) {
+      const v = mod.mcVersion || '';
+      if (!versionGroups.has(v)) versionGroups.set(v, []);
+    }
+    const diskByVersion = new Map<string, string[]>();
+    for (const v of versionGroups.keys()) {
+      diskByVersion.set(v, await mc.listMods({ mcVersion: v }));
+    }
     let changed = false;
     for (const slug of Object.keys(installed)) {
-      if (!diskFiles.includes(installed[slug].filename)) {
+      const mod = installed[slug];
+      const diskFiles = diskByVersion.get(mod.mcVersion || '') ?? [];
+      if (!diskFiles.includes(mod.filename)) {
         delete installed[slug];
         enabledMods.delete(slug);
         changed = true;
@@ -1191,7 +1230,7 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
     if (result.checkFailed) { checkFailed++; continue; }
 
     if (!result.compatible) {
-      try { await mc.removeMod({ filename: mod.filename }); } catch {}
+      try { await mc.removeMod({ filename: mod.filename, mcVersion: mod.mcVersion || mcVer }); } catch {}
       delete installed[slug];
       enabledMods.delete(slug);
       removedCount++;
@@ -1203,7 +1242,7 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
     // it (covers both a genuine version change and mods that were wrongly
     // disabled by a past bug in this check).
     if (mod.disabled) {
-      try { await mc.toggleMod({ filename: mod.filename, enable: true }); } catch {}
+      try { await mc.toggleMod({ filename: mod.filename, enable: true, mcVersion: mod.mcVersion || mcVer }); } catch {}
       installed[slug] = { ...mod, disabled: false };
       enabledMods.add(slug);
     }
@@ -1211,10 +1250,10 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
     if (result.upToDate) { upToDate++; continue; }
 
     try {
-      const installRes = await mc.installMod({ url: result.url!, filename: result.filename! });
+      const installRes = await mc.installMod({ url: result.url!, filename: result.filename!, mcVersion: mcVer });
       if (!installRes.ok) throw new Error(installRes.error);
       if (result.filename !== mod.filename) {
-        try { await mc.removeMod({ filename: mod.filename }); } catch {}
+        try { await mc.removeMod({ filename: mod.filename, mcVersion: mod.mcVersion || mcVer }); } catch {}
       }
       const isCf = slug.startsWith('cf_');
       installed[slug] = {
@@ -1251,7 +1290,7 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
       // to clean up, so skipping this leaves stale + new versions of the
       // same mod jars side by side (causes NoSuchMethodError-style crashes).
       for (const filename of pack.filenames) {
-        try { await mc.removeMod({ filename }); } catch {}
+        try { await mc.removeMod({ filename, mcVersion: pack.mcVersion }); } catch {}
       }
 
       const result = await mc.installModpack({ projectId });
@@ -1453,7 +1492,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
         const file = chosenVer.files.find((f: any) => f.primary) ?? chosenVer.files[0];
         if (!file) throw new Error('No download file found');
         statusEl.textContent = '⬇';
-        const res = await mc.installMod({ url: file.url, filename: file.filename });
+        const res = await mc.installMod({ url: file.url, filename: file.filename, mcVersion: ver });
         if (!res.ok) throw new Error(res.error);
         // Install required dependencies declared in the Modrinth version metadata
         const reqDeps = (chosenVer.dependencies || []).filter((d: any) => d.dependency_type === 'required' && d.project_id);
@@ -1468,7 +1507,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
             if (!Array.isArray(dvData) || !dvData.length) continue;
             const df = dvData[0].files.find((f: any) => f.primary) ?? dvData[0].files[0];
             if (!df) continue;
-            const depRes = await mc.installMod({ url: df.url, filename: df.filename });
+            const depRes = await mc.installMod({ url: df.url, filename: df.filename, mcVersion: ver });
             if (depRes.ok) installedNow[dep.project_id] = { filename: df.filename, name: dep.project_id, mcVersion: ver };
           } catch {}
         }
@@ -1488,7 +1527,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
     } else {
       const installed = loadInstalledMods();
       const info = installed[mod.project_id];
-      if (info && mc) await mc.removeMod({ filename: info.filename });
+      if (info && mc) await mc.removeMod({ filename: info.filename, mcVersion: info.mcVersion || mcVersion.value });
       delete installed[mod.project_id];
       saveInstalledMods(installed);
       enabledMods.delete(mod.project_id);
@@ -1541,6 +1580,15 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
     statusEl.style.color = '#f6c356';
     modpackProgressEl = statusEl;
     try {
+      // Clean up the previous version's files first — installModpack only
+      // adds files from the new .mrpack index, so skipping this leaves old
+      // + new mod jars side by side if the update targets a new MC version.
+      const existingPack = loadInstalledModpacks()[mod.project_id];
+      if (existingPack) {
+        for (const filename of existingPack.filenames) {
+          try { await mc.removeMod({ filename, mcVersion: existingPack.mcVersion }); } catch {}
+        }
+      }
       const result = await mc.installModpack({ projectId: mod.project_id });
       if (!result.ok) throw new Error(result.error);
       const updated = loadInstalledModpacks();
@@ -1572,7 +1620,7 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
         const existing = loadInstalledModpacks();
         for (const pack of Object.values(existing)) {
           for (const filename of pack.filenames) {
-            try { await mc.removeMod({ filename }); } catch {}
+            try { await mc.removeMod({ filename, mcVersion: pack.mcVersion }); } catch {}
           }
         }
         saveInstalledModpacks({});
@@ -1599,7 +1647,7 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
       const pack = updated[mod.project_id];
       if (pack) {
         for (const filename of pack.filenames) {
-          try { await mc.removeMod({ filename }); } catch {}
+          try { await mc.removeMod({ filename, mcVersion: pack.mcVersion }); } catch {}
         }
         delete updated[mod.project_id];
         saveInstalledModpacks(updated);
@@ -1792,7 +1840,7 @@ async function installOneMod(mod: PvpModDef, ver: string): Promise<void> {
   const chosen   = byVerNum ?? data[0];
   const file = chosen.files.find((f: any) => f.primary) ?? chosen.files[0];
   if (!file) throw new Error(`No download file for ${mod.name}`);
-  const res = await mc.installMod({ url: file.url, filename: file.filename });
+  const res = await mc.installMod({ url: file.url, filename: file.filename, mcVersion: ver });
   if (!res.ok) throw new Error(res.error);
   const installed = loadInstalledMods();
   (installed[mod.slug] as any) = { filename: file.filename, name: mod.name, mcVersion: ver };
@@ -1875,7 +1923,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
           const cMod = PVP_MOD_BY_SLUG.get(cSlug);
           if (cMod) {
             const cInstalled = loadInstalledMods();
-            if (cInstalled[cSlug]) await mc?.removeMod({ filename: cInstalled[cSlug].filename });
+            if (cInstalled[cSlug]) await mc?.removeMod({ filename: cInstalled[cSlug].filename, mcVersion: cInstalled[cSlug].mcVersion || mcVersion.value });
             const updated = loadInstalledMods(); delete updated[cSlug]; saveInstalledMods(updated);
             enabledMods.delete(cSlug);
           }
@@ -1918,7 +1966,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
     } else {
       const installed = loadInstalledMods();
       const info = installed[mod.slug];
-      if (info && mc) await mc.removeMod({ filename: info.filename });
+      if (info && mc) await mc.removeMod({ filename: info.filename, mcVersion: info.mcVersion || mcVersion.value });
       delete installed[mod.slug];
       saveInstalledMods(installed);
       enabledMods.delete(mod.slug);
@@ -1983,7 +2031,7 @@ async function reinstallAllMods(btn: HTMLElement) {
         if (!Array.isArray(data) || !data.length) continue;
         const f = data[0].files.find((fi: any) => fi.primary) ?? data[0].files[0];
         if (!f) continue;
-        const res = await mc.installMod({ url: f.url, filename: f.filename });
+        const res = await mc.installMod({ url: f.url, filename: f.filename, mcVersion: ver });
         if (!res.ok) continue;
         const cur = loadInstalledMods();
         cur[slug] = { filename: f.filename, name: (info as any).name || slug, mcVersion: ver };
@@ -2062,7 +2110,7 @@ function renderModProfiles() {
         const installed = loadInstalledMods();
         for (const slug of Array.from(enabledMods)) {
           if (!profile.slugs.includes(slug)) {
-            if (installed[slug]) await mc?.removeMod({ filename: installed[slug].filename });
+            if (installed[slug]) await mc?.removeMod({ filename: installed[slug].filename, mcVersion: installed[slug].mcVersion || mcVersion.value });
             const upd = loadInstalledMods(); delete upd[slug]; saveInstalledMods(upd);
             enabledMods.delete(slug);
           }
@@ -2238,7 +2286,7 @@ async function searchCurseForge(query: string) {
           const dlRes = await cf.getDownload({ modId: mod.id, mcVersion: ver });
           if (!dlRes.ok) throw new Error(dlRes.error);
           statusEl.textContent = '⬇';
-          const installRes = await mc.installMod({ url: dlRes.url, filename: dlRes.filename });
+          const installRes = await mc.installMod({ url: dlRes.url, filename: dlRes.filename, mcVersion: ver });
           if (!installRes.ok) throw new Error(installRes.error);
           const ins = loadInstalledMods();
           ins[`cf_${mod.id}`] = { filename: dlRes.filename, name: mod.name, mcVersion: ver, cfId: mod.id, fileId: dlRes.fileId };
@@ -2254,7 +2302,7 @@ async function searchCurseForge(query: string) {
       } else {
         const ins = loadInstalledMods();
         const info = ins[`cf_${mod.id}`];
-        if (info && mc) await mc.removeMod({ filename: info.filename });
+        if (info && mc) await mc.removeMod({ filename: info.filename, mcVersion: info.mcVersion || ver });
         delete ins[`cf_${mod.id}`];
         saveInstalledMods(ins);
         card.className = 'mod-card';
@@ -3201,7 +3249,7 @@ async function initCosmetics() {
     if (!cosm) return;
     installBtn.disabled = true;
     installBtn.textContent = 'Installing…';
-    const res = await cosm.installMod();
+    const res = await cosm.installMod({ mcVersion: mcVersion.value });
     if (res.ok) {
       installStatus.textContent = 'Installed! Launch with Fabric Loader to see capes.';
       installStatus.style.color = '#f5a623';

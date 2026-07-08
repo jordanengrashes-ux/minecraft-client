@@ -653,7 +653,16 @@ function buildLoaderLaunchOptions(mcRoot: string, version: string, forgePath?: s
   const isFabric = (version || '').startsWith('fabric-loader-');
   if (isFabric) {
     const mcVer = version.replace(/^fabric-loader-[\d.]+-/, '');
-    return { version: { number: mcVer, type: 'release' as const, custom: version } };
+    // Point Fabric at this version's own mods folder instead of the game
+    // directory's shared mods/ — vanilla Fabric has no per-version mod
+    // isolation otherwise, which is exactly how incompatible mods from a
+    // different version kept ending up on the classpath together.
+    const versionModsDir = modsDirFor(mcVer);
+    fs.mkdirSync(versionModsDir, { recursive: true });
+    return {
+      version: { number: mcVer, type: 'release' as const, custom: version },
+      customArgs: [`-Dfabric.modsFolder=${versionModsDir}`],
+    };
   }
   if (forgePath) {
     return {
@@ -717,9 +726,9 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
     setOptionsKey(mcRoot, 'enableVsync', opts.vsync !== false ? 'true' : 'false');
     applyShaderPack(mcRoot, opts.shaderpack || '');
 
-    // Auto-install cosmetics mod if bundled
+    // Auto-install cosmetics mod if bundled — into this version's own mods folder
     try {
-      const modsDir = path.join(mcRoot, 'mods');
+      const modsDir = modsDirFor((opts.version || '').replace(/^fabric-loader-[\d.]+-/, ''));
       const cosmeticsSrc = app.isPackaged
         ? path.join(process.resourcesPath, 'mods', 'voxel-cosmetics.jar')
         : path.join(__dirname, '../../resources/mods/voxel-cosmetics.jar');
@@ -748,13 +757,14 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
       }
     } catch {}
 
-    const { version, forge, mcPath, overridesExtra } = buildLoaderLaunchOptions(mcRoot, opts.version, opts.forgePath);
+    const { version, forge, mcPath, overridesExtra, customArgs } = buildLoaderLaunchOptions(mcRoot, opts.version, opts.forgePath);
 
     mcProcess = launcher.launch({
       authorization: auth,
       root: mcRoot,
       version,
       ...(forge ? { forge, mcPath } : {}),
+      ...(customArgs ? { customArgs } : {}),
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
       overrides: { maxSockets: 64, checkHash: false, ...overridesExtra },
@@ -813,13 +823,14 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
       }
     } catch {}
 
-    const { version, forge, mcPath, overridesExtra } = buildLoaderLaunchOptions(mcRoot, opts.version, opts.forgePath);
+    const { version, forge, mcPath, overridesExtra, customArgs } = buildLoaderLaunchOptions(mcRoot, opts.version, opts.forgePath);
 
     mcProcess = launcher.launch({
       authorization: { access_token: 'offline', client_token: 'offline', uuid, name: opts.username, user_properties: '{}', meta: { type: 'mojang', demo: false } },
       root: mcRoot,
       version,
       ...(forge ? { forge, mcPath } : {}),
+      ...(customArgs ? { customArgs } : {}),
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
       overrides: { maxSockets: 64, checkHash: false, ...overridesExtra },
@@ -868,10 +879,9 @@ ipcMain.handle('mc-get-uuid', async () => {
   return null;
 });
 
-ipcMain.handle('cosmetics-install-mod', async () => {
+ipcMain.handle('cosmetics-install-mod', async (_e, opts: { mcVersion: string }) => {
   try {
-    const mcRoot  = path.join(app.getPath('userData'), '.minecraft');
-    const modsDir = path.join(mcRoot, 'mods');
+    const modsDir = modsDirFor(opts.mcVersion);
     if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
     const src = app.isPackaged
       ? path.join(process.resourcesPath, 'mods', 'voxel-cosmetics.jar')
@@ -1414,9 +1424,20 @@ ipcMain.handle('server-open-folder', async (_e, version: string) => {
 });
 
 // ── IPC: mod install / remove ─────────────────────────────────────────────────
-ipcMain.handle('mc-install-mod', async (_e, opts: { url: string; filename: string }) => {
+// Each Minecraft version gets its own mods folder — vanilla Fabric has no
+// concept of per-version mod isolation in a single shared mods/ directory,
+// which is exactly why version-incompatible mods kept accumulating and
+// crashing launches. Fabric Loader's own fabric.modsFolder system property
+// (set at launch time, see buildLoaderLaunchOptions) points it at whichever
+// version-scoped folder matches what's actually being launched.
+function modsDirFor(mcVersion: string): string {
+  const safe = (mcVersion || 'unknown').replace(/[^a-zA-Z0-9._-]/g, '_');
+  return path.join(app.getPath('userData'), '.minecraft', 'mods-by-version', safe);
+}
+
+ipcMain.handle('mc-install-mod', async (_e, opts: { url: string; filename: string; mcVersion: string }) => {
   try {
-    const modsDir = path.join(app.getPath('userData'), '.minecraft', 'mods');
+    const modsDir = modsDirFor(opts.mcVersion);
     fs.mkdirSync(modsDir, { recursive: true });
     await downloadFileTo(opts.url, path.join(modsDir, opts.filename));
     return { ok: true };
@@ -1425,8 +1446,8 @@ ipcMain.handle('mc-install-mod', async (_e, opts: { url: string; filename: strin
   }
 });
 
-ipcMain.handle('mc-list-mods', async () => {
-  const modsDir = path.join(app.getPath('userData'), '.minecraft', 'mods');
+ipcMain.handle('mc-list-mods', async (_e, opts: { mcVersion: string }) => {
+  const modsDir = modsDirFor(opts.mcVersion);
   const disabledDir = path.join(modsDir, '.disabled');
   try {
     const active   = fs.existsSync(modsDir) ? fs.readdirSync(modsDir).filter((f: string) => f.endsWith('.jar')) : [];
@@ -1438,9 +1459,9 @@ ipcMain.handle('mc-list-mods', async () => {
   } catch { return []; }
 });
 
-ipcMain.handle('mc-remove-mod', async (_e, opts: { filename: string }) => {
+ipcMain.handle('mc-remove-mod', async (_e, opts: { filename: string; mcVersion: string }) => {
   try {
-    const modsDir = path.join(app.getPath('userData'), '.minecraft', 'mods');
+    const modsDir = modsDirFor(opts.mcVersion);
     const dest = path.join(modsDir, opts.filename);
     if (fs.existsSync(dest)) fs.unlinkSync(dest);
     const disabledDest = path.join(modsDir, '.disabled', opts.filename);
@@ -1451,9 +1472,9 @@ ipcMain.handle('mc-remove-mod', async (_e, opts: { filename: string }) => {
   }
 });
 
-ipcMain.handle('mc-toggle-mod', async (_e, opts: { filename: string; enable: boolean }) => {
+ipcMain.handle('mc-toggle-mod', async (_e, opts: { filename: string; enable: boolean; mcVersion: string }) => {
   try {
-    const modsDir     = path.join(app.getPath('userData'), '.minecraft', 'mods');
+    const modsDir     = modsDirFor(opts.mcVersion);
     const disabledDir = path.join(modsDir, '.disabled');
     if (!fs.existsSync(disabledDir)) fs.mkdirSync(disabledDir, { recursive: true });
     const src = opts.enable ? path.join(disabledDir, opts.filename) : path.join(modsDir, opts.filename);
@@ -1468,9 +1489,6 @@ ipcMain.handle('mc-toggle-mod', async (_e, opts: { filename: string; enable: boo
 ipcMain.handle('mc-install-modpack', async (_e: any, opts: { projectId: string }) => {
   const send = (data: object) => gameWin?.webContents.send('mc-modpack-progress', data);
   try {
-    const modsDir = path.join(app.getPath('userData'), '.minecraft', 'mods');
-    fs.mkdirSync(modsDir, { recursive: true });
-
     send({ phase: 'fetching' });
     const versions = await fetchJson(`https://api.modrinth.com/v2/project/${opts.projectId}/version?limit=5`);
     if (!Array.isArray(versions) || !versions.length) throw new Error('No versions found');
@@ -1490,6 +1508,9 @@ ipcMain.handle('mc-install-modpack', async (_e: any, opts: { projectId: string }
     const modFiles: any[] = (index.files || []).filter((f: any) =>
       Array.isArray(f.downloads) && f.downloads.length && typeof f.path === 'string' && f.path.startsWith('mods/')
     );
+    const packMcVersion = (index.dependencies?.minecraft ?? '') as string;
+    const modsDir = modsDirFor(packMcVersion);
+    fs.mkdirSync(modsDir, { recursive: true });
     const installed: string[] = [];
     for (let i = 0; i < modFiles.length; i++) {
       const f = modFiles[i];
@@ -1503,7 +1524,7 @@ ipcMain.handle('mc-install-modpack', async (_e: any, opts: { projectId: string }
     return {
       ok: true,
       filenames: installed,
-      mcVersion: (index.dependencies?.minecraft ?? '') as string,
+      mcVersion: packMcVersion,
       fabricVersion: (index.dependencies?.['fabric-loader'] ?? '') as string,
       versionId: versions[0].id as string,
     };

@@ -81,7 +81,7 @@ contextBridge.exposeInMainWorld('curseforge', {
 });
 
 contextBridge.exposeInMainWorld('cosmetics', {
-  installMod: () => ipcRenderer.invoke('cosmetics-install-mod'),
+  installMod: (opts: { mcVersion: string }) => ipcRenderer.invoke('cosmetics-install-mod', opts),
   getUuid:    () => ipcRenderer.invoke('mc-get-uuid'),
 });
 
@@ -101,10 +101,10 @@ contextBridge.exposeInMainWorld('mc', {
   installBedrockPack: (opts: { url: string; name: string }) => ipcRenderer.invoke('mc-install-bedrock-pack', opts),
   listBedrockPacks:   () => ipcRenderer.invoke('mc-list-bedrock-packs'),
   removeBedrockPack:  (opts: { packId: string; packType: string }) => ipcRenderer.invoke('mc-remove-bedrock-pack', opts),
-  installMod:      (opts: { url: string; filename: string })  => ipcRenderer.invoke('mc-install-mod',  opts),
-  removeMod:       (opts: { filename: string })               => ipcRenderer.invoke('mc-remove-mod',   opts),
-  toggleMod:       (opts: { filename: string; enable: boolean }) => ipcRenderer.invoke('mc-toggle-mod', opts),
-  listMods:        ()                                         => ipcRenderer.invoke('mc-list-mods'),
+  installMod:      (opts: { url: string; filename: string; mcVersion: string })  => ipcRenderer.invoke('mc-install-mod',  opts),
+  removeMod:       (opts: { filename: string; mcVersion: string })               => ipcRenderer.invoke('mc-remove-mod',   opts),
+  toggleMod:       (opts: { filename: string; enable: boolean; mcVersion: string }) => ipcRenderer.invoke('mc-toggle-mod', opts),
+  listMods:        (opts: { mcVersion: string })               => ipcRenderer.invoke('mc-list-mods', opts),
   installBg:             (opts: { images: string[] })               => ipcRenderer.invoke('mc-install-bg',  opts),
   listScreenshots:       () => ipcRenderer.invoke('mc-list-screenshots'),
   openScreenshot:        (p: string) => ipcRenderer.invoke('mc-open-screenshot', p),
