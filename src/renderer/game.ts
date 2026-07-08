@@ -203,6 +203,9 @@ mcVersion.addEventListener('change', () => {
   // Re-filter mod browse results for the newly selected version
   if (modsPanelEl.style.display !== 'none') searchModrinth(modsSearch.value.trim());
   if (cfPanelEl.style.display   !== 'none') searchCurseForge((document.getElementById('cf-search') as HTMLInputElement)?.value.trim() || '');
+  // Re-check mod/modpack compatibility immediately against the newly
+  // selected version, not just whenever Play happens to get clicked next.
+  if (modAutoUpdateToggle.checked && !running) runModUpdateCheck(mcVersion.value, true);
 });
 
 // ── Memory slider ──────────────────────────────────────────────────────────────
@@ -1224,31 +1227,20 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
   saveInstalledMods(installed);
   updateModsBadge();
 
-  // Keep the launcher's version selector in sync with whatever a modpack
-  // actually requires — a mismatch here means Fabric will refuse to start
-  // even though nothing looks wrong from the launcher's side.
-  function syncVersionToPack(requiredVersion: string) {
-    if (!requiredVersion || requiredVersion === mcVersion.value) return;
-    const hasOption = Array.from(mcVersion.options).some(o => o.value === requiredVersion);
-    if (hasOption) {
-      mcVersion.value = requiredVersion;
-      localStorage.setItem('voxel_mc_version', requiredVersion);
-    }
-  }
-
   // Modpacks: check the installed pack (usually just one — installing a new
-  // one already removes the previous) for a newer Modrinth release.
+  // one already removes the previous) for a newer Modrinth release. The
+  // launcher's selected version is the user's explicit choice and is never
+  // changed automatically — a modpack update is only applied if its game
+  // version actually matches what's currently selected; otherwise it's
+  // skipped so the user's chosen version/mods stay intact.
   let modpackUpdated = false;
   const packs = loadInstalledModpacks();
   for (const [projectId, pack] of Object.entries(packs)) {
-    // Fix up any pre-existing mismatch even if no update is available —
-    // covers packs left in this state by a past bug, not just fresh updates.
-    syncVersionToPack(pack.mcVersion);
     try {
-      const res = await fetch(`https://api.modrinth.com/v2/project/${projectId}/version?limit=5`);
+      const res = await fetch(`https://api.modrinth.com/v2/project/${projectId}/version?game_versions=["${mcVer}"]&limit=5`);
       if (!res.ok) continue;
       const versions: any[] = await res.json();
-      if (!Array.isArray(versions) || !versions.length) continue;
+      if (!Array.isArray(versions) || !versions.length) continue; // no release for the selected version — leave as-is
       if (versions[0].id === pack.versionId) continue;
 
       // Remove the previous pack's files first — installModpack only adds
@@ -1263,7 +1255,6 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
       if (!result.ok) continue;
       packs[projectId] = { projectId, title: pack.title, mcVersion: result.mcVersion, filenames: result.filenames, versionId: result.versionId };
       modpackUpdated = true;
-      syncVersionToPack(result.mcVersion);
     } catch {
       // Leave the modpack as-is if the check/update fails
     }
@@ -1302,6 +1293,13 @@ modAutoUpdateToggle.addEventListener('change', () => {
   const autoUpdateRaw = localStorage.getItem('voxel_mod_autoupdate');
   modAutoUpdateToggle.checked = autoUpdateRaw === null ? true : autoUpdateRaw === 'true';
 }
+
+// Keep checking in the background the whole time the app is open — not just
+// once when Play happens to get clicked. Skipped while a game is actually
+// running so it doesn't compete for network/disk with an active launch.
+setInterval(() => {
+  if (modAutoUpdateToggle.checked && !running) runModUpdateCheck(mcVersion.value, true);
+}, 5 * 60 * 1000);
 
 // ── Installed modpacks (persisted) ───────────────────────────────────────────
 interface InstalledModpack { projectId: string; title: string; mcVersion: string; filenames: string[]; versionId?: string }
