@@ -1675,6 +1675,24 @@ ipcMain.handle('mc-install-bg', async (_e, opts: { images: string[] }) => {
 });
 
 // ── IPC: Fabric loader install ────────────────────────────────────────────────
+// A profile from before the library-dedup fix can have the same artifact
+// (e.g. ASM) listed at two different versions, which crashes at launch with
+// "duplicate ASM classes found on classpath" — such a profile must not be
+// treated as a valid cached install, or it'll never get regenerated.
+function isValidFabricProfile(profilePath: string): boolean {
+  if (!fs.existsSync(profilePath)) return false;
+  try {
+    const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+    if (!profile.downloads) return false;
+    const seen = new Set<string>();
+    for (const lib of profile.libraries ?? []) {
+      const key = typeof lib?.name === 'string' ? lib.name.split(':').slice(0, 2).join(':') : null;
+      if (key) { if (seen.has(key)) return false; seen.add(key); }
+    }
+    return true;
+  } catch { return false; }
+}
+
 ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
   try {
     const mcRoot = path.join(app.getPath('userData'), '.minecraft');
@@ -1685,12 +1703,9 @@ ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
     // change, adding real latency before the JVM could even start.
     const versionsDir = path.join(mcRoot, 'versions');
     const existingId = fs.existsSync(versionsDir)
-      ? fs.readdirSync(versionsDir).find(d => {
-          if (!d.startsWith('fabric-loader-') || !d.endsWith(`-${opts.mcVersion}`)) return false;
-          const p = path.join(versionsDir, d, `${d}.json`);
-          if (!fs.existsSync(p)) return false;
-          try { return !!JSON.parse(fs.readFileSync(p, 'utf8')).downloads; } catch { return false; }
-        })
+      ? fs.readdirSync(versionsDir).find(d =>
+          d.startsWith('fabric-loader-') && d.endsWith(`-${opts.mcVersion}`) &&
+          isValidFabricProfile(path.join(versionsDir, d, `${d}.json`)))
       : undefined;
     if (existingId) {
       gameWin?.webContents.send('mc-log', `[Fabric] ${existingId} already installed`);
@@ -1707,9 +1722,9 @@ ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
     const versionDir = path.join(mcRoot, 'versions', fabricId);
     const profilePath = path.join(versionDir, `${fabricId}.json`);
 
-    // Always reinstall if the saved profile is missing the merged vanilla fields
-    const needsInstall = !fs.existsSync(profilePath) ||
-      !JSON.parse(fs.readFileSync(profilePath, 'utf8')).downloads;
+    // Always reinstall if the saved profile is missing the merged vanilla
+    // fields or has a duplicate-artifact conflict from before the dedup fix.
+    const needsInstall = !isValidFabricProfile(profilePath);
 
     if (needsInstall) {
       gameWin?.webContents.send('mc-log', `[Fabric] Installing ${fabricId}…`);
@@ -1725,12 +1740,27 @@ ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
       if (!entry) throw new Error(`Vanilla ${opts.mcVersion} not in Mojang manifest`);
       const vanilla = await fetchJson(entry.url) as any;
 
-      // Merge: vanilla base + Fabric mainClass + combined libraries + combined arguments
+      // Vanilla and Fabric can both declare the same library at different
+      // versions (e.g. vanilla ships an older ASM than Fabric Loader needs)
+      // — a plain concatenation puts both jars on the classpath at once,
+      // which crashes with "duplicate ASM classes found on classpath".
+      // Dedupe by groupId:artifactId, keeping Fabric's version on conflict
+      // since it's appended after vanilla's and Fabric needs its own.
+      function dedupeLibraries(libs: any[]): any[] {
+        const byArtifact = new Map<string, any>();
+        for (const lib of libs) {
+          const key = typeof lib?.name === 'string' ? lib.name.split(':').slice(0, 2).join(':') : lib?.name;
+          byArtifact.set(key, lib);
+        }
+        return Array.from(byArtifact.values());
+      }
+
+      // Merge: vanilla base + Fabric mainClass + deduped libraries + combined arguments
       const merged = {
         ...vanilla,
         id: fabricId,
         mainClass: fabricProfile.mainClass,
-        libraries: [...(vanilla.libraries ?? []), ...(fabricProfile.libraries ?? [])],
+        libraries: dedupeLibraries([...(vanilla.libraries ?? []), ...(fabricProfile.libraries ?? [])]),
         arguments: {
           game: [...(vanilla.arguments?.game ?? []), ...(fabricProfile.arguments?.game ?? [])],
           jvm:  [...(vanilla.arguments?.jvm  ?? []), ...(fabricProfile.arguments?.jvm  ?? [])],
