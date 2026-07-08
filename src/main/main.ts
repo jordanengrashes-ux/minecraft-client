@@ -1678,6 +1678,26 @@ ipcMain.handle('mc-install-bg', async (_e, opts: { images: string[] }) => {
 ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
   try {
     const mcRoot = path.join(app.getPath('userData'), '.minecraft');
+
+    // Skip the network round-trip entirely if a valid Fabric install for
+    // this MC version already exists — every launch used to pay for a
+    // "what's the latest loader" request even when nothing needed to
+    // change, adding real latency before the JVM could even start.
+    const versionsDir = path.join(mcRoot, 'versions');
+    const existingId = fs.existsSync(versionsDir)
+      ? fs.readdirSync(versionsDir).find(d => {
+          if (!d.startsWith('fabric-loader-') || !d.endsWith(`-${opts.mcVersion}`)) return false;
+          const p = path.join(versionsDir, d, `${d}.json`);
+          if (!fs.existsSync(p)) return false;
+          try { return !!JSON.parse(fs.readFileSync(p, 'utf8')).downloads; } catch { return false; }
+        })
+      : undefined;
+    if (existingId) {
+      gameWin?.webContents.send('mc-log', `[Fabric] ${existingId} already installed`);
+      const loaderVersion = existingId.replace(/^fabric-loader-/, '').replace(new RegExp(`-${opts.mcVersion}$`), '');
+      return { ok: true, fabricVersion: existingId, loaderVersion };
+    }
+
     const loaders = await fetchJson('https://meta.fabricmc.net/v2/versions/loader');
     const loader  = (loaders as any[]).find((l: any) => l.stable) ?? loaders[0];
     if (!loader) throw new Error('No Fabric loader found');

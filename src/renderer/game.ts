@@ -419,14 +419,13 @@ mcPlayBtn.addEventListener('click', async () => {
   logToggle.style.display = 'inline';
   openLog();
 
-  // Auto-update CurseForge mods before launch, if enabled
-  if (modAutoUpdateToggle.checked) {
+  // Auto-update mods before launch, if enabled — but skip if the continuous
+  // background check (every 5 min, or on version change) already ran
+  // recently, so clicking Play doesn't pay for a redundant network round
+  // of checks right when the user wants to play now.
+  if (modAutoUpdateToggle.checked && Date.now() - lastModCheckTs > 60_000) {
     setStatus('Checking mods for updates…', 'yellow');
     await runModUpdateCheck(version, true);
-    // A modpack update may have switched the version selector to match its
-    // own required Minecraft version — re-read it so we actually launch
-    // (and install Fabric for) the version that matches what's installed.
-    version = mcVersion.value;
   }
 
   // Install the selected mod loader
@@ -1144,7 +1143,9 @@ async function checkModrinthUpdate(projectId: string, mod: InstalledMod, mcVer: 
   }
 }
 
+let lastModCheckTs = 0;
 async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
+  lastModCheckTs = Date.now();
   const cfApi = (window as any).curseforge;
   if (!mc) return;
 
