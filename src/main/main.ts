@@ -1707,7 +1707,11 @@ function isValidFabricProfile(profilePath: string): boolean {
     if (!profile.downloads) return false;
     const seen = new Set<string>();
     for (const lib of profile.libraries ?? []) {
-      const key = typeof lib?.name === 'string' ? lib.name.split(':').slice(0, 2).join(':') : null;
+      let key: string | null = null;
+      if (typeof lib?.name === 'string') {
+        const parts = lib.name.split(':');
+        key = `${parts[0]}:${parts[1]}:${parts[3] ?? ''}`;
+      }
       if (key) { if (seen.has(key)) return false; seen.add(key); }
     }
     return true;
@@ -1765,12 +1769,21 @@ ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
       // versions (e.g. vanilla ships an older ASM than Fabric Loader needs)
       // — a plain concatenation puts both jars on the classpath at once,
       // which crashes with "duplicate ASM classes found on classpath".
-      // Dedupe by groupId:artifactId, keeping Fabric's version on conflict
-      // since it's appended after vanilla's and Fabric needs its own.
+      // Dedupe by groupId:artifactId:classifier, keeping Fabric's version on
+      // conflict since it's appended after vanilla's and Fabric needs its own.
+      // The classifier must be part of the key — otherwise platform-native
+      // variants of the same artifact (e.g. com.mojang:jtracy's plain jar vs
+      // its natives-windows/linux/macos jars) collapse into a single entry,
+      // silently dropping the base jar with the actual Java classes and
+      // causing a NoClassDefFoundError at runtime.
       function dedupeLibraries(libs: any[]): any[] {
         const byArtifact = new Map<string, any>();
         for (const lib of libs) {
-          const key = typeof lib?.name === 'string' ? lib.name.split(':').slice(0, 2).join(':') : lib?.name;
+          let key = lib?.name;
+          if (typeof lib?.name === 'string') {
+            const parts = lib.name.split(':');
+            key = `${parts[0]}:${parts[1]}:${parts[3] ?? ''}`;
+          }
           byArtifact.set(key, lib);
         }
         return Array.from(byArtifact.values());

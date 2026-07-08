@@ -301,6 +301,23 @@ function modsForCurrentVersion(): [string, InstalledMod][] {
   return Object.entries(loadInstalledMods()).filter(([, m]) => m.mcVersion === mcVersion.value);
 }
 
+// Modpack-installed files aren't individually tracked in loadInstalledMods(), so they
+// need their own disabled-state store keyed by mcVersion for the master toggle to reach them.
+const DISABLED_PACK_FILES_KEY = 'voxel_disabled_pack_files';
+function loadDisabledPackFiles(): Record<string, string[]> {
+  try { return JSON.parse(localStorage.getItem(DISABLED_PACK_FILES_KEY) || '{}'); } catch { return {}; }
+}
+function saveDisabledPackFiles(data: Record<string, string[]>) {
+  localStorage.setItem(DISABLED_PACK_FILES_KEY, JSON.stringify(data));
+}
+function packFilesForCurrentVersion(): string[] {
+  const files: string[] = [];
+  for (const pack of Object.values(loadInstalledModpacks())) {
+    if (pack.mcVersion === mcVersion.value) files.push(...pack.filenames);
+  }
+  return files;
+}
+
 function updateModsBadge() {
   const modCount = Object.keys(loadInstalledMods()).length;
   const packModCount = Object.values(loadInstalledModpacks()).reduce((sum, p) => sum + p.filenames.length, 0);
@@ -316,23 +333,37 @@ function updateModsBadge() {
   modsBadge.style.borderColor= loaderOn ? 'rgba(245,166,35,0.30)'     : 'rgba(246,195,86,0.35)';
 
   const currentVerMods = modsForCurrentVersion();
-  if (!currentVerMods.length) { modsToggleAllBtn.style.display = 'none'; return; }
+  const currentPackFiles = packFilesForCurrentVersion();
+  if (!currentVerMods.length && !currentPackFiles.length) { modsToggleAllBtn.style.display = 'none'; return; }
   modsToggleAllBtn.style.display = 'inline-block';
-  const anyEnabled = currentVerMods.some(([, m]) => !m.disabled);
+  const disabledPackFiles = new Set(loadDisabledPackFiles()[mcVersion.value] ?? []);
+  const anyEnabled = currentVerMods.some(([, m]) => !m.disabled) || currentPackFiles.some(f => !disabledPackFiles.has(f));
   modsToggleAllBtn.textContent = anyEnabled ? 'Disable All' : 'Enable All';
 }
 
 modsToggleAllBtn.addEventListener('click', async () => {
   modsToggleAllBtn.disabled = true;
+  const ver = mcVersion.value;
   const mods = modsForCurrentVersion();
-  const shouldEnable = !mods.some(([, m]) => !m.disabled); // currently all disabled -> enable all
+  const packFiles = packFilesForCurrentVersion();
+  const disabledPackFilesByVer = loadDisabledPackFiles();
+  const disabledPackFiles = new Set(disabledPackFilesByVer[ver] ?? []);
+  const shouldEnable = !(mods.some(([, m]) => !m.disabled) || packFiles.some(f => !disabledPackFiles.has(f))); // currently all disabled -> enable all
+
   const installed = loadInstalledMods();
   for (const [slug, m] of mods) {
-    try { await mc?.toggleMod({ filename: m.filename, enable: shouldEnable, mcVersion: m.mcVersion || mcVersion.value }); } catch {}
+    try { await mc?.toggleMod({ filename: m.filename, enable: shouldEnable, mcVersion: m.mcVersion || ver }); } catch {}
     installed[slug] = { ...m, disabled: !shouldEnable };
     if (shouldEnable) enabledMods.add(slug); else enabledMods.delete(slug);
   }
   saveInstalledMods(installed);
+
+  for (const filename of packFiles) {
+    try { await mc?.toggleMod({ filename, enable: shouldEnable, mcVersion: ver }); } catch {}
+  }
+  disabledPackFilesByVer[ver] = shouldEnable ? [] : [...packFiles];
+  saveDisabledPackFiles(disabledPackFilesByVer);
+
   updateModsBadge();
   modsToggleAllBtn.disabled = false;
 });
