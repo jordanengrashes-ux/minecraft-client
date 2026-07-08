@@ -435,8 +435,26 @@ async function syncModsWithDisk() {
     if (changed) { saveInstalledMods(installed); updateModsBadge(); }
   } catch {}
 }
+
+// Same idea as syncModsWithDisk but for modpacks — a modpack record with no
+// files left on disk (Repair Game, manual deletion, or a failed update that
+// removed the old files) must not keep claiming to be installed forever.
+async function syncModpacksWithDisk() {
+  if (!mc?.listMods) return;
+  try {
+    const packs = loadInstalledModpacks();
+    let changed = false;
+    for (const [projectId, pack] of Object.entries(packs)) {
+      const diskFiles = await mc.listMods({ mcVersion: pack.mcVersion });
+      const anyRemain = pack.filenames.some(f => diskFiles.includes(f));
+      if (!anyRemain) { delete packs[projectId]; changed = true; }
+    }
+    if (changed) { saveInstalledModpacks(packs); updateModsBadge(); }
+  } catch {}
+}
 // Delay slightly so the window finishes loading before the IPC round-trip
 setTimeout(syncModsWithDisk, 1500);
+setTimeout(syncModpacksWithDisk, 1500);
 
 // ── Microsoft auth ─────────────────────────────────────────────────────────────
 mcAuthBtn.addEventListener('click', async () => {
@@ -1630,6 +1648,15 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
       updateBtn.textContent = '✓ Done';
       setTimeout(() => { updateBtn.textContent = '↻ Update'; updateBtn.disabled = false; }, 2000);
     } catch (err: any) {
+      // The old pack's files were already removed above before the reinstall
+      // attempt — if the reinstall itself failed, the stale record must be
+      // cleared too, or localStorage keeps claiming files are installed that
+      // no longer exist on disk (toggle would show "installed" forever).
+      const updated = loadInstalledModpacks();
+      delete updated[mod.project_id];
+      saveInstalledModpacks(updated);
+      card.className = 'mod-card';
+      input.checked = false;
       statusEl.textContent = '✗';
       statusEl.style.color = '#e05500';
       updateBtn.textContent = '✗ Failed';
@@ -2138,6 +2165,8 @@ function renderModProfiles() {
     toggleInput.addEventListener('change', async () => {
       if (toggleInput.checked) {
         setActiveProfileId(profile.id);
+        toggleInput.disabled = true;
+        const ver = mcVersion.value || '26.1.2';
         const installed = loadInstalledMods();
         for (const slug of Array.from(enabledMods)) {
           if (!profile.slugs.includes(slug)) {
@@ -2146,7 +2175,49 @@ function renderModProfiles() {
             enabledMods.delete(slug);
           }
         }
+        // The profile's own mods that aren't currently enabled must actually be
+        // (re)installed here too — previously this loop only removed extras,
+        // so switching to a profile never turned its mods back on once they'd
+        // been uninstalled by a prior profile switch.
+        for (const slug of profile.slugs) {
+          if (enabledMods.has(slug)) continue;
+          try {
+            const pvpMod = PVP_MOD_BY_SLUG.get(slug);
+            if (pvpMod) {
+              await installOneMod(pvpMod, ver);
+            } else if (slug.startsWith('cf_')) {
+              const modId = Number(slug.slice(3));
+              const dlRes = await (window as any).curseforge?.getDownload?.({ modId, mcVersion: ver });
+              if (dlRes?.ok) {
+                const installRes = await mc.installMod({ url: dlRes.url, filename: dlRes.filename, mcVersion: ver });
+                if (installRes.ok) {
+                  const cur = loadInstalledMods();
+                  cur[slug] = { filename: dlRes.filename, name: slug, mcVersion: ver, cfId: modId, fileId: dlRes.fileId };
+                  saveInstalledMods(cur);
+                  enabledMods.add(slug);
+                }
+              }
+            } else {
+              const p = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '5' });
+              const r = await fetch(`https://api.modrinth.com/v2/project/${encodeURIComponent(slug)}/version?${p}`);
+              const data: any[] = await r.json();
+              if (Array.isArray(data) && data.length) {
+                const f = data[0].files.find((fi: any) => fi.primary) ?? data[0].files[0];
+                if (f) {
+                  const res = await mc.installMod({ url: f.url, filename: f.filename, mcVersion: ver });
+                  if (res.ok) {
+                    const cur = loadInstalledMods();
+                    cur[slug] = { filename: f.filename, name: slug, mcVersion: ver, modrinthVersionId: data[0].id };
+                    saveInstalledMods(cur);
+                    enabledMods.add(slug);
+                  }
+                }
+              }
+            }
+          } catch {}
+        }
         updateModsBadge();
+        toggleInput.disabled = false;
       } else {
         if (getActiveProfileId() === profile.id) setActiveProfileId(null);
       }

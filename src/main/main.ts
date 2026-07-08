@@ -1542,6 +1542,9 @@ ipcMain.handle('cf-search', async (_e, opts: { query: string; mcVersion: string 
   try {
     const params = new URLSearchParams({
       gameId: '432',           // Minecraft
+      classId: '6',            // Mods only — without this, modpacks/resource packs/
+                                // worlds show up mixed in and get force-installed as
+                                // if they were a single mod jar when toggled on
       searchFilter: opts.query,
       modLoaderType: '4',      // Fabric
       gameVersion: opts.mcVersion || '1.21.4',
