@@ -1844,6 +1844,31 @@ ipcMain.handle('mc-remove-resourcepack', async (_e, opts: { filename: string }) 
   } catch (err: any) { return { ok: false, error: err.message }; }
 });
 
+ipcMain.handle('mc-list-shaderpacks', async () => {
+  const dir = path.join(app.getPath('userData'), '.minecraft', 'shaderpacks');
+  try {
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir).filter((f: string) => f.endsWith('.zip'));
+  } catch { return []; }
+});
+
+ipcMain.handle('mc-install-shaderpack', async (_e, opts: { url: string; filename: string }) => {
+  try {
+    const dir = path.join(app.getPath('userData'), '.minecraft', 'shaderpacks');
+    fs.mkdirSync(dir, { recursive: true });
+    await downloadFileTo(opts.url, path.join(dir, opts.filename));
+    return { ok: true };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('mc-remove-shaderpack', async (_e, opts: { filename: string }) => {
+  try {
+    const fp = path.join(app.getPath('userData'), '.minecraft', 'shaderpacks', opts.filename);
+    if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    return { ok: true };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
 // ── IPC: file manager (worlds, schematics) ────────────────────────────────────
 const mcRoot = () => path.join(app.getPath('userData'), '.minecraft');
 

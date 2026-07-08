@@ -337,8 +337,7 @@ shaderpackSelect?.addEventListener('change', () => {
   if (savedJava && javaVersionSel) javaVersionSel.value = savedJava;
   const savedVsync = localStorage.getItem('voxel_vsync');
   if (vsyncToggle) vsyncToggle.checked = savedVsync !== null ? savedVsync === 'true' : true;
-  const savedShader = localStorage.getItem('voxel_shaderpack');
-  if (shaderpackSelect && savedShader !== null) shaderpackSelect.value = savedShader;
+  refreshShaderpackDropdown();
   updateModsBadge();
 }
 
@@ -623,7 +622,7 @@ navMyServer      .addEventListener('click', () => { showPanel(serverPanelEl, nav
 navCosmetics     .addEventListener('click', () => { showPanel(cosmeticsPanelEl,    navCosmetics); if (!cosmeticsPanelEl.dataset.loaded) { initCosmetics(); cosmeticsPanelEl.dataset.loaded = '1'; } });
 navFriends       .addEventListener('click', () => { showPanel(friendsPanelEl,      navFriends);   if (!friendsPanelEl.dataset.loaded) { initFriendsPanel(); friendsPanelEl.dataset.loaded = '1'; } });
 navCustomize     .addEventListener('click', () => { showPanel(customizePanelEl,    navCustomize); if (!customizePanelEl.dataset.loaded) { initCustomize(); searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
-navSettings      .addEventListener('click', () => showPanel(settingsPanelEl,       navSettings));
+navSettings      .addEventListener('click', () => { showPanel(settingsPanelEl,       navSettings); initShaderpackSettings(); });
 
 // ── Bedrock Edition ────────────────────────────────────────────────────────────
 const bedrockIcon       = document.getElementById('bedrock-icon')!;
@@ -2385,6 +2384,82 @@ function initResourcePacks() {
     rpTimer = setTimeout(() => searchResourcePacks(searchEl.value), 400);
   });
   searchResourcePacks('');
+}
+
+// ── Shader packs (installed on-demand from Modrinth, like mods/resource packs) ─
+const SHADERPACK_CATALOG = [
+  { slug: 'complementary-reimagined', name: 'Complementary Reimagined', match: 'reimagined' },
+  { slug: 'complementary-unbound',    name: 'Complementary Unbound',    match: 'unbound' },
+  { slug: 'bsl-shaders',              name: 'BSL Shaders',              match: 'bsl' },
+  { slug: 'bliss-shader',             name: 'Bliss Shaders',            match: 'bliss' },
+  { slug: 'photon-shader',            name: 'Photon Shaders',           match: 'photon' },
+];
+
+async function listInstalledShaderpacks(): Promise<string[]> {
+  return await (window as any).mc?.listShaderpacks?.() ?? [];
+}
+
+async function refreshShaderpackDropdown() {
+  if (!shaderpackSelect) return;
+  const installed = await listInstalledShaderpacks();
+  const current = shaderpackSelect.value || localStorage.getItem('voxel_shaderpack') || '';
+  shaderpackSelect.innerHTML = '<option value="">None (vanilla)</option>' +
+    installed.map(f => `<option value="${escHtml(f)}">${escHtml(f.replace(/\.zip$/i, ''))}</option>`).join('');
+  if (current && installed.includes(current)) shaderpackSelect.value = current;
+}
+
+async function initShaderpackSettings() {
+  await refreshShaderpackDropdown();
+  const listEl = document.getElementById('shaderpack-install-list');
+  if (!listEl) return;
+  const installed = await listInstalledShaderpacks();
+  listEl.innerHTML = '';
+  for (const pack of SHADERPACK_CATALOG) {
+    const existing = installed.find(f => f.toLowerCase().includes(pack.match));
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;background:#080808;border:1px solid #2a2a2a;border-radius:6px;padding:9px 12px;';
+    row.innerHTML = `
+      <span style="flex:1;font-size:13px;color:#ffffff;">${pack.name}</span>
+      <span class="sp-status" style="font-size:12px;color:#f5a623;${existing ? '' : 'display:none;'}">✓ Installed</span>
+      <button class="sp-btn" style="padding:6px 14px;background:${existing ? '#1e1e1e' : 'rgba(245,166,35,0.15)'};border:1px solid ${existing ? '#2a2a2a' : 'rgba(245,166,35,0.4)'};border-radius:6px;color:#ffffff;font-size:12px;cursor:pointer;white-space:nowrap;">${existing ? 'Remove' : 'Install'}</button>`;
+    const btn = row.querySelector('.sp-btn') as HTMLButtonElement;
+    const statusEl = row.querySelector('.sp-status') as HTMLElement;
+    let currentFile = existing;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      if (currentFile) {
+        btn.textContent = 'Removing…';
+        await (window as any).mc.removeShaderpack({ filename: currentFile });
+        currentFile = undefined;
+        statusEl.style.display = 'none';
+        btn.textContent = 'Install';
+        btn.style.background = 'rgba(245,166,35,0.15)'; btn.style.borderColor = 'rgba(245,166,35,0.4)';
+      } else {
+        btn.textContent = 'Installing…';
+        try {
+          const vRes = await fetch(`https://api.modrinth.com/v2/project/${pack.slug}/version?limit=1`);
+          const versions: any[] = await vRes.json();
+          const file = versions[0]?.files.find((f: any) => f.primary) ?? versions[0]?.files[0];
+          if (!file) throw new Error('No download found');
+          const res = await (window as any).mc.installShaderpack({ url: file.url, filename: file.filename });
+          if (!res.ok) throw new Error(res.error);
+          currentFile = file.filename;
+          statusEl.style.display = '';
+          btn.textContent = 'Remove';
+          btn.style.background = '#1e1e1e'; btn.style.borderColor = '#2a2a2a';
+        } catch (err: any) {
+          btn.textContent = 'Failed';
+          statusEl.style.display = '';
+          statusEl.style.color = '#e05500';
+          statusEl.textContent = err.message;
+          setTimeout(() => { btn.textContent = 'Install'; statusEl.style.display = 'none'; }, 2500);
+        }
+      }
+      await refreshShaderpackDropdown();
+      btn.disabled = false;
+    });
+    listEl.appendChild(row);
+  }
 }
 
 // ── Skins / Wardrobe panel ────────────────────────────────────────────────────
@@ -4908,7 +4983,7 @@ const RECIPES: MCRecipe[] = [
   {name:'Dropper',img:'Dropper',grid:[WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),null,WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Redstone_Dust'),WIKI('Cobblestone')],cat:'build'},
   {name:'Dispenser',img:'Dispenser',grid:[WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Bow'),WIKI('Cobblestone'),WIKI('Cobblestone'),WIKI('Redstone_Dust'),WIKI('Cobblestone')],cat:'build'},
   {name:'Enchanting Table',img:'Enchanting_Table',grid:[null,WIKI('Book'),null,WIKI('Diamond'),WIKI('Obsidian'),WIKI('Diamond'),WIKI('Obsidian'),WIKI('Obsidian'),WIKI('Obsidian')],cat:'build'},
-  {name:'Anvil',img:'Anvil',grid:[WIKI('Iron_Block'),WIKI('Iron_Block'),WIKI('Iron_Block'),null,WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot')],cat:'build'},
+  {name:'Anvil',img:'Anvil',grid:[WIKI('Block_of_Iron'),WIKI('Block_of_Iron'),WIKI('Block_of_Iron'),null,WIKI('Iron_Ingot'),null,WIKI('Iron_Ingot'),WIKI('Iron_Ingot'),WIKI('Iron_Ingot')],cat:'build'},
   {name:'Beacon',img:'Beacon',grid:[WIKI('Glass'),WIKI('Glass'),WIKI('Glass'),WIKI('Glass'),WIKI('Nether_Star'),WIKI('Glass'),WIKI('Obsidian'),WIKI('Obsidian'),WIKI('Obsidian')],cat:'build'},
   {name:'Bookshelf',img:'Bookshelf',grid:[WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Book'),WIKI('Book'),WIKI('Book'),WIKI('Oak_Planks'),WIKI('Oak_Planks'),WIKI('Oak_Planks')],cat:'build'},
   {name:'TNT',img:'TNT',grid:[WIKI('Gunpowder'),WIKI('Sand'),WIKI('Gunpowder'),WIKI('Sand'),WIKI('Gunpowder'),WIKI('Sand'),WIKI('Gunpowder'),WIKI('Sand'),WIKI('Gunpowder')],cat:'build'},
@@ -5259,7 +5334,7 @@ function initGuide() {
     const label = name || url.split('Invicon_')[1]?.replace('.png','').replace(/_/g,' ') || '';
     const short = label.split(' ').map((w: string) => w[0]).join('').slice(0,3).toUpperCase();
     const tip = label ? `<span class="rc-tip">${escHtml(label)}</span>` : '';
-    return `<div class="recipe-cell">${tip}<img src="${url}" alt="${escHtml(label)}" onerror="this.style.display='none';(this.nextElementSibling as HTMLElement).style.display='flex'"><span class="rc-fallback" title="${escHtml(label)}">${escHtml(short)}</span></div>`;
+    return `<div class="recipe-cell">${tip}<img src="${url}" loading="lazy" alt="${escHtml(label)}" onerror="this.style.display='none';(this.nextElementSibling as HTMLElement).style.display='flex'"><span class="rc-fallback" title="${escHtml(label)}">${escHtml(short)}</span></div>`;
   }
 
   function showRecipeDetail(r: MCRecipe) {
@@ -5274,7 +5349,7 @@ function initGuide() {
     const cells = r.grid.map(url => itemCell(url || null, url ? names[url] : undefined)).join('');
     const ingredients = [...new Set(r.grid.filter(Boolean))].map(url => {
       const n = url!.split('Invicon_')[1]?.replace('.png','').replace(/_/g,' ') || url;
-      return `<span style="display:inline-flex;align-items:center;gap:4px;background:#1a1a1a;border:1px solid #222;border-radius:5px;padding:2px 7px;font-size:11px;"><img src="${url}" style="width:16px;height:16px;image-rendering:pixelated;" onerror="this.style.display='none'"> ${escHtml(n!)}</span>`;
+      return `<span style="display:inline-flex;align-items:center;gap:4px;background:#1a1a1a;border:1px solid #222;border-radius:5px;padding:2px 7px;font-size:11px;"><img src="${url}" loading="lazy" style="width:16px;height:16px;image-rendering:pixelated;" onerror="this.style.display='none'"> ${escHtml(n!)}</span>`;
     }).join('');
     contentEl.innerHTML = `
       <button id="guide-back" style="background:none;border:none;color:#f5a623;font-size:12px;cursor:pointer;padding:0 0 10px;display:flex;align-items:center;gap:4px;">← ${t('crafting')}</button>
@@ -5312,7 +5387,7 @@ function initGuide() {
       card.className = 'recipe-card';
       card.style.marginBottom = '6px';
       const initials = r.name.split(' ').map((w:string)=>w[0]).join('').slice(0,3).toUpperCase();
-      card.innerHTML = `<div class="recipe-card-icon"><img src="${WIKI(r.img)}" alt="${escHtml(r.name)}" style="width:30px;height:30px;image-rendering:pixelated;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:8px;font-weight:700;color:#8b949e;\\'>${initials}</span>'"></div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#ffffff;">${escHtml(r.name)}</div><div style="font-size:10px;color:#484f58;text-transform:uppercase;letter-spacing:0.5px;">${r.cat}</div></div><span style="font-size:11px;color:#484f58;">▶</span>`;
+      card.innerHTML = `<div class="recipe-card-icon"><img src="${WIKI(r.img)}" loading="lazy" alt="${escHtml(r.name)}" style="width:30px;height:30px;image-rendering:pixelated;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:8px;font-weight:700;color:#8b949e;\\'>${initials}</span>'"></div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#ffffff;">${escHtml(r.name)}</div><div style="font-size:10px;color:#484f58;text-transform:uppercase;letter-spacing:0.5px;">${r.cat}</div></div><span style="font-size:11px;color:#484f58;">▶</span>`;
       card.addEventListener('click', () => showRecipeDetail(r));
       frag.appendChild(card);
     });
@@ -5338,7 +5413,7 @@ function initGuide() {
       const tc = typeColors[m.type] || '#aaaaaa';
       card.innerHTML = `
         <div style="display:flex;gap:12px;align-items:flex-start;">
-          <img src="${m.img}" alt="${escHtml(m.name)}" style="width:52px;height:52px;image-rendering:pixelated;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'">
+          <img src="${m.img}" loading="lazy" alt="${escHtml(m.name)}" style="width:52px;height:52px;image-rendering:pixelated;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'">
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
               <span style="font-size:14px;font-weight:700;color:#ffffff;">${escHtml(m.name)}</span>
