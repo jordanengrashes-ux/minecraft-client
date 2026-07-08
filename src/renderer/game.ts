@@ -296,7 +296,9 @@ offlineToggle.addEventListener('change', () => applyOfflineState(offlineToggle.c
 const modsBadge = document.getElementById('mods-badge') as HTMLElement;
 
 function updateModsBadge() {
-  const count = Object.keys(loadInstalledMods()).length;
+  const modCount = Object.keys(loadInstalledMods()).length;
+  const packModCount = Object.values(loadInstalledModpacks()).reduce((sum, p) => sum + p.filenames.length, 0);
+  const count = modCount + packModCount;
   if (count === 0) { modsBadge.style.display = 'none'; return; }
   modsBadge.style.display    = 'inline-block';
   const loaderOn = modLoaderSelect.value !== 'none';
