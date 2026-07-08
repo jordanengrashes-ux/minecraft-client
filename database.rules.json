@@ -69,6 +69,11 @@
     "vhServers": {
       ".read": "auth != null",
       ".write": "auth != null"
+    },
+
+    "voxel_local_server": {
+      ".read": true,
+      ".write": true
     }
 
   }
