@@ -418,6 +418,10 @@ mcPlayBtn.addEventListener('click', async () => {
   if (modAutoUpdateToggle.checked) {
     setStatus('Checking mods for updates…', 'yellow');
     await runModUpdateCheck(version, true);
+    // A modpack update may have switched the version selector to match its
+    // own required Minecraft version — re-read it so we actually launch
+    // (and install Fabric for) the version that matches what's installed.
+    version = mcVersion.value;
   }
 
   // Install the selected mod loader
@@ -1220,11 +1224,26 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
   saveInstalledMods(installed);
   updateModsBadge();
 
+  // Keep the launcher's version selector in sync with whatever a modpack
+  // actually requires — a mismatch here means Fabric will refuse to start
+  // even though nothing looks wrong from the launcher's side.
+  function syncVersionToPack(requiredVersion: string) {
+    if (!requiredVersion || requiredVersion === mcVersion.value) return;
+    const hasOption = Array.from(mcVersion.options).some(o => o.value === requiredVersion);
+    if (hasOption) {
+      mcVersion.value = requiredVersion;
+      localStorage.setItem('voxel_mc_version', requiredVersion);
+    }
+  }
+
   // Modpacks: check the installed pack (usually just one — installing a new
   // one already removes the previous) for a newer Modrinth release.
   let modpackUpdated = false;
   const packs = loadInstalledModpacks();
   for (const [projectId, pack] of Object.entries(packs)) {
+    // Fix up any pre-existing mismatch even if no update is available —
+    // covers packs left in this state by a past bug, not just fresh updates.
+    syncVersionToPack(pack.mcVersion);
     try {
       const res = await fetch(`https://api.modrinth.com/v2/project/${projectId}/version?limit=5`);
       if (!res.ok) continue;
@@ -1244,6 +1263,7 @@ async function runModUpdateCheck(mcVer: string, silent = false): Promise<void> {
       if (!result.ok) continue;
       packs[projectId] = { projectId, title: pack.title, mcVersion: result.mcVersion, filenames: result.filenames, versionId: result.versionId };
       modpackUpdated = true;
+      syncVersionToPack(result.mcVersion);
     } catch {
       // Leave the modpack as-is if the check/update fails
     }
