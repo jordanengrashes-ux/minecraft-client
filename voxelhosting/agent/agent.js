@@ -147,9 +147,14 @@ function writeServerProperties(dir, cfg) {
   fs.writeFileSync(path.join(dir, 'server.properties'), props);
 }
 
+async function pushConfigToRtdb(serverId, file, content) {
+  await set(ref(rtdb, `vhServers/${serverId}/configs/${file.replace('.', '_')}`), content).catch(() => {});
+}
+
 async function initServer(serverId, cfg) {
   const dir = serverDir(serverId);
   writeServerProperties(dir, cfg);
+  await pushConfigToRtdb(serverId, 'server.properties', fs.readFileSync(path.join(dir, 'server.properties'), 'utf8'));
   await log(serverId, `[Agent] Server folder created for "${cfg.name}". Files are ready in the Files tab.`);
   for (const folder of Object.keys(FOLDER_MAP)) await listFiles(serverId, folder);
 }
@@ -237,7 +242,16 @@ async function deleteFile(serverId, folder, filename) {
 async function writeConfig(serverId, file, content) {
   const dir = serverDir(serverId);
   fs.writeFileSync(path.join(dir, file), content);
+  await pushConfigToRtdb(serverId, file, content);
   await log(serverId, `[Agent] Wrote ${file}.`);
+}
+
+async function readConfig(serverId, file, cfg) {
+  const dir = serverDir(serverId);
+  const filePath = path.join(dir, file);
+  if (!fs.existsSync(filePath) && file === 'server.properties') writeServerProperties(dir, cfg);
+  const content = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
+  await pushConfigToRtdb(serverId, file, content);
 }
 
 function watchServerCommands(serverId, cfgRef) {
@@ -254,6 +268,7 @@ function watchServerCommands(serverId, cfgRef) {
       case 'download-file': await downloadFile(serverId, extra.folder, extra.filename, extra.storagePath); break;
       case 'delete-file': await deleteFile(serverId, extra.folder, extra.filename); break;
       case 'write-config': await writeConfig(serverId, extra.file, extra.content); break;
+      case 'read-config': await readConfig(serverId, extra.file, cfgRef()); break;
     }
   });
 }
