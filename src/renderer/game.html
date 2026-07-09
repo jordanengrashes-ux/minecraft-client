@@ -353,7 +353,6 @@
       <div class="nav-item" id="nav-ai">Minecraft Guide</div>
       <div class="nav-section-label">Social</div>
       <div class="nav-item" id="nav-skins">Skins</div>
-      <div class="nav-item" id="nav-my-server">My Server</div>
       <div class="nav-item" id="nav-server" style="color:#4f9eff;">Voxel Hosting ↗</div>
       <div class="nav-item" id="nav-cosmetics">Cosmetics</div>
       <div class="nav-item" id="nav-friends">Friends</div>
@@ -665,7 +664,14 @@
           <h2 style="font-size:17px;font-weight:700;">CurseForge</h2>
           <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#f16436;background:rgba(241,100,54,0.12);border:1px solid rgba(241,100,54,0.25);border-radius:10px;padding:2px 8px;">Fabric</span>
         </div>
-        <p style="color:#555555;font-size:12px;margin-bottom:12px;">Browse &amp; install mods from CurseForge</p>
+        <p style="color:#555555;font-size:12px;margin-bottom:12px;">Browse &amp; install mods, modpacks, resource packs, shaders &amp; worlds from CurseForge</p>
+        <div id="cf-type-tabs" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="cf-type-tab active" data-type="mod"          style="padding:6px 14px;background:rgba(241,100,54,0.12);border:1px solid rgba(241,100,54,0.4);border-radius:7px;color:#f16436;font-size:12px;font-weight:600;cursor:pointer;">Mods</button>
+          <button class="cf-type-tab"        data-type="modpack"      style="padding:6px 14px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:7px;color:#aaaaaa;font-size:12px;font-weight:600;cursor:pointer;">Modpacks</button>
+          <button class="cf-type-tab"        data-type="resourcepack" style="padding:6px 14px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:7px;color:#aaaaaa;font-size:12px;font-weight:600;cursor:pointer;">Resource Packs</button>
+          <button class="cf-type-tab"        data-type="shader"       style="padding:6px 14px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:7px;color:#aaaaaa;font-size:12px;font-weight:600;cursor:pointer;">Shaders</button>
+          <button class="cf-type-tab"        data-type="world"        style="padding:6px 14px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:7px;color:#aaaaaa;font-size:12px;font-weight:600;cursor:pointer;">Worlds</button>
+        </div>
         <input id="cf-search" type="text" placeholder="Search CurseForge mods…"
           style="width:100%;padding:10px 14px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;color:#ffffff;font-size:14px;outline:none;"
           onfocus="this.style.borderColor='#f16436'" onblur="this.style.borderColor='#2a2a2a'" />
@@ -857,187 +863,6 @@
         Loading from Modrinth…
       </div>
       <div id="bedrock-mods-list" style="flex:1;overflow-y:auto;padding:20px 32px;display:flex;flex-direction:column;gap:10px;"></div>
-    </div>
-
-    <!-- Server Host panel -->
-    <div id="server-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden;background:#0d0d0d;font-family:'Roboto','Helvetica',sans-serif;">
-
-      <!-- Dedicated Server Mode bar -->
-      <div style="padding:12px 24px;background:rgba(245,166,35,0.06);border-bottom:1px solid rgba(245,166,35,0.2);flex-shrink:0;display:flex;align-items:center;gap:16px;">
-        <div style="display:flex;flex-direction:column;gap:2px;flex:1;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:12px;font-weight:700;color:#f5a623;letter-spacing:1px;text-transform:uppercase;">Dedicated Server</span>
-            <span id="srv-dedicated-dot" style="width:7px;height:7px;border-radius:50%;background:#30363d;display:inline-block;flex-shrink:0;"></span>
-            <span id="srv-dedicated-status" style="font-size:11px;color:#555555;">Inactive</span>
-          </div>
-          <span style="font-size:11px;color:#555555;">Auto-starts when this app opens — keeps laptop awake 24/7</span>
-        </div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0;">
-          <span style="font-size:12px;color:#aaaaaa;white-space:nowrap;">Dedicated Mode</span>
-          <label class="toggle toggle-sm"><input type="checkbox" id="srv-dedicated-toggle" /><span class="toggle-slider"></span></label>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0;">
-          <span style="font-size:12px;color:#aaaaaa;white-space:nowrap;">Start with Windows</span>
-          <label class="toggle toggle-sm"><input type="checkbox" id="srv-boot-toggle" /><span class="toggle-slider"></span></label>
-        </label>
-      </div>
-
-      <!-- Voxel SMP — external Paper server control -->
-      <div style="padding:14px 24px;background:rgba(63,185,80,0.05);border-bottom:1px solid rgba(63,185,80,0.15);flex-shrink:0;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:20px;">🌍</span>
-          <div style="flex:1;">
-            <div style="font-size:13px;font-weight:700;color:#e6edf3;">Voxel SMP</div>
-            <div style="font-size:11px;color:#555;margin-top:1px;">99.240.116.116 &nbsp;·&nbsp; Paper 26.1.2 &nbsp;·&nbsp; <a id="voxel-srv-map-link" href="#" style="color:#58a6ff;text-decoration:none;" onclick="(window as any).electron?.openExternal('http://99.240.116.116:8100');return false;">Live Map</a></div>
-          </div>
-          <span id="voxel-srv-dot" style="width:8px;height:8px;border-radius:50%;background:#30363d;flex-shrink:0;"></span>
-          <span id="voxel-srv-status-text" style="font-size:11px;color:#555555;min-width:60px;">Checking…</span>
-          <button id="voxel-srv-start-btn" style="padding:5px 14px;background:#238636;border:1px solid #2ea043;border-radius:6px;color:#fff;font-size:12px;cursor:pointer;">Start</button>
-          <button id="voxel-srv-stop-btn"  style="padding:5px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:12px;cursor:pointer;">Stop</button>
-          <button id="voxel-srv-restart-btn" style="padding:5px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:12px;cursor:pointer;">Restart</button>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-shrink:0;">
-            <span style="font-size:11px;color:#aaaaaa;white-space:nowrap;">Auto-start</span>
-            <label class="toggle toggle-sm"><input type="checkbox" id="voxel-srv-autostart-toggle" /><span class="toggle-slider"></span></label>
-          </label>
-        </div>
-        <div id="voxel-srv-msg" style="font-size:11px;color:#555;margin-top:6px;display:none;"></div>
-      </div>
-
-      <!-- Config header -->
-      <div style="padding:16px 24px;border-bottom:1px solid rgba(60,60,60,0.6);flex-shrink:0;display:flex;flex-direction:column;gap:12px;">
-
-        <!-- Row 1: name + version + snapshots + preset -->
-        <div style="display:flex;align-items:center;gap:10px;">
-          <input id="srv-name" type="text" value="My Server" placeholder="Server name"
-            style="flex:2;min-width:100px;background:rgba(60,60,60,0.35);border:1px solid rgba(60,60,60,0.8);border-radius:8px;color:#ffffff;padding:9px 13px;font-size:13px;outline:none;font-family:'Roboto',sans-serif;"
-            onfocus="this.style.borderColor='#f5a623'" onblur="this.style.borderColor='rgba(60,60,60,0.8)'" />
-          <select id="srv-version" style="flex:1;min-width:110px;background:rgba(60,60,60,0.35);border:1px solid rgba(60,60,60,0.8);border-radius:8px;color:#ffffff;padding:9px 12px;font-size:13px;outline:none;cursor:pointer;font-family:'Roboto',sans-serif;">
-            <option disabled selected>Loading…</option>
-          </select>
-          <label style="display:flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer;flex-shrink:0;">
-            <input type="checkbox" id="srv-snapshots-toggle" style="accent-color:#ffffff;" />
-            <span style="font-size:12px;color:#ffffff;">Snapshots</span>
-          </label>
-          <button id="srv-new-btn" style="padding:9px 14px;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.5);border-radius:8px;color:#f5a623;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'Roboto',sans-serif;">+ New Server</button>
-          <button id="srv-preset-btn" title="Load defaults" style="padding:9px 14px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.25);border-radius:8px;color:#ffffff;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'Roboto',sans-serif;">Defaults</button>
-          <button id="srv-open-folder-btn" title="Open server files in Explorer" style="padding:9px 14px;background:rgba(60,60,60,0.4);border:1px solid rgba(60,60,60,0.8);border-radius:8px;color:#aaaaaa;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'Roboto',sans-serif;">Files</button>
-        </div>
-
-        <!-- Row 2: Java + RAM + start/stop -->
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:12px;color:#ffffff;white-space:nowrap;">Java</span>
-          <select id="srv-java-version" style="background:rgba(60,60,60,0.35);border:1px solid rgba(60,60,60,0.8);border-radius:8px;color:#ffffff;padding:7px 10px;font-size:12px;outline:none;cursor:pointer;font-family:'Roboto',sans-serif;">
-            <option value="auto">Auto</option>
-            <option value="21">Java 21</option>
-            <option value="25">Java 25</option>
-          </select>
-          <span style="font-size:12px;color:#ffffff;white-space:nowrap;">Max RAM</span>
-          <input type="range" id="srv-mem" min="1" max="32" value="2" style="flex:1;max-width:120px;accent-color:#ffffff;" />
-          <span style="font-size:13px;color:#ffffff;font-weight:600;min-width:28px;"><span id="srv-mem-val">2</span>G</span>
-          <span style="font-size:12px;color:#ffffff;white-space:nowrap;">Min RAM</span>
-          <input type="range" id="srv-minmem" min="256" max="4096" step="256" value="512" style="flex:1;max-width:100px;accent-color:#ffffff;" />
-          <span style="font-size:12px;color:#ffffff;font-weight:600;min-width:42px;"><span id="srv-minmem-val">512</span>M</span>
-          <div style="flex:1;"></div>
-          <button id="srv-start-btn" style="padding:9px 28px;font-size:13px;font-weight:700;background:#f5a623;border:none;border-radius:8px;color:#000000;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;font-family:'Roboto',sans-serif;">▶ Start Server</button>
-          <button id="srv-stop-btn" style="display:none;padding:9px 28px;font-size:13px;font-weight:700;background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.35);border-radius:8px;color:#ffffff;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;font-family:'Roboto',sans-serif;">⏹ Stop Server</button>
-        </div>
-
-        <!-- Row 3: Port + Max Players + MOTD + Auto-restart -->
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <span style="font-size:12px;color:#ffffff;white-space:nowrap;">Port</span>
-          <input id="srv-port" type="number" value="25565" min="1024" max="65535"
-            style="width:72px;background:rgba(60,60,60,0.35);border:1px solid rgba(60,60,60,0.8);border-radius:7px;color:#ffffff;padding:6px 10px;font-size:12px;outline:none;font-family:monospace;"
-            onfocus="this.style.borderColor='#f5a623'" onblur="this.style.borderColor='rgba(60,60,60,0.8)'" />
-          <span style="font-size:12px;color:#ffffff;white-space:nowrap;">Max Players</span>
-          <input id="srv-maxplayers" type="number" value="20" min="1" max="200"
-            style="width:55px;background:rgba(60,60,60,0.35);border:1px solid rgba(60,60,60,0.8);border-radius:7px;color:#ffffff;padding:6px 10px;font-size:12px;outline:none;font-family:monospace;"
-            onfocus="this.style.borderColor='#f5a623'" onblur="this.style.borderColor='rgba(60,60,60,0.8)'" />
-          <span style="font-size:12px;color:#ffffff;white-space:nowrap;">MOTD</span>
-          <input id="srv-motd" type="text" value="Voxel Client Server" placeholder="Server description"
-            style="flex:1;min-width:140px;background:rgba(60,60,60,0.35);border:1px solid rgba(60,60,60,0.8);border-radius:7px;color:#ffffff;padding:6px 10px;font-size:12px;outline:none;font-family:'Roboto',sans-serif;"
-            onfocus="this.style.borderColor='#f5a623'" onblur="this.style.borderColor='rgba(60,60,60,0.8)'" />
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
-            <input type="checkbox" id="srv-autorestart" style="accent-color:#f5a623;" />
-            <span style="font-size:12px;color:#ffffff;">Auto-restart</span>
-          </label>
-        </div>
-
-        <!-- Row 4: Public address (for players to join / 24/7 listing) -->
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:12px;color:#ffffff;white-space:nowrap;">Address</span>
-          <input id="srv-ip" type="text" placeholder="your-server.net or leave blank for local only"
-            style="flex:1;background:rgba(60,60,60,0.35);border:1px solid rgba(60,60,60,0.8);border-radius:7px;color:#ffffff;padding:6px 10px;font-size:12px;outline:none;font-family:monospace;"
-            onfocus="this.style.borderColor='#f5a623'" onblur="this.style.borderColor='rgba(60,60,60,0.8)'" />
-          <span style="font-size:11px;color:#555555;white-space:nowrap;">Public IP/domain — for 24/7 listing &amp; sharing with friends</span>
-        </div>
-
-        <!-- Row 5: Seed + Import World -->
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <span style="font-size:12px;color:#ffffff;white-space:nowrap;">Seed</span>
-          <input id="srv-seed" type="text" placeholder="Random" maxlength="64"
-            style="width:130px;background:rgba(60,60,60,0.35);border:1px solid rgba(60,60,60,0.8);border-radius:7px;color:#ffffff;padding:6px 10px;font-size:12px;outline:none;font-family:monospace;"
-            onfocus="this.style.borderColor='#f5a623'" onblur="this.style.borderColor='rgba(60,60,60,0.8)'" />
-          <button id="srv-from-saves-btn" style="padding:6px 13px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:7px;color:#f5a623;font-size:12px;cursor:pointer;white-space:nowrap;font-family:'Roboto',sans-serif;flex-shrink:0;">From Saves ▾</button>
-          <button id="srv-browse-world-btn" style="padding:6px 13px;background:rgba(60,60,60,0.4);border:1px solid rgba(60,60,60,0.8);border-radius:7px;color:#aaaaaa;font-size:12px;cursor:pointer;white-space:nowrap;font-family:'Roboto',sans-serif;">Browse Folder…</button>
-          <span id="srv-world-label" style="font-size:11px;color:#555555;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">No world selected — generates fresh each time</span>
-          <button id="srv-clear-world-btn" style="display:none;padding:4px 8px;background:none;border:1px solid rgba(248,81,73,0.3);border-radius:5px;color:#888;font-size:11px;cursor:pointer;white-space:nowrap;">Remove</button>
-        </div>
-
-        <!-- Status bar (shown when running) -->
-        <div id="srv-info" style="display:none;align-items:center;gap:12px;background:rgba(60,60,60,0.4);border:1px solid rgba(60,60,60,0.8);border-radius:10px;padding:10px 16px;">
-          <span style="color:#3fb950;font-size:12px;font-weight:600;white-space:nowrap;">● Running</span>
-          <span style="color:#444444;font-size:12px;">│</span>
-          <span style="color:#ffffff;font-size:12px;">Port <span id="srv-port-display" style="color:#ffffff;font-family:monospace;">25565</span></span>
-          <span style="color:#444444;font-size:12px;">│</span>
-          <span style="color:#ffffff;font-size:12px;white-space:nowrap;">MC <span id="srv-ver-display" style="color:#ffffff;font-family:monospace;"></span></span>
-          <span style="color:#444444;font-size:12px;">│</span>
-          <span id="srv-players-badge" style="color:#ffffff;font-size:12px;white-space:nowrap;">0/<span id="srv-maxplayers-display">20</span> players</span>
-          <span style="color:#444444;font-size:12px;">│</span>
-          <span id="srv-address" style="color:#ffffff;font-family:monospace;font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">localhost:25565</span>
-          <button id="srv-copy-addr-btn" style="background:none;border:1px solid rgba(245,166,35,0.3);border-radius:5px;color:#ffffff;font-size:10px;cursor:pointer;padding:2px 8px;font-family:'Roboto',sans-serif;white-space:nowrap;flex-shrink:0;">Copy</button>
-          <a href="https://playit.gg" target="_blank" style="font-size:11px;color:#aaaaaa;white-space:nowrap;flex-shrink:0;">playit.gg →</a>
-        </div>
-      </div>
-
-      <!-- Console -->
-      <div style="flex:1;min-height:200px;display:flex;flex-direction:column;overflow:hidden;background:rgba(0,0,0,0.45);">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid rgba(60,60,60,0.5);flex-shrink:0;">
-          <span style="font-size:10px;color:#444444;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Console</span>
-          <div style="display:flex;gap:6px;">
-            <button id="srv-log-clear" style="background:none;border:1px solid rgba(60,60,60,0.8);color:#aaaaaa;font-size:10px;cursor:pointer;padding:2px 10px;border-radius:5px;font-family:'Roboto',sans-serif;">Clear</button>
-            <button id="srv-log-copy" style="background:none;border:1px solid rgba(60,60,60,0.8);color:#aaaaaa;font-size:10px;cursor:pointer;padding:2px 10px;border-radius:5px;font-family:'Roboto',sans-serif;">Copy</button>
-          </div>
-        </div>
-        <div id="srv-log" style="flex:1;overflow-y:auto;padding:12px 18px;font-family:'Consolas','Courier New',monospace;font-size:12px;color:#ffffff;line-height:1.7;scrollbar-color:#444444 transparent;">
-          <div id="srv-log-placeholder" style="color:#444444;">Select a version and click Start Server</div>
-        </div>
-        <div style="display:flex;border-top:1px solid rgba(60,60,60,0.5);flex-shrink:0;">
-          <span style="padding:9px 12px;font-family:monospace;font-size:13px;color:#ffffff;background:rgba(0,0,0,0.3);border-right:1px solid rgba(60,60,60,0.5);">›</span>
-          <input id="srv-cmd-input" type="text" placeholder="Command — e.g. list, say Hello, op player"
-            style="flex:1;background:rgba(0,0,0,0.3);border:none;color:#ffffff;padding:9px 12px;font-size:12px;font-family:monospace;outline:none;" />
-          <button id="srv-cmd-btn" style="padding:9px 18px;background:rgba(60,60,60,0.5);border:none;border-left:1px solid rgba(60,60,60,0.5);color:#ffffff;font-size:12px;cursor:pointer;font-weight:600;font-family:'Roboto',sans-serif;">Send</button>
-        </div>
-      </div>
-
-      <!-- Saved + Community -->
-      <div style="max-height:160px;overflow-y:auto;border-top:1px solid rgba(60,60,60,0.5);padding:12px 24px;display:flex;flex-direction:column;gap:8px;background:rgba(0,0,0,0.25);flex-shrink:0;scrollbar-color:#444444 transparent;">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-          <span style="font-size:10px;color:#444444;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Saved</span>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <label class="toggle toggle-sm"><input type="checkbox" id="srv-247-toggle" /><span class="toggle-slider"></span></label>
-            <span style="font-size:11px;color:#aaaaaa;">24/7 list</span>
-            <button id="srv-save-btn" style="padding:3px 12px;background:rgba(60,60,60,0.5);border:1px solid rgba(245,166,35,0.25);border-radius:6px;color:#ffffff;font-size:11px;font-weight:600;cursor:pointer;font-family:'Roboto',sans-serif;">Save</button>
-            <span id="srv-save-status" style="font-size:11px;color:#444444;"></span>
-          </div>
-        </div>
-        <div id="saved-servers" style="display:flex;flex-direction:column;gap:5px;">
-          <div style="color:#444444;font-size:12px;" id="saved-servers-empty">No saved servers yet</div>
-        </div>
-        <span style="font-size:10px;color:#444444;letter-spacing:2px;text-transform:uppercase;font-weight:600;margin-top:2px;">Community</span>
-        <div id="community-servers" style="display:flex;flex-direction:column;gap:5px;">
-          <div style="color:#444444;font-size:12px;">Loading…</div>
-        </div>
-      </div>
     </div>
 
     <!-- Files panel -->

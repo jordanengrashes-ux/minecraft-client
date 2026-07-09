@@ -17,9 +17,7 @@ let overlayWin: BrowserWindow | null = null;
 let aiWin:      BrowserWindow | null = null;
 let mcAuthToken: any = null;
 let updateReady = false;
-let serverProcess: ChildProcess | null = null;
 let keepAwakeId: number | null = null;
-let srvUserStopped = false;
 let mcProcess: ChildProcess | null = null;
 let javaReadyPromise: Promise<string> | null = null;
 
@@ -431,54 +429,6 @@ async function authenticateWithMinecraft(code: string): Promise<any> {
     meta: { type: 'msa', demo: false },
   };
 }
-
-// ── Voxel SMP — external Paper server control ─────────────────────────────────
-const VOXEL_SRV_DIR       = 'C:\\Users\\Jorda\\VoxelServer';
-const VOXEL_SRV_BAT       = path.join(VOXEL_SRV_DIR, 'start.bat');
-const VOXEL_SRV_AUTOSTART = path.join(app.getPath('userData'), 'voxel-srv-autostart.json');
-let voxelSrvProcess: ReturnType<typeof spawn> | null = null;
-
-function voxelSrvRunning(): boolean {
-  if (voxelSrvProcess && !voxelSrvProcess.killed) return true;
-  // Also check if port 25565 is already listening (started outside the app)
-  try {
-    const r = spawnSync('powershell', ['-NoProfile', '-Command',
-      '(netstat -an | Select-String ":25565.*LISTENING").Count -gt 0'], { encoding: 'utf-8', timeout: 3000 });
-    return (r.stdout || '').trim() === 'True';
-  } catch { return false; }
-}
-
-ipcMain.handle('voxel-srv-status', () => ({ running: voxelSrvRunning() }));
-
-ipcMain.handle('voxel-srv-start', async () => {
-  if (voxelSrvRunning()) return { ok: false, error: 'Already running' };
-  if (!fs.existsSync(VOXEL_SRV_BAT)) return { ok: false, error: `start.bat not found at ${VOXEL_SRV_BAT}` };
-  try {
-    voxelSrvProcess = spawn('cmd.exe', ['/c', VOXEL_SRV_BAT], {
-      cwd: VOXEL_SRV_DIR, stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    voxelSrvProcess.stdout?.on('data', (d: Buffer) => gameWin?.webContents.send('voxel-srv-log', d.toString()));
-    voxelSrvProcess.stderr?.on('data', (d: Buffer) => gameWin?.webContents.send('voxel-srv-log', d.toString()));
-    voxelSrvProcess.on('close', () => { voxelSrvProcess = null; gameWin?.webContents.send('voxel-srv-closed'); });
-    return { ok: true };
-  } catch (err: any) { return { ok: false, error: err.message }; }
-});
-
-ipcMain.handle('voxel-srv-stop', async () => {
-  if (voxelSrvProcess?.stdin) { voxelSrvProcess.stdin.write('stop\n'); }
-  setTimeout(() => { try { voxelSrvProcess?.kill(); } catch {} voxelSrvProcess = null; }, 8000);
-  return { ok: true };
-});
-
-ipcMain.handle('voxel-srv-autostart-get', () => {
-  try { return JSON.parse(fs.readFileSync(VOXEL_SRV_AUTOSTART, 'utf-8')).enabled ?? false; } catch { return false; }
-});
-ipcMain.handle('voxel-srv-autostart-set', (_e, enabled: boolean) => {
-  try { fs.writeFileSync(VOXEL_SRV_AUTOSTART, JSON.stringify({ enabled }), 'utf-8'); } catch {}
-  // Also register/unregister the app itself to open at Windows login
-  app.setLoginItemSettings({ openAtLogin: enabled, path: app.getPath('exe') });
-  return { ok: true };
-});
 
 // ── Firebase user cache (reliable disk-based persistence for Electron) ────────
 ipcMain.handle('save-firebase-user', (_e, data: { uid: string; name: string }) => {
@@ -1186,242 +1136,6 @@ function copyDirRecursive(src: string, dest: string) {
   }
 }
 
-ipcMain.handle('server-pick-world', async () => {
-  const result = await dialog.showOpenDialog(gameWin!, {
-    title: 'Select Minecraft World Folder',
-    properties: ['openDirectory'],
-  });
-  if (result.canceled || !result.filePaths.length) return null;
-  return result.filePaths[0];
-});
-
-// Returns the Java major version required to run a given Minecraft version
-function javaForMcVersion(id: string): number {
-  const m = id.match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
-  if (!m) return 21;
-  const maj = parseInt(m[1]);
-  if (maj !== 1) return 25;                           // year-based (26.x …) → Java 25
-  const min = parseInt(m[2]);
-  const patch = m[3] ? parseInt(m[3]) : 0;
-  if (min < 17) return 8;
-  if (min < 21) return 17;
-  if (min === 21 && patch <= 11) return 21;
-  return 25;                                          // 1.21.12+ → Java 25
-}
-
-// Try PaperMC API for a server JAR download URL
-async function getPaperJarUrl(version: string): Promise<{ url: string; size: number } | null> {
-  try {
-    const data = await fetchJson(`https://api.papermc.io/v2/projects/paper/versions/${version}/builds`);
-    const builds: any[] = data.builds ?? [];
-    if (!builds.length) return null;
-    const latest  = builds[builds.length - 1];
-    const dlName  = latest.downloads?.application?.name as string | undefined;
-    if (!dlName) return null;
-    return {
-      url:  `https://api.papermc.io/v2/projects/paper/versions/${version}/builds/${latest.build}/downloads/${dlName}`,
-      size: latest.downloads?.application?.size ?? 0,
-    };
-  } catch { return null; }
-}
-
-// ── IPC: server hosting ───────────────────────────────────────────────────────
-ipcMain.handle('server-start', async (_e, opts: { version: string; maxMem: number; minMem?: number; name: string; port?: number; maxPlayers?: number; motd?: string; seed?: string; worldPath?: string; javaVersion?: number; }) => {
-  if (serverProcess) return { ok: false, error: 'Server is already running' };
-  try {
-    const serverDir = path.join(app.getPath('userData'), 'mc-server', opts.version);
-    const jarPath   = path.join(serverDir, 'server.jar');
-    fs.mkdirSync(serverDir, { recursive: true });
-
-    // Download server.jar if not cached
-    if (!fs.existsSync(jarPath)) {
-      gameWin?.webContents.send('server-log', '[Host] Fetching version info…');
-
-      let dlUrl  = '';
-      let dlSize = 0;
-
-      // 1. Try Mojang manifest (vanilla)
-      try {
-        const manifest = await fetchJson('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json');
-        const entry    = (manifest.versions as any[]).find((v: any) => v.id === opts.version);
-        if (entry) {
-          const info = await fetchJson(entry.url);
-          dlUrl  = info.downloads?.server?.url  ?? '';
-          dlSize = info.downloads?.server?.size ?? 0;
-        }
-      } catch {}
-
-      // 2. Fall back to PaperMC (handles year-based versions and versions missing from Mojang manifest)
-      if (!dlUrl) {
-        gameWin?.webContents.send('server-log', '[Host] Not in Mojang manifest — trying PaperMC…');
-        const paper = await getPaperJarUrl(opts.version);
-        if (paper) { dlUrl = paper.url; dlSize = paper.size; gameWin?.webContents.send('server-log', '[Host] Found on PaperMC ✓'); }
-      }
-
-      if (!dlUrl) throw new Error(`No server JAR found for ${opts.version}. Check the version name and try again.`);
-
-      const sizeMB = dlSize > 0 ? ` (${Math.round(dlSize / 1024 / 1024)}MB)` : '';
-      gameWin?.webContents.send('server-log', `[Host] Downloading server.jar${sizeMB}…`);
-      let lastPct = -1;
-      await downloadFileTo(dlUrl, jarPath, pct => {
-        if (pct !== lastPct && pct % 10 === 0) { lastPct = pct; gameWin?.webContents.send('server-log', `[Host] Downloading… ${pct}%`); }
-      });
-      gameWin?.webContents.send('server-log', '[Host] Download complete');
-    }
-
-    // Always accept EULA
-    fs.writeFileSync(path.join(serverDir, 'eula.txt'), 'eula=true\n');
-
-    // Import world folder — always overwrite so the user's chosen save is used
-    const worldDestDir = path.join(serverDir, 'world');
-    if (opts.worldPath) {
-      gameWin?.webContents.send('server-log', '[Host] Importing world — this may take a moment…');
-      if (fs.existsSync(worldDestDir)) fs.rmSync(worldDestDir, { recursive: true, force: true });
-      copyDirRecursive(opts.worldPath, worldDestDir);
-      gameWin?.webContents.send('server-log', '[Host] World imported');
-    }
-
-    // Write server.properties — online-mode=false avoids Mojang auth socket errors
-    const propsPath = path.join(serverDir, 'server.properties');
-    // Patch server.properties — write defaults on first run, then patch specific keys each start
-    const patchProps: Record<string, string> = {
-      'online-mode':              'false',
-      'server-port':              String(opts.port        ?? 25565),
-      'server-ip':                '',
-      'max-players':              String(opts.maxPlayers  ?? 20),
-      'view-distance':            '10',
-      'motd':                     opts.motd               || 'Voxel Client Server',
-      'pause-when-empty-seconds': '0',
-      'spawn-protection':         '32',
-      'enforce-secure-profile':   'false',
-    };
-    if (opts.seed) patchProps['level-seed'] = opts.seed;
-    let propsContent = fs.existsSync(propsPath) ? fs.readFileSync(propsPath, 'utf-8') : '';
-    for (const [k, v] of Object.entries(patchProps)) {
-      const re = new RegExp(`^${k}=.*`, 'm');
-      propsContent = re.test(propsContent) ? propsContent.replace(re, `${k}=${v}`) : `${k}=${v}\n` + propsContent;
-    }
-    fs.writeFileSync(propsPath, propsContent || Object.entries(patchProps).map(([k, v]) => `${k}=${v}`).join('\n') + '\n');
-
-    // Resolve Java the same way as game launch (bundled → cache → system → download)
-    // Use java.exe not javaw.exe — server needs stdout
-    const srvJava = opts.javaVersion ?? javaForMcVersion(opts.version);
-    const javawPath = await ensureJava(srvJava, (msg) => gameWin?.webContents.send('server-log', msg));
-    const javaExe   = javawPath.replace(/javaw(\.exe)?$/i, 'java$1');
-
-    const port    = opts.port ?? 25565;
-    const minMemM = (opts.minMem ?? 512);
-
-    // Open Windows Firewall for this port so clients can connect (best-effort, no UAC required for local rules)
-    try {
-      spawnSync('netsh', [
-        'advfirewall', 'firewall', 'add', 'rule',
-        `name=VoxelClientServer_${port}`, 'dir=in', 'action=allow', 'protocol=TCP', `localport=${port}`,
-      ], { windowsHide: true });
-    } catch {}
-
-    gameWin?.webContents.send('server-log', `[Host] Starting Minecraft ${opts.version} on port ${port}…`);
-    serverProcess = spawn(javaExe, [
-      `-Xmx${opts.maxMem}G`, `-Xms${minMemM}M`, '-jar', 'server.jar', '--nogui',
-    ], { cwd: serverDir, stdio: ['pipe', 'pipe', 'pipe'] });
-
-    // Keep system awake while server runs
-    srvUserStopped = false;
-    if (keepAwakeId === null) keepAwakeId = powerSaveBlocker.start('prevent-display-sleep');
-
-    let serverReady = false;
-    const handleOut = (d: Buffer) => {
-      const text = d.toString();
-      gameWin?.webContents.send('server-log', text);
-      // Detect server fully started
-      if (!serverReady && (text.includes(' Done (') || text.includes('! Done'))) {
-        serverReady = true;
-        gameWin?.webContents.send('server-ready', port);
-      }
-      // Player join → restore window + notify renderer + starter kit
-      const joinM = text.match(/(\w+) joined the game/);
-      if (joinM) {
-        if (gameWin?.isMinimized()) gameWin.restore();
-        gameWin?.show();
-        const player = joinM[1];
-        gameWin?.webContents.send('server-player-join', player);
-
-        // First-join starter kit: 16 steak, stone tools, leather armor
-        const kitsPath = path.join(serverDir, 'kits-given.json');
-        let kitsGiven: string[] = [];
-        try { kitsGiven = JSON.parse(fs.readFileSync(kitsPath, 'utf-8')); } catch {}
-        if (!kitsGiven.includes(player)) {
-          kitsGiven.push(player);
-          try { fs.writeFileSync(kitsPath, JSON.stringify(kitsGiven)); } catch {}
-          setTimeout(() => {
-            if (!serverProcess?.stdin) return;
-            const give = (item: string, n: number) =>
-              serverProcess!.stdin!.write(`give ${player} ${item} ${n}\n`);
-            give('minecraft:cooked_beef',        16);
-            give('minecraft:stone_sword',         1);
-            give('minecraft:stone_pickaxe',       1);
-            give('minecraft:stone_axe',           1);
-            give('minecraft:stone_shovel',        1);
-            give('minecraft:leather_helmet',      1);
-            give('minecraft:leather_chestplate',  1);
-            give('minecraft:leather_leggings',    1);
-            give('minecraft:leather_boots',       1);
-            gameWin?.webContents.send('server-log', `[Host] Starter kit sent to ${player}\n`);
-          }, 2500);
-        }
-      }
-      // Player count from /list response
-      const cntM = text.match(/There are (\d+) of a max(?: of)? (\d+) players/);
-      if (cntM) gameWin?.webContents.send('server-player-count', parseInt(cntM[1]), parseInt(cntM[2]));
-    };
-    serverProcess.stdout?.on('data', handleOut);
-    serverProcess.stderr?.on('data', (d: Buffer) => gameWin?.webContents.send('server-log', d.toString()));
-    serverProcess.on('close', (code: number) => {
-      if (keepAwakeId !== null) { powerSaveBlocker.stop(keepAwakeId); keepAwakeId = null; }
-      serverProcess = null;
-      gameWin?.webContents.send('server-closed', { code: code ?? 0, userStopped: srvUserStopped });
-      srvUserStopped = false;
-    });
-
-    return { ok: true };
-  } catch (err: any) {
-    serverProcess = null;
-    return { ok: false, error: err.message };
-  }
-});
-
-ipcMain.handle('server-set-autostart', (_e, enabled: boolean) => {
-  try {
-    app.setLoginItemSettings({ openAtLogin: enabled, path: app.getPath('exe') });
-    return { ok: true };
-  } catch (err: any) { return { ok: false, error: err.message }; }
-});
-
-ipcMain.handle('server-get-autostart', () => {
-  try { return { ok: true, enabled: app.getLoginItemSettings().openAtLogin }; }
-  catch { return { ok: true, enabled: false }; }
-});
-
-ipcMain.handle('server-stop', async () => {
-  if (!serverProcess) return { ok: false, error: 'Not running' };
-  srvUserStopped = true;
-  serverProcess.stdin?.write('stop\n');
-  setTimeout(() => { try { serverProcess?.kill(); } catch {} }, 15000);
-  return { ok: true };
-});
-
-ipcMain.handle('server-command', async (_e, cmd: string) => {
-  if (!serverProcess?.stdin) return { ok: false, error: 'Server not running' };
-  serverProcess.stdin.write(cmd + '\n');
-  return { ok: true };
-});
-
-ipcMain.handle('server-open-folder', async (_e, version: string) => {
-  const dir = path.join(app.getPath('userData'), 'mc-server', version || 'default');
-  fs.mkdirSync(dir, { recursive: true });
-  shell.openPath(dir);
-  return { ok: true };
-});
 
 // ── IPC: mod install / remove ─────────────────────────────────────────────────
 // Each Minecraft version gets its own mods folder — vanilla Fabric has no
@@ -1533,25 +1247,62 @@ ipcMain.handle('mc-install-modpack', async (_e: any, opts: { projectId: string }
   }
 });
 
-// ── CurseForge mod search ──────────────────────────────────────────────────────
+// ── CurseForge content search ─────────────────────────────────────────────────
 const CF_BASE = 'https://api.curseforge.com/v1';
 const cfHeaders = () => ({ 'x-api-key': CF_API_KEY, 'Content-Type': 'application/json' });
 
-ipcMain.handle('cf-search', async (_e, opts: { query: string; mcVersion: string }) => {
+// Well-documented CurseForge classIds for Minecraft (gameId 432). Confirmed
+// against multiple independent CF API references — these are stable, static
+// top-level category IDs, not user data, so hardcoding them is safe.
+const CF_CLASS_IDS: Record<string, number> = {
+  mod: 6, modpack: 4471, resourcepack: 12, world: 17,
+};
+// "Shaders" isn't consistently documented with a fixed classId across CF API
+// references, so instead of guessing a number and silently returning empty
+// results if wrong, resolve it once at runtime from CF's own category list
+// and cache it.
+let cfShaderClassId: number | null | undefined; // undefined = not yet resolved
+async function resolveCfShaderClassId(): Promise<number | null> {
+  if (cfShaderClassId !== undefined) return cfShaderClassId;
+  let resolved: number | null = null;
+  try {
+    const res = await fetch(`${CF_BASE}/categories?gameId=432`, { headers: cfHeaders() });
+    if (res.ok) {
+      const data: any = await res.json();
+      const cats: any[] = data.data ?? [];
+      const shaderClass = cats.find((c: any) => c.isClass && /shader/i.test(c.name));
+      resolved = shaderClass?.id ?? null;
+    }
+  } catch { resolved = null; }
+  cfShaderClassId = resolved;
+  return resolved;
+}
+
+async function resolveCfClassId(contentType: string): Promise<number | null> {
+  if (contentType === 'shader') return resolveCfShaderClassId();
+  return CF_CLASS_IDS[contentType] ?? CF_CLASS_IDS.mod;
+}
+
+ipcMain.handle('cf-search', async (_e, opts: { query: string; mcVersion: string; contentType?: string }) => {
   if (!CF_API_KEY) return { ok: false, error: 'No CurseForge API key configured' };
   try {
+    const contentType = opts.contentType || 'mod';
+    const classId = await resolveCfClassId(contentType);
+    if (classId == null) throw new Error(`Could not resolve CurseForge category for ${contentType}`);
     const params = new URLSearchParams({
       gameId: '432',           // Minecraft
-      classId: '6',            // Mods only — without this, modpacks/resource packs/
-                                // worlds show up mixed in and get force-installed as
-                                // if they were a single mod jar when toggled on
+      classId: String(classId), // Restrict to one content type — without this,
+                                 // modpacks/resource packs/worlds show up mixed
+                                 // into mod results and get force-installed as
+                                 // if they were a single mod jar when toggled on
       searchFilter: opts.query,
-      modLoaderType: '4',      // Fabric
       gameVersion: opts.mcVersion || '1.21.4',
       pageSize: '20',
       sortField: opts.query ? '2' : '6', // relevance : totalDownloads
       sortOrder: 'desc',
     });
+    // Loader filter only makes sense for loader-dependent content (mods/modpacks)
+    if (contentType === 'mod' || contentType === 'modpack') params.set('modLoaderType', '4');
     const res = await fetch(`${CF_BASE}/mods/search?${params}`, { headers: cfHeaders() });
     if (!res.ok) throw new Error(`CurseForge API error ${res.status}`);
     const data: any = await res.json();
@@ -1559,14 +1310,15 @@ ipcMain.handle('cf-search', async (_e, opts: { query: string; mcVersion: string 
   } catch (err: any) { return { ok: false, error: err.message }; }
 });
 
-ipcMain.handle('cf-get-download-url', async (_e, opts: { modId: number; mcVersion: string }) => {
+ipcMain.handle('cf-get-download-url', async (_e, opts: { modId: number; mcVersion: string; contentType?: string }) => {
   if (!CF_API_KEY) return { ok: false, error: 'No CurseForge API key configured' };
   try {
+    const contentType = opts.contentType || 'mod';
     const params = new URLSearchParams({
       gameVersion: opts.mcVersion || '1.21.4',
-      modLoaderType: '4',
       pageSize: '5',
     });
+    if (contentType === 'mod' || contentType === 'modpack') params.set('modLoaderType', '4');
     const res = await fetch(`${CF_BASE}/mods/${opts.modId}/files?${params}`, { headers: cfHeaders() });
     if (!res.ok) throw new Error(`CurseForge API error ${res.status}`);
     const data: any = await res.json();
@@ -1577,6 +1329,146 @@ ipcMain.handle('cf-get-download-url', async (_e, opts: { modId: number; mcVersio
     const id = file.id as number;
     const url = file.downloadUrl || `https://mediafiles.forgecdn.net/files/${Math.floor(id/1000)}/${id%1000}/${encodeURIComponent(file.fileName)}`;
     return { ok: true, url, filename: file.fileName, fileId: id };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('cf-install-world', async (_e, opts: { modId: number; mcVersion: string }) => {
+  if (!CF_API_KEY) return { ok: false, error: 'No CurseForge API key configured' };
+  try {
+    const params = new URLSearchParams({ pageSize: '5' });
+    if (opts.mcVersion) params.set('gameVersion', opts.mcVersion);
+    const res = await fetch(`${CF_BASE}/mods/${opts.modId}/files?${params}`, { headers: cfHeaders() });
+    if (!res.ok) throw new Error(`CurseForge API error ${res.status}`);
+    const data: any = await res.json();
+    const files: any[] = data.data ?? [];
+    if (!files.length) throw new Error('No files found for this world');
+    const file = files[0];
+    const id = file.id as number;
+    const url = file.downloadUrl || `https://mediafiles.forgecdn.net/files/${Math.floor(id/1000)}/${id%1000}/${encodeURIComponent(file.fileName)}`;
+
+    const tmpZip = path.join(os.tmpdir(), `voxel-cfworld-${opts.modId}-${id}.zip`);
+    await downloadFileTo(url, tmpZip);
+    const tmpExtractDir = path.join(os.tmpdir(), `voxel-cfworld-extract-${opts.modId}-${id}`);
+    fs.rmSync(tmpExtractDir, { recursive: true, force: true });
+    const zipBuf = fs.readFileSync(tmpZip);
+    extractZipAll(zipBuf, tmpExtractDir);
+    try { fs.unlinkSync(tmpZip); } catch {}
+
+    // CF world archives vary between the save files sitting at the zip root
+    // and being wrapped in one folder — search a couple levels deep for the
+    // actual save (identified by level.dat) instead of assuming either shape.
+    function findWorldRoot(dir: string, depth = 0): string | null {
+      if (fs.existsSync(path.join(dir, 'level.dat'))) return dir;
+      if (depth >= 2) return null;
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          const found = findWorldRoot(path.join(dir, entry.name), depth + 1);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    const worldRoot = findWorldRoot(tmpExtractDir);
+    if (!worldRoot) { fs.rmSync(tmpExtractDir, { recursive: true, force: true }); throw new Error('No level.dat found in this world archive'); }
+
+    const safeName = (file.displayName || file.fileName || `world-${id}`)
+      .replace(/\.zip$/i, '').replace(/[^a-zA-Z0-9._ -]/g, '_').trim() || `world-${id}`;
+    const savesDir = path.join(mcRoot(), 'saves');
+    fs.mkdirSync(savesDir, { recursive: true });
+    let destDir = path.join(savesDir, safeName);
+    let suffix = 1;
+    while (fs.existsSync(destDir)) { destDir = path.join(savesDir, `${safeName} (${++suffix})`); }
+    copyDirRecursive(worldRoot, destDir);
+    fs.rmSync(tmpExtractDir, { recursive: true, force: true });
+
+    return { ok: true, name: path.basename(destDir) };
+  } catch (err: any) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('cf-install-modpack', async (_e, opts: { modId: number }) => {
+  if (!CF_API_KEY) return { ok: false, error: 'No CurseForge API key configured' };
+  const send = (data: object) => gameWin?.webContents.send('mc-modpack-progress', data);
+  try {
+    send({ phase: 'fetching' });
+    const filesRes = await fetch(`${CF_BASE}/mods/${opts.modId}/files?pageSize=5`, { headers: cfHeaders() });
+    if (!filesRes.ok) throw new Error(`CurseForge API error ${filesRes.status}`);
+    const filesData: any = await filesRes.json();
+    const packFile = (filesData.data ?? [])[0];
+    if (!packFile) throw new Error('No files found for this modpack');
+    const packId = packFile.id as number;
+    const packUrl = packFile.downloadUrl || `https://mediafiles.forgecdn.net/files/${Math.floor(packId/1000)}/${packId%1000}/${encodeURIComponent(packFile.fileName)}`;
+
+    const tmpZip = path.join(os.tmpdir(), `voxel-cfpack-${opts.modId}.zip`);
+    send({ phase: 'downloading', pct: 0 });
+    await downloadFileTo(packUrl, tmpZip, pct => send({ phase: 'downloading', pct }));
+    const zipBuf = fs.readFileSync(tmpZip);
+    const manifestBuf = await extractFromZip(zipBuf, 'manifest.json');
+    const manifest = JSON.parse(manifestBuf.toString('utf-8'));
+
+    const packMcVersion = (manifest.minecraft?.version ?? '') as string;
+    const loaderEntry = (manifest.minecraft?.modLoaders ?? []).find((l: any) => l.primary) ?? manifest.minecraft?.modLoaders?.[0];
+    const modsDir = modsDirFor(packMcVersion);
+    fs.mkdirSync(modsDir, { recursive: true });
+
+    // Resolve every referenced mod file's download URL in batched bulk calls
+    // instead of one request per mod — CurseForge's /mods/files endpoint
+    // accepts a batch of file IDs and returns all their info in one response.
+    const fileIds: number[] = (manifest.files ?? []).map((f: any) => f.fileID).filter((n: any) => typeof n === 'number');
+    const installed: string[] = [];
+    if (fileIds.length) {
+      send({ phase: 'mods', current: 0, total: fileIds.length });
+      const fileInfoById = new Map<number, any>();
+      const CHUNK = 50;
+      for (let i = 0; i < fileIds.length; i += CHUNK) {
+        const chunk = fileIds.slice(i, i + CHUNK);
+        try {
+          const bulkRes = await fetch(`${CF_BASE}/mods/files`, {
+            method: 'POST', headers: cfHeaders(), body: JSON.stringify({ fileIds: chunk }),
+          });
+          if (bulkRes.ok) {
+            const bulkData: any = await bulkRes.json();
+            for (const f of bulkData.data ?? []) fileInfoById.set(f.id, f);
+          }
+        } catch {}
+      }
+      let done = 0;
+      for (const fid of fileIds) {
+        done++;
+        send({ phase: 'mods', current: done, total: fileIds.length });
+        const f = fileInfoById.get(fid);
+        if (!f) continue;
+        const durl = f.downloadUrl || `https://mediafiles.forgecdn.net/files/${Math.floor(fid/1000)}/${fid%1000}/${encodeURIComponent(f.fileName)}`;
+        try {
+          await downloadFileTo(durl, path.join(modsDir, f.fileName));
+          installed.push(f.fileName);
+        } catch {}
+      }
+    }
+
+    // Overrides can include extra mod jars bundled directly in the pack (not
+    // resolved through the CF API) — pull those in too. Anything else in
+    // overrides (configs, resourcepacks) is skipped: there's no per-version
+    // config namespacing, so extracting into the shared .minecraft root risks
+    // clobbering config for other installed versions/packs.
+    try {
+      const tmpExtractDir = path.join(os.tmpdir(), `voxel-cfpack-extract-${opts.modId}`);
+      fs.rmSync(tmpExtractDir, { recursive: true, force: true });
+      extractZipAll(zipBuf, tmpExtractDir);
+      const overridesModsDir = path.join(tmpExtractDir, manifest.overrides || 'overrides', 'mods');
+      if (fs.existsSync(overridesModsDir)) {
+        for (const f of fs.readdirSync(overridesModsDir)) {
+          if (f.endsWith('.jar')) {
+            fs.copyFileSync(path.join(overridesModsDir, f), path.join(modsDir, f));
+            if (!installed.includes(f)) installed.push(f);
+          }
+        }
+      }
+      fs.rmSync(tmpExtractDir, { recursive: true, force: true });
+    } catch {}
+
+    try { fs.unlinkSync(tmpZip); } catch {}
+
+    return { ok: true, filenames: installed, mcVersion: packMcVersion, fabricVersion: loaderEntry?.id ?? '', fileId: packId };
   } catch (err: any) { return { ok: false, error: err.message }; }
 });
 

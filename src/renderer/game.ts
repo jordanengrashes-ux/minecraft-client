@@ -6,7 +6,7 @@ import { auth, signOut } from './firebase';
 
 
 const mc     = (window as any).mc;
-const server = (window as any).server;
+let myUid = '';
 
 // ── DOM ────────────────────────────────────────────────────────────────────────
 const userName      = document.getElementById('user-name')!;
@@ -65,14 +65,21 @@ function applyAccountName(name: string) {
 if ((window as any).electron) {
   (window as any).electron.onUserData((d: any) => {
     applyAccountName(d.name || 'Player');
-    if (d.email) initAdminPanel(d.email);
+    if (d.uid && d.uid !== myUid) {
+      myUid = d.uid;
+      initTokens(myUid);
+      initPresence(myUid);
+      initFriends(myUid);
+      // So guests/offline-account users (no Microsoft auth) can still be
+      // found by name when someone sends them a friend request.
+      registerUserIndex(myUid, myDisplayName());
+    }
   });
 } else {
   const stored = sessionStorage.getItem('userData');
   if (stored) {
     const p = JSON.parse(stored);
     applyAccountName(p.name || 'Player');
-    if (p.email) setTimeout(() => initAdminPanel(p.email), 0);
   }
 }
 
@@ -678,10 +685,8 @@ const filesPanelEl        = document.getElementById('files-panel')!;
 const navCustomize        = document.getElementById('nav-customize')!;
 const navSettings         = document.getElementById('nav-settings')!;
 const navServer         = document.getElementById('nav-server')!;
-const navMyServer       = document.getElementById('nav-my-server')!;
 const navCosmetics      = document.getElementById('nav-cosmetics')!;
 const navFriends        = document.getElementById('nav-friends')!;
-const serverPanelEl     = document.getElementById('server-panel')!;
 const cosmeticsPanelEl  = document.getElementById('cosmetics-panel')!;
 const friendsPanelEl    = document.getElementById('friends-panel')!;
 const chatPanelEl = document.getElementById('chat-panel')!;
@@ -690,8 +695,8 @@ const aiPanelEl   = document.getElementById('ai-panel')!;
 const navAi       = document.getElementById('nav-ai')!;
 const cfPanelEl   = document.getElementById('curseforge-panel')!;
 const navCf       = document.getElementById('nav-curseforge')!;
-const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, cfPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, serverPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl, chatPanelEl, aiPanelEl];
-const allNavs   = [navPlay, navBedrock, navMods, navCf, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navMyServer, navCosmetics, navFriends, navCustomize, navSettings, navChat, navAi];
+const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, cfPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl, chatPanelEl, aiPanelEl];
+const allNavs   = [navPlay, navBedrock, navMods, navCf, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navCosmetics, navFriends, navCustomize, navSettings, navChat, navAi];
 
 function showPanel(panel: HTMLElement, nav: HTMLElement) {
   allPanels.forEach(p => p.style.display = 'none');
@@ -714,7 +719,6 @@ navServer        .addEventListener('click', () => {
   const url = 'https://voxelhosting.vercel.app/';
   (window as any).electron?.openExternal?.(url) || window.open(url);
 });
-navMyServer      .addEventListener('click', () => { showPanel(serverPanelEl, navMyServer); });
 navCosmetics     .addEventListener('click', () => { showPanel(cosmeticsPanelEl,    navCosmetics); if (!cosmeticsPanelEl.dataset.loaded) { initCosmetics(); cosmeticsPanelEl.dataset.loaded = '1'; } });
 navFriends       .addEventListener('click', () => { showPanel(friendsPanelEl,      navFriends);   if (!friendsPanelEl.dataset.loaded) { initFriendsPanel(); friendsPanelEl.dataset.loaded = '1'; } });
 navCustomize     .addEventListener('click', () => { showPanel(customizePanelEl,    navCustomize); if (!customizePanelEl.dataset.loaded) { initCustomize(); searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
@@ -1393,7 +1397,7 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 // ── Installed modpacks (persisted) ───────────────────────────────────────────
-interface InstalledModpack { projectId: string; title: string; mcVersion: string; filenames: string[]; versionId?: string }
+interface InstalledModpack { projectId: string; title: string; mcVersion: string; filenames: string[]; versionId?: string; cfId?: number; fileId?: number }
 const INSTALLED_MODPACKS_KEY = 'voxel_installed_modpacks';
 function loadInstalledModpacks(): Record<string, InstalledModpack> {
   try { return JSON.parse(localStorage.getItem(INSTALLED_MODPACKS_KEY) || '{}'); } catch { return {}; }
@@ -2281,12 +2285,33 @@ document.getElementById('mod-profile-save-btn')?.addEventListener('click', () =>
 
 renderModProfiles();
 
-// ── CurseForge mod browser ────────────────────────────────────────────────────
+// ── CurseForge browser (mods / modpacks / resource packs / shaders / worlds) ──
 const cf = (window as any).curseforge;
+type CfContentType = 'mod' | 'modpack' | 'resourcepack' | 'shader' | 'world';
+let cfContentType: CfContentType = 'mod';
 
 function initCurseForge() {
-  searchCurseForge('');
   const searchEl = document.getElementById('cf-search') as HTMLInputElement;
+  document.querySelectorAll('.cf-type-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = (btn as HTMLElement).dataset.type as CfContentType;
+      if (type === cfContentType) return;
+      cfContentType = type;
+      document.querySelectorAll('.cf-type-tab').forEach(b => {
+        const active = b === btn;
+        (b as HTMLElement).classList.toggle('active', active);
+        (b as HTMLElement).style.background   = active ? 'rgba(241,100,54,0.12)' : '#0d0d0d';
+        (b as HTMLElement).style.borderColor  = active ? 'rgba(241,100,54,0.4)' : '#2a2a2a';
+        (b as HTMLElement).style.color        = active ? '#f16436' : '#aaaaaa';
+      });
+      const labels: Record<CfContentType, string> = {
+        mod: 'mods', modpack: 'modpacks', resourcepack: 'resource packs', shader: 'shaders', world: 'worlds',
+      };
+      searchEl.placeholder = `Search CurseForge ${labels[type]}…`;
+      searchCurseForge(searchEl.value.trim());
+    });
+  });
+  searchCurseForge('');
   let cfTimer: ReturnType<typeof setTimeout> | null = null;
   searchEl.addEventListener('input', () => {
     if (cfTimer) clearTimeout(cfTimer);
@@ -2297,21 +2322,21 @@ function initCurseForge() {
 // Same batched-badge pattern as Modrinth's queueModBuildVersion, but peeking
 // CurseForge's file list (a plain GET — doesn't install anything) to show
 // the actual matched build's filename for the selected MC version.
-const cfBuildVerQueue: Array<{ modId: number; mcVersion: string; el: HTMLElement }> = [];
+const cfBuildVerQueue: Array<{ modId: number; mcVersion: string; contentType: CfContentType; el: HTMLElement }> = [];
 let cfBuildVerFlushTimer: ReturnType<typeof setTimeout> | null = null;
-function queueCfBuildVersion(modId: number, mcVersion: string, el: HTMLElement) {
-  cfBuildVerQueue.push({ modId, mcVersion, el });
+function queueCfBuildVersion(modId: number, mcVersion: string, contentType: CfContentType, el: HTMLElement) {
+  cfBuildVerQueue.push({ modId, mcVersion, contentType, el });
   if (cfBuildVerFlushTimer) return;
   cfBuildVerFlushTimer = setTimeout(flushCfBuildVerQueue, 80);
 }
 async function flushCfBuildVerQueue() {
   cfBuildVerFlushTimer = null;
   const batch = cfBuildVerQueue.splice(0, cfBuildVerQueue.length);
-  await runBatched(batch, 5, async ({ modId, mcVersion, el }) => {
+  await runBatched(batch, 5, async ({ modId, mcVersion, contentType, el }) => {
     try {
-      const res = await cf.getDownload({ modId, mcVersion });
+      const res = await cf.getDownload({ modId, mcVersion, contentType });
       if (res?.ok && res.filename) {
-        el.textContent = res.filename.replace(/\.jar$/i, '');
+        el.textContent = res.filename.replace(/\.(jar|zip)$/i, '');
         el.style.color = '#f5a623';
       } else {
         el.textContent = '';
@@ -2320,17 +2345,246 @@ async function flushCfBuildVerQueue() {
   });
 }
 
+function fmtCfDownloads(n: number): string {
+  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
+}
+
+function cfCardShell(mod: any): { card: HTMLElement; statusEl: HTMLElement; buildVerEl: HTMLElement | null } {
+  const card = document.createElement('div');
+  card.className = 'mod-card';
+  const icon = mod.logo?.thumbnailUrl
+    ? `<img src="${mod.logo.thumbnailUrl}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
+    : `<div class="mod-icon" style="background:#1a0a00;border:1px solid #331100;"></div>`;
+  const showBuildVer = cfContentType === 'mod' || cfContentType === 'modpack';
+  card.innerHTML = `
+    ${icon}
+    <div class="mod-info">
+      <div class="mod-name">${mod.name}</div>
+      <div class="mod-desc">${mod.summary}</div>
+      <div class="mod-tags">
+        <span class="mod-tag" style="background:rgba(241,100,54,0.1);color:#f16436;border-color:rgba(241,100,54,0.3);">CurseForge</span>
+        ${showBuildVer ? `<span class="mod-tag cf-build-ver" style="margin-left:auto;color:#666666;">…</span>` : ''}
+        <span class="mod-tag" style="${showBuildVer ? '' : 'margin-left:auto;'}">⬇ ${fmtCfDownloads(mod.downloadCount)}</span>
+      </div>
+    </div>
+    <div class="mod-right" id="cf-right-${mod.id}"></div>`;
+  const statusEl = document.createElement('div');
+  statusEl.className = 'mod-version';
+  const buildVerEl = card.querySelector('.cf-build-ver') as HTMLElement | null;
+  return { card, statusEl, buildVerEl };
+}
+
+function buildCfModCard(mod: any, ver: string): HTMLElement {
+  const { card, statusEl, buildVerEl } = cfCardShell(mod);
+  const installed = loadInstalledMods();
+  const isOn = !!Object.values(installed).find((m: any) => m.cfId === mod.id);
+  card.className = 'mod-card' + (isOn ? ' enabled' : '');
+  const right = card.querySelector(`#cf-right-${mod.id}`)!;
+  right.appendChild(statusEl);
+  right.innerHTML += `<label class="toggle"><input type="checkbox" ${isOn ? 'checked' : ''} /><span class="toggle-slider"></span></label>`;
+  const input = right.querySelector('input') as HTMLInputElement;
+  if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+  if (buildVerEl) queueCfBuildVersion(mod.id, ver, 'mod', buildVerEl);
+
+  input.addEventListener('change', async e => {
+    const checked = (e.target as HTMLInputElement).checked;
+    input.disabled = true;
+    if (checked) {
+      statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
+      try {
+        const dlRes = await cf.getDownload({ modId: mod.id, mcVersion: ver, contentType: 'mod' });
+        if (!dlRes.ok) throw new Error(dlRes.error);
+        statusEl.textContent = '⬇';
+        const installRes = await mc.installMod({ url: dlRes.url, filename: dlRes.filename, mcVersion: ver });
+        if (!installRes.ok) throw new Error(installRes.error);
+        const ins = loadInstalledMods();
+        ins[`cf_${mod.id}`] = { filename: dlRes.filename, name: mod.name, mcVersion: ver, cfId: mod.id, fileId: dlRes.fileId };
+        saveInstalledMods(ins);
+        card.className = 'mod-card enabled';
+        statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+        updateModsBadge();
+      } catch (err: any) {
+        input.checked = false; card.className = 'mod-card';
+        statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+        statusEl.title = err.message;
+      }
+    } else {
+      const ins = loadInstalledMods();
+      const info = ins[`cf_${mod.id}`];
+      if (info && mc) await mc.removeMod({ filename: info.filename, mcVersion: info.mcVersion || ver });
+      delete ins[`cf_${mod.id}`];
+      saveInstalledMods(ins);
+      card.className = 'mod-card';
+      statusEl.textContent = '';
+      updateModsBadge();
+    }
+    input.disabled = false;
+  });
+  return card;
+}
+
+function buildCfModpackCard(mod: any, ver: string): HTMLElement {
+  const { card, statusEl, buildVerEl } = cfCardShell(mod);
+  const key = `cf_${mod.id}`;
+  const packs = loadInstalledModpacks();
+  const isOn = !!packs[key];
+  card.className = 'mod-card' + (isOn ? ' enabled' : '');
+  const right = card.querySelector(`#cf-right-${mod.id}`)!;
+  right.appendChild(statusEl);
+  right.innerHTML += `<label class="toggle"><input type="checkbox" ${isOn ? 'checked' : ''} /><span class="toggle-slider"></span></label>`;
+  const input = right.querySelector('input') as HTMLInputElement;
+  if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+  if (buildVerEl) queueCfBuildVersion(mod.id, ver, 'modpack', buildVerEl);
+
+  input.addEventListener('change', async e => {
+    const checked = (e.target as HTMLInputElement).checked;
+    input.disabled = true;
+    if (checked) {
+      statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
+      modpackProgressEl = statusEl;
+      try {
+        // Remove any currently installed modpacks first — mirrors the
+        // Modrinth modpack install behavior (one active pack at a time).
+        const existing = loadInstalledModpacks();
+        for (const pack of Object.values(existing)) {
+          for (const filename of pack.filenames) {
+            try { await mc.removeMod({ filename, mcVersion: pack.mcVersion }); } catch {}
+          }
+        }
+        saveInstalledModpacks({});
+
+        const result = await cf.installModpack({ modId: mod.id });
+        if (!result.ok) throw new Error(result.error);
+        const updated = loadInstalledModpacks();
+        updated[key] = { projectId: '', title: mod.name, mcVersion: result.mcVersion, filenames: result.filenames, cfId: mod.id, fileId: result.fileId };
+        saveInstalledModpacks(updated);
+        card.className = 'mod-card enabled';
+        statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+        updateModsBadge();
+      } catch (err: any) {
+        input.checked = false; card.className = 'mod-card';
+        statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+        statusEl.title = err.message;
+      } finally {
+        modpackProgressEl = null;
+      }
+    } else {
+      const updated = loadInstalledModpacks();
+      const pack = updated[key];
+      if (pack) {
+        for (const filename of pack.filenames) {
+          try { await mc.removeMod({ filename, mcVersion: pack.mcVersion }); } catch {}
+        }
+        delete updated[key];
+        saveInstalledModpacks(updated);
+      }
+      card.className = 'mod-card';
+      statusEl.textContent = '';
+      updateModsBadge();
+    }
+    input.disabled = false;
+  });
+  return card;
+}
+
+function buildCfResourceOrShaderCard(mod: any, ver: string, kind: 'resourcepack' | 'shader'): HTMLElement {
+  const { card, statusEl } = cfCardShell(mod);
+  const right = card.querySelector(`#cf-right-${mod.id}`)!;
+  right.appendChild(statusEl);
+  right.innerHTML += `<label class="toggle"><input type="checkbox" /><span class="toggle-slider"></span></label>`;
+  const input = right.querySelector('input') as HTMLInputElement;
+
+  (async () => {
+    const disk = kind === 'resourcepack' ? await mc.listResourcePacks() : await listInstalledShaderpacks();
+    const dlRes = await cf.getDownload({ modId: mod.id, mcVersion: ver, contentType: kind });
+    const filename = dlRes?.ok ? dlRes.filename : null;
+    const isOn = !!filename && disk.includes(filename);
+    input.checked = isOn;
+    card.className = 'mod-card' + (isOn ? ' enabled' : '');
+    if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+    input.dataset.filename = filename ?? '';
+  })();
+
+  input.addEventListener('change', async e => {
+    const checked = (e.target as HTMLInputElement).checked;
+    input.disabled = true;
+    if (checked) {
+      statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
+      try {
+        const dlRes = await cf.getDownload({ modId: mod.id, mcVersion: ver, contentType: kind });
+        if (!dlRes.ok) throw new Error(dlRes.error);
+        statusEl.textContent = '⬇';
+        const installRes = kind === 'resourcepack'
+          ? await mc.installResourcePack({ url: dlRes.url, filename: dlRes.filename })
+          : await mc.installShaderpack({ url: dlRes.url, filename: dlRes.filename });
+        if (!installRes.ok) throw new Error(installRes.error);
+        input.dataset.filename = dlRes.filename;
+        card.className = 'mod-card enabled';
+        statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+        if (kind === 'shader') refreshShaderpackDropdown();
+      } catch (err: any) {
+        input.checked = false; card.className = 'mod-card';
+        statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+        statusEl.title = err.message;
+      }
+    } else {
+      const filename = input.dataset.filename;
+      if (filename) {
+        try {
+          if (kind === 'resourcepack') await mc.removeResourcePack({ filename });
+          else { await mc.removeShaderpack({ filename }); refreshShaderpackDropdown(); }
+        } catch {}
+      }
+      card.className = 'mod-card';
+      statusEl.textContent = '';
+    }
+    input.disabled = false;
+  });
+  return card;
+}
+
+function buildCfWorldCard(mod: any, ver: string): HTMLElement {
+  const { card, statusEl } = cfCardShell(mod);
+  const right = card.querySelector(`#cf-right-${mod.id}`)!;
+  right.appendChild(statusEl);
+  const btn = document.createElement('button');
+  btn.textContent = 'Import';
+  btn.style.cssText = 'padding:6px 16px;background:rgba(241,100,54,0.12);border:1px solid rgba(241,100,54,0.4);border-radius:7px;color:#f16436;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;';
+  right.appendChild(btn);
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    statusEl.textContent = '⬇'; statusEl.style.color = '#f6c356';
+    btn.textContent = 'Importing…';
+    try {
+      const res = await cf.installWorld({ modId: mod.id, mcVersion: ver });
+      if (!res.ok) throw new Error(res.error);
+      statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+      btn.textContent = '✓ Imported';
+      setTimeout(() => { btn.textContent = 'Import'; btn.disabled = false; }, 2000);
+    } catch (err: any) {
+      statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+      statusEl.title = err.message;
+      btn.textContent = '✗ Failed';
+      setTimeout(() => { btn.textContent = 'Import'; btn.disabled = false; }, 2500);
+    }
+  });
+  return card;
+}
+
 async function searchCurseForge(query: string) {
   const list    = document.getElementById('cf-list')!;
   const loading = document.getElementById('cf-loading')!;
   list.innerHTML = '';
   loading.style.display = 'flex';
   const ver = (document.getElementById('mc-version') as HTMLSelectElement)?.value || '26.1.2';
-  const res = await cf?.search({ query, mcVersion: ver });
+  const res = await cf?.search({ query, mcVersion: ver, contentType: cfContentType });
   loading.style.display = 'none';
   if (!res?.ok) {
     const q = encodeURIComponent(query || '');
-    const url = `https://www.curseforge.com/minecraft/search?search=${q}&class=mc-mods`;
+    const classSlug: Record<CfContentType, string> = {
+      mod: 'mc-mods', modpack: 'modpacks', resourcepack: 'texture-packs', shader: 'shaders', world: 'worlds',
+    };
+    const url = `https://www.curseforge.com/minecraft/search?search=${q}&class=${classSlug[cfContentType]}`;
     list.innerHTML = `<div style="text-align:center;padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;">
       <p style="color:#666;font-size:13px;">CurseForge API unavailable. Browse on the website:</p>
       <a href="${url}" style="background:#f16436;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;cursor:pointer;"
@@ -2344,76 +2598,10 @@ async function searchCurseForge(query: string) {
   }
   const frag = document.createDocumentFragment();
   for (const mod of res.data) {
-    const installed = loadInstalledMods();
-    const isOn = !!Object.values(installed).find((m: any) => m.cfId === mod.id);
-    const card = document.createElement('div');
-    card.className = 'mod-card' + (isOn ? ' enabled' : '');
-    const icon = mod.logo?.thumbnailUrl
-      ? `<img src="${mod.logo.thumbnailUrl}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
-      : `<div class="mod-icon" style="background:#1a0a00;border:1px solid #331100;"></div>`;
-    const dlCount = mod.downloadCount >= 1_000_000
-      ? `${(mod.downloadCount / 1_000_000).toFixed(1)}M`
-      : mod.downloadCount >= 1000 ? `${Math.round(mod.downloadCount / 1000)}k` : String(mod.downloadCount);
-    card.innerHTML = `
-      ${icon}
-      <div class="mod-info">
-        <div class="mod-name">${mod.name}</div>
-        <div class="mod-desc">${mod.summary}</div>
-        <div class="mod-tags">
-          <span class="mod-tag" style="background:rgba(241,100,54,0.1);color:#f16436;border-color:rgba(241,100,54,0.3);">CurseForge</span>
-          <span class="mod-tag cf-build-ver" style="margin-left:auto;color:#666666;">…</span>
-          <span class="mod-tag">⬇ ${dlCount}</span>
-        </div>
-      </div>
-      <div class="mod-right">
-        <div class="mod-version" id="cfstatus-${mod.id}"></div>
-        <label class="toggle">
-          <input type="checkbox" ${isOn ? 'checked' : ''} />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>`;
-
-    const input   = card.querySelector('input') as HTMLInputElement;
-    const statusEl = card.querySelector('.mod-version') as HTMLElement;
-    const cfBuildVerEl = card.querySelector('.cf-build-ver') as HTMLElement;
-    if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
-    queueCfBuildVersion(mod.id, ver, cfBuildVerEl);
-
-    input.addEventListener('change', async e => {
-      const checked = (e.target as HTMLInputElement).checked;
-      input.disabled = true;
-      if (checked) {
-        statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
-        try {
-          const dlRes = await cf.getDownload({ modId: mod.id, mcVersion: ver });
-          if (!dlRes.ok) throw new Error(dlRes.error);
-          statusEl.textContent = '⬇';
-          const installRes = await mc.installMod({ url: dlRes.url, filename: dlRes.filename, mcVersion: ver });
-          if (!installRes.ok) throw new Error(installRes.error);
-          const ins = loadInstalledMods();
-          ins[`cf_${mod.id}`] = { filename: dlRes.filename, name: mod.name, mcVersion: ver, cfId: mod.id, fileId: dlRes.fileId };
-          saveInstalledMods(ins);
-          card.className = 'mod-card enabled';
-          statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
-          updateModsBadge();
-        } catch (err: any) {
-          input.checked = false; card.className = 'mod-card';
-          statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
-          statusEl.title = err.message;
-        }
-      } else {
-        const ins = loadInstalledMods();
-        const info = ins[`cf_${mod.id}`];
-        if (info && mc) await mc.removeMod({ filename: info.filename, mcVersion: info.mcVersion || ver });
-        delete ins[`cf_${mod.id}`];
-        saveInstalledMods(ins);
-        card.className = 'mod-card';
-        statusEl.textContent = '';
-        updateModsBadge();
-      }
-      input.disabled = false;
-    });
-
+    const card = cfContentType === 'mod'          ? buildCfModCard(mod, ver)
+               : cfContentType === 'modpack'       ? buildCfModpackCard(mod, ver)
+               : cfContentType === 'world'          ? buildCfWorldCard(mod, ver)
+               : buildCfResourceOrShaderCard(mod, ver, cfContentType);
     frag.appendChild(card);
   }
   list.appendChild(frag);
@@ -3361,816 +3549,6 @@ async function initCosmetics() {
     }
     installBtn.disabled = false;
     installBtn.textContent = 'Install Cosmetics Mod';
-  });
-}
-
-// ── Server Host panel ─────────────────────────────────────────────────────────
-const srvStartBtn  = document.getElementById('srv-start-btn') as HTMLButtonElement;
-const srvStopBtn   = document.getElementById('srv-stop-btn')  as HTMLButtonElement;
-const srvInfo      = document.getElementById('srv-info')!;
-const srvAddress   = document.getElementById('srv-address')!;
-const srvVerDisplay= document.getElementById('srv-ver-display')!;
-const srvLog       = document.getElementById('srv-log')!;
-const srvLogCopy   = document.getElementById('srv-log-copy') as HTMLButtonElement;
-const srvCmdInput  = document.getElementById('srv-cmd-input') as HTMLInputElement;
-const srvCmdBtn    = document.getElementById('srv-cmd-btn') as HTMLButtonElement;
-const srvMemSlider    = document.getElementById('srv-mem')    as HTMLInputElement;
-const srvMemVal       = document.getElementById('srv-mem-val')!;
-const srvMinMemSlider = document.getElementById('srv-minmem') as HTMLInputElement;
-const srvMinMemVal    = document.getElementById('srv-minmem-val')!;
-const communityEl  = document.getElementById('community-servers')!;
-const savedSrvEl   = document.getElementById('saved-servers')!;
-const savedSrvEmpty= document.getElementById('saved-servers-empty')!;
-const srvSaveBtn   = document.getElementById('srv-save-btn') as HTMLButtonElement;
-const srvNewBtn    = document.getElementById('srv-new-btn') as HTMLButtonElement;
-const srvSaveStatus= document.getElementById('srv-save-status')!;
-const srv247Toggle = document.getElementById('srv-247-toggle') as HTMLInputElement;
-const srvIpInput   = document.getElementById('srv-ip') as HTMLInputElement;
-
-let srvRunning = false;
-let selectedWorldPath: string | null = null;
-
-// World selector (From Saves dropdown + Browse Folder fallback)
-const srvWorldLabel    = document.getElementById('srv-world-label')!;
-const srvClearWorldBtn = document.getElementById('srv-clear-world-btn') as HTMLButtonElement | null;
-const fromSavesBtn     = document.getElementById('srv-from-saves-btn')  as HTMLButtonElement | null;
-const savesMenu        = document.getElementById('srv-saves-menu')!;
-const browseWorldBtn   = document.getElementById('srv-browse-world-btn') as HTMLButtonElement | null;
-
-function setWorldPath(fullPath: string, label: string) {
-  selectedWorldPath = fullPath;
-  srvWorldLabel.textContent = `World: ${label}`;
-  srvWorldLabel.style.color = '#f5a623';
-  if (srvClearWorldBtn) srvClearWorldBtn.style.display = 'inline-flex';
-}
-
-fromSavesBtn?.addEventListener('click', async () => {
-  if (savesMenu.style.display !== 'none') { savesMenu.style.display = 'none'; return; }
-
-  // Position below the button using fixed coords so overflow:hidden doesn't clip it
-  const rect = fromSavesBtn!.getBoundingClientRect();
-  savesMenu.style.top  = `${rect.bottom + 4}px`;
-  savesMenu.style.left = `${rect.left}px`;
-
-  savesMenu.innerHTML = '<div style="padding:8px 14px;font-size:12px;color:#555;">Loading…</div>';
-  savesMenu.style.display = 'block';
-
-  const files = (window as any).files;
-  const saves: string[] = await files?.listWorlds() ?? [];
-  const savesDir: string = await files?.savesDir() ?? '';
-  const sep = savesDir.includes('\\') ? '\\' : '/';
-
-  savesMenu.innerHTML = '';
-  if (!saves.length) {
-    savesMenu.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:#555;">No worlds found — play single-player first</div>';
-    return;
-  }
-  for (const name of saves) {
-    const item = document.createElement('div');
-    item.style.cssText = 'padding:9px 14px;font-size:12px;color:#cccccc;cursor:pointer;border-bottom:1px solid #1e1e1e;';
-    item.textContent = name;
-    item.addEventListener('mouseenter', () => { item.style.background = '#1e1e1e'; });
-    item.addEventListener('mouseleave', () => { item.style.background = ''; });
-    item.addEventListener('click', () => {
-      setWorldPath(`${savesDir}${sep}${name}`, name);
-      savesMenu.style.display = 'none';
-    });
-    savesMenu.appendChild(item);
-  }
-});
-
-document.addEventListener('click', (e) => {
-  if (!savesMenu || savesMenu.style.display === 'none') return;
-  if (!fromSavesBtn?.contains(e.target as Node) && !savesMenu.contains(e.target as Node)) {
-    savesMenu.style.display = 'none';
-  }
-});
-
-browseWorldBtn?.addEventListener('click', async () => {
-  if (!server) return;
-  const picked = await server.pickWorld();
-  if (!picked) return;
-  const folderName = picked.replace(/\\/g, '/').split('/').pop() ?? picked;
-  setWorldPath(picked, folderName);
-});
-
-srvClearWorldBtn?.addEventListener('click', () => {
-  selectedWorldPath = null;
-  srvWorldLabel.textContent = 'No world selected — generates fresh each time';
-  srvWorldLabel.style.color = '#555555';
-  srvClearWorldBtn.style.display = 'none';
-});
-let srvLogLines: string[] = [];
-
-// ── Dedicated server mode ──────────────────────────────────────────────────────
-const DEDICATED_KEY = 'voxel_srv_dedicated_v1';
-const dedicatedToggle = document.getElementById('srv-dedicated-toggle') as HTMLInputElement;
-const bootToggle      = document.getElementById('srv-boot-toggle')      as HTMLInputElement;
-const dedicatedDot    = document.getElementById('srv-dedicated-dot')!;
-const dedicatedStatus = document.getElementById('srv-dedicated-status')!;
-
-function setDedicatedDot(active: boolean) {
-  dedicatedDot.style.background   = active ? '#3fb950' : '#30363d';
-  dedicatedStatus.style.color     = active ? '#3fb950' : '#555555';
-  dedicatedStatus.textContent     = active ? 'Active — server will auto-start' : 'Inactive';
-}
-
-function saveDedicatedSettings() {
-  localStorage.setItem(DEDICATED_KEY, JSON.stringify({ dedicated: dedicatedToggle?.checked, boot: bootToggle?.checked }));
-}
-
-function loadDedicatedSettings() {
-  try {
-    const s = JSON.parse(localStorage.getItem(DEDICATED_KEY) || '{}');
-    if (dedicatedToggle) dedicatedToggle.checked = !!s.dedicated;
-    if (bootToggle)      bootToggle.checked      = !!s.boot;
-    setDedicatedDot(!!s.dedicated);
-  } catch {}
-}
-
-dedicatedToggle?.addEventListener('change', () => {
-  saveDedicatedSettings();
-  setDedicatedDot(dedicatedToggle.checked);
-  if (dedicatedToggle.checked && !srvRunning) {
-    // Auto-start immediately if not already running
-    setTimeout(() => { if (!srvRunning) srvStartBtn?.click(); }, 500);
-  }
-});
-
-bootToggle?.addEventListener('change', async () => {
-  saveDedicatedSettings();
-  await (server as any)?.setAutoStart?.(bootToggle.checked);
-});
-
-// Sync boot toggle from OS setting on load
-(async () => {
-  const r = await (server as any)?.getAutoStart?.();
-  if (bootToggle && r?.ok) bootToggle.checked = !!r.enabled;
-})();
-
-loadDedicatedSettings();
-let myUid = '';
-let pendingSrvName = '';
-let pendingSrvVersion = '';
-
-// ── Saved servers (localStorage) ──────────────────────────────────────────────
-interface SavedServer { id: string; name: string; ip: string; version: string; publish: boolean; port?: number; maxPlayers?: number; motd?: string; maxMem?: number; minMem?: number; }
-
-function loadSavedServers(): SavedServer[] {
-  try { return JSON.parse(localStorage.getItem('voxel_saved_servers') || '[]'); } catch { return []; }
-}
-function persistSavedServers(list: SavedServer[]) {
-  localStorage.setItem('voxel_saved_servers', JSON.stringify(list));
-}
-
-async function publish247(srv: SavedServer) {
-  if (!myUid) return;
-  await set(ref(rtdb, `mc_servers/${myUid}`), {
-    name: srv.name, version: srv.version, address: srv.ip || '—',
-    port: 25565, online: false, publish: true,
-    owner: userName.textContent || 'Player',
-  });
-}
-async function unpublish247() {
-  if (!myUid) return;
-  await set(ref(rtdb, `mc_servers/${myUid}/publish`), false);
-}
-
-function applyServerConfig(srv: SavedServer) {
-  (document.getElementById('srv-name') as HTMLInputElement).value = srv.name;
-  srvIpInput.value = srv.ip;
-  srv247Toggle.checked = srv.publish;
-  const sel = document.getElementById('srv-version') as HTMLSelectElement;
-  if (Array.from(sel.options).find(o => o.value === srv.version)) sel.value = srv.version;
-  const portEl = document.getElementById('srv-port') as HTMLInputElement;
-  if (portEl) portEl.value = String(srv.port ?? 25565);
-  const maxPlayersEl = document.getElementById('srv-maxplayers') as HTMLInputElement;
-  if (maxPlayersEl) maxPlayersEl.value = String(srv.maxPlayers ?? 20);
-  const motdEl = document.getElementById('srv-motd') as HTMLInputElement;
-  if (motdEl) motdEl.value = srv.motd ?? 'Voxel Client Server';
-  const memEl = document.getElementById('srv-mem') as HTMLInputElement;
-  if (memEl) { memEl.value = String(srv.maxMem ?? 2); document.getElementById('srv-mem-val')!.textContent = String(srv.maxMem ?? 2); }
-  const minMemEl = document.getElementById('srv-minmem') as HTMLInputElement;
-  if (minMemEl) { minMemEl.value = String(srv.minMem ?? 512); document.getElementById('srv-minmem-val')!.textContent = String(srv.minMem ?? 512); }
-  srvLog.innerHTML = '<div id="srv-log-placeholder" style="color:#444444;">Select a version and click Start Server</div>';
-  srvLogLines = [];
-}
-
-function renderSavedServers() {
-  const list = loadSavedServers();
-  savedSrvEmpty.style.display = list.length ? 'none' : 'block';
-  // Remove existing server cards (not the empty placeholder)
-  savedSrvEl.querySelectorAll('.saved-srv-card').forEach(c => c.remove());
-  list.forEach(srv => {
-    const card = document.createElement('div');
-    card.className = 'mod-card saved-srv-card';
-    card.style.cursor = 'pointer';
-    card.innerHTML = `
-      <div class="mod-icon" style="font-size:20px;"></div>
-      <div class="mod-info">
-        <div class="mod-name">${srv.name}</div>
-        <div class="mod-desc" style="font-family:monospace">${srv.ip || '(no IP)'} &nbsp;·&nbsp; ${srv.version}</div>
-        <div class="mod-tags" style="margin-top:6px;">
-          <span class="mod-tag ${srv.publish ? 'perf' : ''}">${srv.publish ? '24/7 Listed' : 'Local only'}</span>
-        </div>
-      </div>
-      <div class="mod-right" style="gap:6px;">
-        <button data-id="${srv.id}" class="srv-del-btn" style="padding:5px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:11px;cursor:pointer;">✕</button>
-      </div>`;
-    card.addEventListener('click', () => applyServerConfig(srv));
-    card.querySelector('.srv-del-btn')!.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const updated = loadSavedServers().filter(s => s.id !== srv.id);
-      persistSavedServers(updated);
-      if (srv.publish) await unpublish247();
-      renderSavedServers();
-    });
-    savedSrvEl.appendChild(card);
-  });
-}
-
-function isValidServerDomain(addr: string): boolean {
-  const host = addr.trim().replace(/:\d+$/, ''); // strip optional :port
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return false; // block raw IPv4
-  return /\.[a-zA-Z]{2,}$/.test(host); // must end with a TLD (.net, .gg, .com …)
-}
-
-srvNewBtn?.addEventListener('click', () => {
-  (document.getElementById('srv-name') as HTMLInputElement).value = 'My Server';
-  srvIpInput.value = '';
-  srv247Toggle.checked = false;
-  const sel = document.getElementById('srv-version') as HTMLSelectElement;
-  if (sel.options.length > 0) sel.selectedIndex = 0;
-  const mem = document.getElementById('srv-mem') as HTMLInputElement;
-  mem.value = '2';
-  document.getElementById('srv-mem-val')!.textContent = '2';
-  srvSaveStatus.textContent = '';
-});
-
-srvSaveBtn?.addEventListener('click', async () => {
-  const name       = (document.getElementById('srv-name') as HTMLInputElement).value.trim() || 'My Server';
-  const ip         = srvIpInput.value.trim();
-  const version    = (document.getElementById('srv-version') as HTMLSelectElement).value;
-  const publish    = srv247Toggle.checked;
-  const port       = parseInt((document.getElementById('srv-port') as HTMLInputElement)?.value) || 25565;
-  const maxPlayers = parseInt((document.getElementById('srv-maxplayers') as HTMLInputElement)?.value) || 20;
-  const motd       = (document.getElementById('srv-motd') as HTMLInputElement)?.value.trim() || 'Voxel Client Server';
-  const maxMem     = parseInt((document.getElementById('srv-mem') as HTMLInputElement)?.value) || 2;
-  const minMem     = parseInt((document.getElementById('srv-minmem') as HTMLInputElement)?.value) || 512;
-
-  if (publish && !isValidServerDomain(ip)) {
-    srvSaveStatus.textContent = 'Enter a domain address to list publicly (e.g. play.yourserver.net)';
-    srvSaveStatus.style.color = '#e05500';
-    setTimeout(() => { srvSaveStatus.textContent = ''; }, 4000);
-    return;
-  }
-
-  const id  = `${Date.now()}`;
-  const srv: SavedServer = { id, name, ip, version, publish, port, maxPlayers, motd, maxMem, minMem };
-  const list = loadSavedServers().filter(s => s.name !== name);
-  list.unshift(srv);
-  persistSavedServers(list);
-  if (publish) await publish247(srv);
-  renderSavedServers();
-  srvSaveStatus.textContent = publish ? 'Saved & listed 24/7' : 'Saved locally';
-  srvSaveStatus.style.color = '#f5a623';
-  setTimeout(() => { srvSaveStatus.textContent = ''; }, 2500);
-});
-
-// Capture uid from user-data — init tokens, presence, friends
-const ADMIN_EMAILS = ['jordanengrashes@gmail.com'];
-let adminPanelInited = false;
-
-function initAdminPanel(email: string) {
-  if (adminPanelInited) return;
-  adminPanelInited = true;
-  const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
-  const voxelCard = document.getElementById('voxel-srv-card')?.parentElement as HTMLElement | null;
-  // The card is inside server-panel; gate visibility
-  const card = document.querySelector('[id^="voxel-srv-dot"]')?.closest('div[style*="voxel"]') as HTMLElement | null;
-  // Find it by the dedicated bar's next sibling approach — target the green-tinted card
-  const allPanelDivs = document.querySelectorAll('#server-panel > div');
-  // The Voxel SMP card is the 2nd child (index 1), Dedicated Mode bar is index 0
-  const voxelSmpCard = allPanelDivs[1] as HTMLElement | null;
-  const dedicatedBar = allPanelDivs[0] as HTMLElement | null;
-
-  if (voxelSmpCard) voxelSmpCard.style.display = isAdmin ? '' : 'none';
-  if (dedicatedBar)  dedicatedBar.style.display  = isAdmin ? '' : 'none';
-
-  if (!isAdmin) return;
-
-  const vSrv = (window as any).voxelSrv;
-  if (!vSrv) return;
-
-  const dotEl    = document.getElementById('voxel-srv-dot') as HTMLElement;
-  const statusEl = document.getElementById('voxel-srv-status-text') as HTMLElement;
-  const startBtn = document.getElementById('voxel-srv-start-btn')    as HTMLButtonElement;
-  const stopBtn  = document.getElementById('voxel-srv-stop-btn')     as HTMLButtonElement;
-  const rstBtn   = document.getElementById('voxel-srv-restart-btn')  as HTMLButtonElement;
-  const autoTgl  = document.getElementById('voxel-srv-autostart-toggle') as HTMLInputElement;
-  const msgEl    = document.getElementById('voxel-srv-msg') as HTMLElement;
-
-  function setVoxelStatus(running: boolean) {
-    dotEl.style.background    = running ? '#3fb950' : '#da3633';
-    statusEl.textContent      = running ? 'Online' : 'Offline';
-    statusEl.style.color      = running ? '#3fb950' : '#da3633';
-    startBtn.disabled         = running;
-    stopBtn.disabled          = !running;
-    rstBtn.disabled           = false;
-    startBtn.style.opacity    = running ? '0.4' : '1';
-    stopBtn.style.opacity     = running ? '1'   : '0.4';
-  }
-
-  function showMsg(m: string, color = '#8b949e') {
-    msgEl.textContent  = m;
-    msgEl.style.color  = color;
-    msgEl.style.display = m ? 'block' : 'none';
-  }
-
-  // Poll status every 10s
-  async function refreshStatus() {
-    try { const r = await vSrv.status(); setVoxelStatus(r.running); } catch {}
-  }
-  refreshStatus();
-  setInterval(refreshStatus, 10000);
-
-  // Load autostart toggle
-  vSrv.autostartGet().then((v: boolean) => { autoTgl.checked = !!v; });
-
-  autoTgl.addEventListener('change', async () => {
-    await vSrv.autostartSet(autoTgl.checked);
-    showMsg(autoTgl.checked ? 'Server will start automatically when you open the app.' : 'Auto-start disabled.', '#8b949e');
-  });
-
-  startBtn.addEventListener('click', async () => {
-    startBtn.disabled = true;
-    showMsg('Starting…', '#f5a623');
-    const r = await vSrv.start();
-    if (r.ok) { showMsg('Server starting — may take ~30s to be joinable.', '#3fb950'); setTimeout(refreshStatus, 5000); }
-    else       { showMsg(`Error: ${r.error}`, '#da3633'); startBtn.disabled = false; }
-  });
-
-  stopBtn.addEventListener('click', async () => {
-    stopBtn.disabled = true;
-    showMsg('Stopping…', '#f5a623');
-    await vSrv.stop();
-    setTimeout(() => { refreshStatus(); showMsg(''); }, 5000);
-  });
-
-  rstBtn.addEventListener('click', async () => {
-    rstBtn.disabled = true;
-    showMsg('Restarting…', '#f5a623');
-    await vSrv.stop();
-    await new Promise(r => setTimeout(r, 6000));
-    const r = await vSrv.start();
-    rstBtn.disabled = false;
-    showMsg(r.ok ? 'Server restarted — ready in ~30s.' : `Error: ${r.error}`, r.ok ? '#3fb950' : '#da3633');
-    setTimeout(refreshStatus, 8000);
-  });
-
-  // Auto-start on app open if preference is set
-  vSrv.autostartGet().then(async (enabled: boolean) => {
-    if (enabled) {
-      const s = await vSrv.status();
-      if (!s.running) { await vSrv.start(); showMsg('Auto-starting server…', '#f5a623'); setTimeout(refreshStatus, 8000); }
-    }
-  });
-}
-
-if ((window as any).electron) {
-  (window as any).electron.onUserData((d: any) => {
-    if (d.uid && d.uid !== myUid) {
-      myUid = d.uid;
-      initTokens(myUid);
-      initPresence(myUid);
-      initFriends(myUid);
-      // So guests/offline-account users (no Microsoft auth) can still be
-      // found by name when someone sends them a friend request.
-      registerUserIndex(myUid, myDisplayName());
-    }
-    if (d.email) initAdminPanel(d.email);
-  });
-}
-
-
-
-async function onServerReady(name: string, version: string, port: number) {
-  const manualIp = srvIpInput.value.trim();
-  const ip = manualIp || await getPublicIP();
-  if (!manualIp) srvIpInput.value = ip;
-  srvAddress.textContent = `localhost:${port}   (public: ${ip}:${port})`;
-  // Update status dot to green "Ready"
-  const dot = document.getElementById('srv-dedicated-dot');
-  const status = document.getElementById('srv-dedicated-status');
-  if (dot) dot.style.background = '#3fb950';
-  if (status) { status.textContent = 'Ready — accepting connections'; status.style.color = '#3fb950'; }
-  srvAddLog(`[Host] ✓ Server is READY — connect with localhost:${port}`);
-  await publishServer(name, version, ip);
-}
-
-function srvAddHint(msg: string) {
-  const div = document.createElement('div');
-  div.style.cssText = 'line-height:1.6;color:#f5a623;padding-left:14px;font-style:italic;';
-  div.textContent = `↳ ${msg}`;
-  srvLog.appendChild(div);
-  srvLogLines.push(`↳ ${msg}`);
-}
-
-function srvAddLog(text: string) {
-  const lines = text.split('\n').filter(l => l.trim());
-  lines.forEach(l => {
-    srvLogLines.push(l);
-    if (srvLogLines.length > 300) srvLogLines.shift();
-    const div = document.createElement('div');
-    div.style.lineHeight = '1.6';
-    if (l.includes('[Host] ✓')) {
-      div.style.color = '#3fb950'; div.style.fontWeight = '600';
-    } else if (l.includes('FATAL') || l.includes('Exception in') || l.includes(']: Error') || l.includes('crashed')) {
-      div.style.color = '#f85149';
-    } else if (l.includes('ERROR') || l.includes('WARN')) {
-      div.style.color = '#f6c356';
-    } else if (l.includes('[Host]')) {
-      div.style.color = '#f6c356';
-    } else {
-      div.style.color = '#6e7681';
-    }
-    div.textContent = l;
-    srvLog.appendChild(div);
-
-    // Inline hints for common failure patterns
-    if (l.includes('Address already in use') || l.includes('FAILED TO BIND TO PORT')) {
-      srvAddHint('Port already taken — change the port number above and restart');
-    } else if (l.includes('OutOfMemoryError') || l.includes('Could not reserve enough space')) {
-      srvAddHint('Out of memory — increase Max RAM above');
-    } else if (l.includes('Invalid or corrupt jarfile') || l.includes('Error opening zip file')) {
-      srvAddHint('server.jar is corrupt — open the Files folder, delete server.jar, and restart');
-    } else if (l.includes('Unable to access jarfile')) {
-      srvAddHint('server.jar not found — it may have been moved or deleted');
-    } else if (l.includes('UnsupportedClassVersionError')) {
-      srvAddHint('Java version too old for this Minecraft version — restart to re-download Java');
-    }
-  });
-  document.getElementById('srv-log-placeholder')?.remove();
-  srvLog.scrollTop = srvLog.scrollHeight;
-}
-
-document.getElementById('srv-log-copy')?.addEventListener('click', function() {
-  const text = srvLogLines.join('\n');
-  if (!text) { (this as HTMLButtonElement).textContent = 'Nothing yet'; setTimeout(() => { (this as HTMLButtonElement).textContent = 'Copy'; }, 1200); return; }
-  (window as any).electron?.copyText(text);
-  (this as HTMLButtonElement).textContent = '✓ Copied!';
-  (this as HTMLButtonElement).style.color = '#f5a623';
-  setTimeout(() => { (this as HTMLButtonElement).textContent = 'Copy'; (this as HTMLButtonElement).style.color = ''; }, 1500);
-});
-
-document.getElementById('srv-log-clear')?.addEventListener('click', () => {
-  srvLogLines = [];
-  srvLog.innerHTML = '';
-});
-
-// Copy address button
-document.getElementById('srv-copy-addr-btn')?.addEventListener('click', () => {
-  const addr = srvAddress.textContent || 'localhost:25565';
-  (window as any).electron?.copyText(addr);
-  const btn = document.getElementById('srv-copy-addr-btn') as HTMLButtonElement;
-  if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); }
-});
-
-// Open server files folder
-document.getElementById('srv-open-folder-btn')?.addEventListener('click', () => {
-  const ver = (document.getElementById('srv-version') as HTMLSelectElement)?.value || 'default';
-  (server as any)?.openFolder?.(ver);
-});
-
-// Send command to server
-srvCmdBtn?.addEventListener('click', () => {
-  const cmd = srvCmdInput.value.trim();
-  if (!cmd || !server) return;
-  server.command(cmd);
-  srvAddLog(`> ${cmd}`);
-  srvCmdInput.value = '';
-});
-srvCmdInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') srvCmdBtn.click(); });
-
-// Fetch public IP via ipify
-async function getPublicIP(): Promise<string> {
-  try {
-    const r = await fetch('https://api.ipify.org?format=json');
-    const d = await r.json();
-    return d.ip || 'unknown';
-  } catch { return 'unknown'; }
-}
-
-// Publish server to Firebase RTDB
-async function publishServer(name: string, version: string, address: string) {
-  if (!myUid) return;
-  try {
-    await set(ref(rtdb, `mc_servers/${myUid}`), {
-      name, version, address, port: 25565,
-      online: true, publish: srv247Toggle.checked,
-      startedAt: serverTimestamp(),
-      owner: userName.textContent || 'Player',
-    });
-  } catch {}
-}
-
-async function unpublishServer() {
-  if (!myUid) return;
-  try {
-    await set(ref(rtdb, `mc_servers/${myUid}/online`), false);
-    if (!srv247Toggle.checked) await set(ref(rtdb, `mc_servers/${myUid}/publish`), false);
-  } catch {}
-}
-
-let srvAllVersions: { id: string; type: string }[] = [];
-
-function populateSrvVersions() {
-  const sel = document.getElementById('srv-version') as HTMLSelectElement;
-  const showSnaps = (document.getElementById('srv-snapshots-toggle') as HTMLInputElement)?.checked;
-  const prev = sel.value;
-  sel.innerHTML = '';
-  const filtered = srvAllVersions.filter(v =>
-    v.type === 'release' || (showSnaps && v.type === 'snapshot')
-  );
-  filtered.forEach((v, i) => {
-    const opt = document.createElement('option');
-    opt.value = v.id;
-    opt.textContent = i === 0
-      ? `${v.id} — ${v.type === 'snapshot' ? 'Latest Snapshot' : 'Latest'}`
-      : v.type === 'snapshot' ? `${v.id} ✦` : v.id;
-    sel.appendChild(opt);
-  });
-  if (filtered.find(v => v.id === prev)) sel.value = prev;
-  loadSrvSettings();
-}
-
-// Populate server version dropdown from Mojang manifest
-async function loadServerVersions() {
-  const sel = document.getElementById('srv-version') as HTMLSelectElement;
-  if (!sel) return;
-  try {
-    const res  = await fetch('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json');
-    const data = await res.json() as { versions: { id: string; type: string }[] };
-    const fetched = data.versions.filter(v => v.type === 'release' || v.type === 'snapshot');
-    // Prepend Paper versions not in Mojang manifest
-    const paperVersions = ['26.1.2', '26.1.1', '26.1'].map(id => ({ id, type: 'release' }));
-    srvAllVersions = [...paperVersions, ...fetched.filter(v => !paperVersions.find(p => p.id === v.id))];
-    populateSrvVersions();
-  } catch {
-    srvAllVersions = [
-      { id: '26.1.2', type: 'release' }, { id: '26.1.1', type: 'release' },
-      { id: '26.1',   type: 'release' }, { id: '1.21.5', type: 'release' },
-      { id: '1.21.4', type: 'release' }, { id: '1.21.3', type: 'release' },
-      { id: '1.21.1', type: 'release' }, { id: '1.21',   type: 'release' },
-      { id: '1.20.6', type: 'release' }, { id: '1.20.4', type: 'release' },
-      { id: '1.20.1', type: 'release' }, { id: '1.19.4', type: 'release' },
-    ];
-    populateSrvVersions();
-  }
-  maybeDedicatedAutoStart();
-}
-
-document.getElementById('srv-snapshots-toggle')?.addEventListener('change', populateSrvVersions);
-
-function maybeDedicatedAutoStart() {
-  try {
-    const s = JSON.parse(localStorage.getItem(DEDICATED_KEY) || '{}');
-    if (s.dedicated && !srvRunning) {
-      srvAddLog('[Dedicated] Auto-starting server…');
-      setTimeout(() => { if (!srvRunning) srvStartBtn?.click(); }, 800);
-    }
-  } catch {}
-}
-
-// ── Persist server settings across sessions ────────────────────────────────────
-const SRV_SETTINGS_KEY = 'voxel_srv_settings';
-function loadSrvSettings() {
-  try {
-    const s = JSON.parse(localStorage.getItem(SRV_SETTINGS_KEY) || '{}');
-    const nameEl   = document.getElementById('srv-name')       as HTMLInputElement;
-    const verSel   = document.getElementById('srv-version')    as HTMLSelectElement;
-    const portEl   = document.getElementById('srv-port')       as HTMLInputElement;
-    const maxPEl   = document.getElementById('srv-maxplayers') as HTMLInputElement;
-    const motdEl   = document.getElementById('srv-motd')       as HTMLInputElement;
-    const arEl     = document.getElementById('srv-autorestart')as HTMLInputElement;
-    if (s.name)    nameEl.value = s.name;
-    if (s.version && Array.from(verSel.options).find(o => o.value === s.version)) verSel.value = s.version;
-    if (s.mem)     { srvMemSlider.value = s.mem;       srvMemVal.textContent    = s.mem; }
-    if (s.minMem)  { srvMinMemSlider.value = s.minMem; srvMinMemVal.textContent = s.minMem; }
-    if (s.port)    portEl.value   = s.port;
-    if (s.maxP)    maxPEl.value   = s.maxP;
-    if (s.motd)    motdEl.value   = s.motd;
-    if (arEl)      arEl.checked   = !!s.autoRestart;
-  } catch {}
-}
-function saveSrvSettings() {
-  const nameEl = document.getElementById('srv-name')       as HTMLInputElement;
-  const verSel = document.getElementById('srv-version')    as HTMLSelectElement;
-  const portEl = document.getElementById('srv-port')       as HTMLInputElement;
-  const maxPEl = document.getElementById('srv-maxplayers') as HTMLInputElement;
-  const motdEl = document.getElementById('srv-motd')       as HTMLInputElement;
-  const arEl   = document.getElementById('srv-autorestart')as HTMLInputElement;
-  localStorage.setItem(SRV_SETTINGS_KEY, JSON.stringify({
-    name: nameEl?.value,
-    version: verSel?.value,
-    mem:    srvMemSlider?.value,
-    minMem: srvMinMemSlider?.value,
-    port:   portEl?.value,
-    maxP:   maxPEl?.value,
-    motd:   motdEl?.value,
-    autoRestart: arEl?.checked,
-  }));
-}
-srvMemSlider?.addEventListener('input', () => { srvMemVal.textContent = srvMemSlider.value; saveSrvSettings(); });
-srvMinMemSlider?.addEventListener('input', () => { srvMinMemVal.textContent = srvMinMemSlider.value; saveSrvSettings(); });
-document.getElementById('srv-name')?.addEventListener('input', saveSrvSettings);
-document.getElementById('srv-version')?.addEventListener('change', saveSrvSettings);
-document.getElementById('srv-port')?.addEventListener('input', saveSrvSettings);
-document.getElementById('srv-maxplayers')?.addEventListener('input', saveSrvSettings);
-document.getElementById('srv-motd')?.addEventListener('input', saveSrvSettings);
-document.getElementById('srv-autorestart')?.addEventListener('change', saveSrvSettings);
-
-document.getElementById('srv-preset-btn')?.addEventListener('click', () => {
-  (document.getElementById('srv-name')       as HTMLInputElement).value = 'Voxels Default';
-  (document.getElementById('srv-port')       as HTMLInputElement).value = '25565';
-  (document.getElementById('srv-maxplayers') as HTMLInputElement).value = '20';
-  (document.getElementById('srv-motd')       as HTMLInputElement).value = 'Voxel Client Server';
-  const sel = document.getElementById('srv-version') as HTMLSelectElement;
-  const latest = Array.from(sel.options).find(o => o.value && !o.disabled);
-  if (latest) sel.value = latest.value;
-  srvMemSlider.value = '4'; srvMemVal.textContent = '4';
-  srvMinMemSlider.value = '512'; srvMinMemVal.textContent = '512';
-  saveSrvSettings();
-});
-
-// Load community servers from Firebase RTDB (online OR 24/7 published)
-function loadCommunityServers() {
-  renderSavedServers();
-  try {
-    onValue(ref(rtdb, 'mc_servers'), snap => {
-      const data = snap.val() as Record<string, any> | null;
-      communityEl.innerHTML = '';
-      if (!data) {
-        communityEl.innerHTML = '<div style="color:#30363d;font-size:12px;">No servers listed</div>';
-        return;
-      }
-      const visible = Object.values(data).filter(s => s.online || s.publish);
-      if (!visible.length) {
-        communityEl.innerHTML = '<div style="color:#30363d;font-size:12px;">No servers listed</div>';
-        return;
-      }
-      visible.forEach(s => {
-        const isOnline = !!s.online;
-        const card = document.createElement('div');
-        card.className = 'mod-card';
-        card.style.cursor = 'default';
-        card.innerHTML = `
-          <div class="mod-icon" style="font-size:20px;"></div>
-          <div class="mod-info">
-            <div class="mod-name">${s.name || 'Unnamed Server'}</div>
-            <div class="mod-desc">${s.owner || 'Unknown'} · ${s.version || '?'}</div>
-            <div class="mod-tags" style="margin-top:6px;">
-              <span class="mod-tag ${isOnline ? 'util' : ''}">${isOnline ? 'Online' : 'Offline'}</span>
-              ${s.publish ? '<span class="mod-tag perf">24/7</span>' : ''}
-            </div>
-          </div>
-          <div class="mod-right">
-            <span style="font-family:monospace;font-size:11px;color:${isOnline ? '#f5a623' : '#484f58'};background:rgba(${isOnline ? '63,185,80' : '255,255,255'},0.06);border:1px solid rgba(${isOnline ? '63,185,80' : '255,255,255'},0.12);padding:4px 10px;border-radius:6px;">${s.address || '—'}:${s.port || 25565}</span>
-          </div>`;
-        communityEl.appendChild(card);
-      });
-    });
-  } catch {}
-}
-
-// Start/stop server
-srvStartBtn?.addEventListener('click', async () => {
-  if (!server) return;
-
-  const name       = (document.getElementById('srv-name')       as HTMLInputElement).value.trim() || 'My Server';
-  const version    = (document.getElementById('srv-version')    as HTMLSelectElement).value;
-  const maxMem     = parseInt(srvMemSlider.value, 10);
-  const minMem     = parseInt((document.getElementById('srv-minmem') as HTMLInputElement)?.value || '512', 10);
-  const port       = parseInt((document.getElementById('srv-port') as HTMLInputElement)?.value || '25565', 10);
-  const maxPlayers = parseInt((document.getElementById('srv-maxplayers') as HTMLInputElement)?.value || '20', 10);
-  const motd       = (document.getElementById('srv-motd') as HTMLInputElement)?.value.trim() || 'Voxel Client Server';
-  const seed       = (document.getElementById('srv-seed') as HTMLInputElement)?.value.trim() || undefined;
-  const worldPath  = selectedWorldPath ?? undefined;
-  const srvJavaSel = (document.getElementById('srv-java-version') as HTMLSelectElement)?.value ?? 'auto';
-  const javaVersion = srvJavaSel === 'auto' ? undefined : parseInt(srvJavaSel, 10);
-
-  srvRunning = true;
-  srvStopBtn.style.display = 'inline-flex';
-  srvStopBtn.disabled = false;
-  srvStartBtn.style.display = 'none';
-  srvStartBtn.textContent = 'Starting…';
-  srvLog.innerHTML = '';
-  srvLogLines = [];
-
-  pendingSrvName    = name;
-  pendingSrvVersion = version;
-
-  const res = await server.start({ version, maxMem, minMem, name, port, maxPlayers, motd, seed, worldPath, javaVersion });
-  if (!res.ok) {
-    srvAddLog(`[Error] ${res.error}`);
-    srvRunning = false;
-    srvStopBtn.style.display = 'none';
-    srvStartBtn.style.display = 'inline-flex';
-    srvStartBtn.style.background = '#f5a623';
-    srvStartBtn.style.color = '#0d1117';
-    srvStartBtn.textContent = '▶ Start Server';
-    srvStartBtn.disabled = false;
-    return;
-  }
-
-  srvInfo.style.display = 'flex';
-  srvVerDisplay.textContent = version;
-  const portDisplay = document.getElementById('srv-port-display');
-  const maxPDisplay = document.getElementById('srv-maxplayers-display');
-  const playersBadge = document.getElementById('srv-players-badge');
-  if (portDisplay) portDisplay.textContent = String(port);
-  if (maxPDisplay) maxPDisplay.textContent = String(maxPlayers);
-  if (playersBadge) playersBadge.textContent = `0/${maxPlayers} players`;
-  srvAddress.textContent = `Starting… connect via localhost:${port} once ready`;
-  // IP + publish happen in srvAddLog when MC logs "Done"
-});
-
-srvStopBtn?.addEventListener('click', async () => {
-  if (!server || !srvRunning) return;
-  srvStopBtn.disabled = true;
-  srvStopBtn.textContent = 'Stopping…';
-  await server.stop();
-});
-
-// Handle server log events
-if (server) {
-  server.onLog((line: string) => srvAddLog(line));
-
-  (server as any).onReady?.((port: number) => {
-    onServerReady(pendingSrvName, pendingSrvVersion, port);
-  });
-
-  (server as any).onPlayerJoin?.((name: string) => {
-    srvAddLog(`[Host] >> ${name} joined the server`);
-    // Flash a toast notification
-    const toast = document.createElement('div');
-    toast.textContent = `${name} joined the server`;
-    toast.style.cssText = 'position:fixed;bottom:80px;right:24px;background:#1e1e1e;border:1px solid #f5a623;border-radius:8px;color:#ffffff;font-size:13px;padding:10px 18px;z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.3s;font-family:Roboto,sans-serif;';
-    document.body.appendChild(toast);
-    requestAnimationFrame(() => { toast.style.opacity = '1'; });
-    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 350); }, 3500);
-  });
-
-  (server as any).onPlayerCount?.((cur: number, max: number) => {
-    const badge = document.getElementById('srv-players-badge');
-    const maxD  = document.getElementById('srv-maxplayers-display');
-    if (badge) badge.textContent = `${cur}/${max} players`;
-    if (maxD)  maxD.textContent  = String(max);
-  });
-
-  server.onClosed((info: any) => {
-    const code = typeof info === 'object' ? info?.code : info;
-    const userStopped = typeof info === 'object' ? info?.userStopped : false;
-    srvRunning = false;
-    srvInfo.style.display = 'none';
-    // Reset ready indicator
-    const dot = document.getElementById('srv-dedicated-dot');
-    const status = document.getElementById('srv-dedicated-status');
-    if (dot) dot.style.background = '#30363d';
-    if (status) { status.textContent = 'Inactive'; status.style.color = '#555555'; }
-    srvStopBtn.style.display = 'none';
-    srvStopBtn.disabled = false;
-    srvStopBtn.textContent = '⏹ Stop Server';
-    srvStartBtn.style.display = 'inline-flex';
-    srvStartBtn.style.background = '#f5a623';
-    srvStartBtn.style.color = '#0d1117';
-    srvStartBtn.textContent = '▶ Start Server';
-    srvStartBtn.disabled = false;
-    if (!userStopped && code !== 0 && code != null) {
-      const codeHex = code < 0 ? `0x${(code >>> 0).toString(16).toUpperCase()}` : String(code);
-      const codeDesc: Record<number, string> = {
-        1:             'General server error',
-        2:             'Bad Java arguments',
-        137:           'Killed by OS — likely out of memory',
-        [-1073741819]: 'Windows access violation (0xC0000005) — corrupt JAR or Java install',
-        [-1073741571]: 'Windows stack overflow (0xC00000FD) — try increasing RAM',
-        [-1073740791]: 'Windows heap corruption — try reinstalling Java',
-      };
-      const desc = codeDesc[code] || 'Unexpected exit';
-      srvAddLog(`[Host] ✗ Server stopped — exit code ${codeHex} (${desc})`);
-      srvLog.lastElementChild && ((srvLog.lastElementChild as HTMLElement).style.color = '#f85149');
-      srvLog.lastElementChild && ((srvLog.lastElementChild as HTMLElement).style.fontWeight = '600');
-      const autoRestart = (document.getElementById('srv-autorestart') as HTMLInputElement)?.checked;
-      const dedicatedOn = (() => { try { return JSON.parse(localStorage.getItem(DEDICATED_KEY) || '{}').dedicated; } catch { return false; } })();
-      if (autoRestart || dedicatedOn) {
-        const label = dedicatedOn ? '[Dedicated]' : '[Host]';
-        srvAddLog(`${label} Restarting server in 5s…`);
-        setTimeout(() => { if (!srvRunning) srvStartBtn.click(); }, 5000);
-      }
-    } else {
-      srvAddLog('[Host] Server stopped.');
-    }
-    unpublishServer();
   });
 }
 

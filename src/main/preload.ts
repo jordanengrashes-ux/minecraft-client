@@ -16,16 +16,6 @@ contextBridge.exposeInMainWorld('electron', {
   googleAuth:         ()             => ipcRenderer.invoke('google-auth'),
 });
 
-contextBridge.exposeInMainWorld('voxelSrv', {
-  status:        ()               => ipcRenderer.invoke('voxel-srv-status'),
-  start:         ()               => ipcRenderer.invoke('voxel-srv-start'),
-  stop:          ()               => ipcRenderer.invoke('voxel-srv-stop'),
-  autostartGet:  ()               => ipcRenderer.invoke('voxel-srv-autostart-get'),
-  autostartSet:  (e: boolean)     => ipcRenderer.invoke('voxel-srv-autostart-set', e),
-  onLog:         (cb: (s: string) => void) => ipcRenderer.on('voxel-srv-log',    (_e, s) => cb(s)),
-  onClosed:      (cb: () => void)          => ipcRenderer.on('voxel-srv-closed', () => cb()),
-});
-
 contextBridge.exposeInMainWorld('updater', {
   onChecking:    (cb: () => void)             => ipcRenderer.on('update-checking',      () => cb()),
   onAvailable:   (cb: (ver: string) => void)  => ipcRenderer.on('update-available',     (_e, v) => cb(v)),
@@ -35,21 +25,6 @@ contextBridge.exposeInMainWorld('updater', {
   onError:       (cb: (msg: string) => void)  => ipcRenderer.on('update-error',         (_e, m) => cb(m)),
   install:       () => ipcRenderer.send('install-update'),
   check:         () => ipcRenderer.send('check-for-updates'),
-});
-
-contextBridge.exposeInMainWorld('server', {
-  start:      (opts: any)    => ipcRenderer.invoke('server-start',       opts),
-  pickWorld:  ()             => ipcRenderer.invoke('server-pick-world'),
-  stop:       ()             => ipcRenderer.invoke('server-stop'),
-  command:    (cmd: string)  => ipcRenderer.invoke('server-command',     cmd),
-  openFolder: (ver: string)  => ipcRenderer.invoke('server-open-folder', ver),
-  setAutoStart:  (on: boolean) => ipcRenderer.invoke('server-set-autostart', on),
-  getAutoStart:  ()            => ipcRenderer.invoke('server-get-autostart'),
-  onLog:         (cb: (l: string) => void)             => ipcRenderer.on('server-log',          (_e, l)    => cb(l)),
-  onReady:       (cb: (port: number) => void)          => ipcRenderer.on('server-ready',        (_e, p)    => cb(p)),
-  onClosed:      (cb: (info: any) => void)             => ipcRenderer.on('server-closed',       (_e, info) => cb(info)),
-  onPlayerJoin:  (cb: (name: string) => void)          => ipcRenderer.on('server-player-join',  (_e, n)    => cb(n)),
-  onPlayerCount: (cb: (cur: number, max: number) => void) => ipcRenderer.on('server-player-count', (_e, c, m) => cb(c, m)),
 });
 
 contextBridge.exposeInMainWorld('overlay', {
@@ -75,9 +50,11 @@ contextBridge.exposeInMainWorld('ai', {
 });
 
 contextBridge.exposeInMainWorld('curseforge', {
-  search:      (opts: { query: string; mcVersion: string }) => ipcRenderer.invoke('cf-search', opts),
-  getDownload: (opts: { modId: number; mcVersion: string }) => ipcRenderer.invoke('cf-get-download-url', opts),
-  checkUpdates:(mods: { modId: number; fileId: number }[], mcVersion: string) => ipcRenderer.invoke('cf-check-updates', mods, mcVersion),
+  search:       (opts: { query: string; mcVersion: string; contentType?: string }) => ipcRenderer.invoke('cf-search', opts),
+  getDownload:  (opts: { modId: number; mcVersion: string; contentType?: string }) => ipcRenderer.invoke('cf-get-download-url', opts),
+  checkUpdates: (mods: { modId: number; fileId: number }[], mcVersion: string) => ipcRenderer.invoke('cf-check-updates', mods, mcVersion),
+  installWorld:   (opts: { modId: number; mcVersion: string }) => ipcRenderer.invoke('cf-install-world', opts),
+  installModpack: (opts: { modId: number }) => ipcRenderer.invoke('cf-install-modpack', opts),
 });
 
 contextBridge.exposeInMainWorld('cosmetics', {
