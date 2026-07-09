@@ -184,45 +184,6 @@
     </div>
   </div>
 
-  <!-- Live survival server status -->
-  <div style="position:relative;z-index:1;max-width:960px;margin:0 auto 0;padding:0 24px 56px;">
-    <div class="reveal" style="background:var(--surface,#111);border:1px solid var(--border,#1e1e1e);border-radius:14px;padding:24px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;">
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#4f9eff;text-transform:uppercase;margin-bottom:8px;">My Survival Server</div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;" id="srv-status-line">
-          <span id="srv-dot" style="width:8px;height:8px;border-radius:50%;background:#555;display:inline-block;"></span>
-          <span id="srv-status-text">Checking…</span>
-        </div>
-        <div style="font-size:12px;color:#888;margin-top:6px;" id="srv-meta"></div>
-      </div>
-    </div>
-  </div>
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
-    import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js';
-    const app = initializeApp({
-      apiKey: "AIzaSyDiiPTWvpdDBkeazQRz79MSp_RfcDlarOs",
-      authDomain: "tank-d367c.firebaseapp.com",
-      databaseURL: "https://tank-d367c-default-rtdb.firebaseio.com",
-      projectId: "tank-d367c",
-    });
-    const rtdb = getDatabase(app);
-    onValue(ref(rtdb, 'voxel_local_server'), snap => {
-      const d = snap.val();
-      const dot = document.getElementById('srv-dot');
-      const text = document.getElementById('srv-status-text');
-      const meta = document.getElementById('srv-meta');
-      if (!d) { text.textContent = 'No data yet'; return; }
-      const stale = Date.now() - d.updatedAt > 60000; // no heartbeat in 60s = treat as offline
-      const online = d.status === 'online' && !stale;
-      dot.style.background = online ? '#3ecf8e' : d.status === 'starting' ? '#f5a623' : '#555';
-      dot.style.boxShadow = online ? '0 0 6px #3ecf8e' : 'none';
-      text.textContent = online ? 'Online' : stale ? 'Offline (unreachable)' : (d.status.charAt(0).toUpperCase() + d.status.slice(1));
-      const addrText = d.publicAddress ? `${d.publicAddress} (open to anyone)` : `${d.address} (LAN only)`;
-      meta.textContent = `${addrText} — ${d.version || ''}${d.players && d.players.length ? ' — ' + d.players.length + ' online' : ''}`;
-    });
-  </script>
-
   <section class="download reveal" id="download">
     <h2>Download Voxel Client</h2>
     <p>Free forever — no account required</p>
