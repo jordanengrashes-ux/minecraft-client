@@ -57,14 +57,54 @@ jobs:
           path: dist-artifacts/
           if-no-files-found: error
 
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Create resource stubs
+        run: mkdir -p resources/mods resources/shaderpacks
+      - name: Inject API keys
+        run: |
+          # Quoted heredoc delimiter — CF_API_KEY is bcrypt-shaped ($2a$10$...)
+          # and an unquoted heredoc would let bash expand $2a/$10 as variables,
+          # silently mangling the key (same bug already fixed for the Windows
+          # PowerShell equivalent of this step).
+          cat > src/main/ai-key.ts <<'EOF'
+          export const GEMINI_KEY = '${{ secrets.GEMINI_API_KEY }}';
+          export const CF_API_KEY = '${{ secrets.CF_API_KEY }}';
+          export const GOOGLE_CLIENT_ID = '${{ secrets.GOOGLE_CLIENT_ID }}';
+          export const GOOGLE_CLIENT_SECRET = '${{ secrets.GOOGLE_CLIENT_SECRET }}';
+          EOF
+      - run: npm ci
+      - run: npm run build && npx electron-builder --mac --publish never
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist-artifacts
+          find release -maxdepth 1 -iname '*.dmg' -exec cp {} dist-artifacts/ \;
+      - name: List artifacts
+        run: ls -la dist-artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-mac
+          path: dist-artifacts/
+          if-no-files-found: error
+
   publish:
-    needs: [build-windows]
+    needs: [build-windows, build-mac]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: release-windows
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-mac
           path: dist
       - name: List files
         run: ls -la dist/
@@ -77,5 +117,5 @@ jobs:
           mapfile -d '' files < <(find dist -type f -print0)
           gh release create "$tag" \
             --title "Voxel Client $tag" \
-            --notes "Voxel Client $tag" \
+            --notes "Voxel Client $tag — the macOS build is unsigned (no Apple Developer certificate yet), so Gatekeeper will show an 'unidentified developer' warning. Right-click the app and choose Open the first time to launch it." \
             "${files[@]}"
