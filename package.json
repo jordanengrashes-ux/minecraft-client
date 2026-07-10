@@ -28,13 +28,6 @@
     ],
     "extraResources": [
       {
-        "from": "resources/java21",
-        "to": "java21",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
         "from": "resources/mods",
         "to": "mods",
         "filter": [
@@ -64,6 +57,15 @@
           "target": "nsis",
           "arch": [
             "x64"
+          ]
+        }
+      ],
+      "extraResources": [
+        {
+          "from": "resources/java21",
+          "to": "java21",
+          "filter": [
+            "**/*"
           ]
         }
       ]
@@ -123,6 +125,7 @@
     "electron-updater": "^6.0.0",
     "firebase": "^10.14.0",
     "minecraft-launcher-core": "^3.18.2",
+    "tar": "^6.2.1",
     "three": "^0.184.0"
   }
 }

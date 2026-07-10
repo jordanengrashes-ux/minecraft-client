@@ -10,6 +10,8 @@ import os from 'os';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Client } = require('minecraft-launcher-core');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const tar = require('tar');
 
 let loginWin:   BrowserWindow | null = null;
 let gameWin:    BrowserWindow | null = null;
@@ -79,13 +81,32 @@ function getJavaMajorVersion(javaPath: string): number {
   } catch { return 0; }
 }
 
+// Windows ships a windowless "javaw" launcher; mac/Linux JREs only have "java".
+const JAVA_EXE = process.platform === 'win32' ? 'javaw.exe' : 'java';
+
+function mcRuntimeOsDir(): string {
+  if (process.platform === 'darwin') return process.arch === 'arm64' ? 'mac-os-arm64' : 'mac-os';
+  if (process.platform === 'linux')  return process.arch === 'arm64' ? 'linux-arm64'  : 'linux';
+  return process.arch === 'arm64' ? 'windows-arm64' : 'windows-x64';
+}
+
+// macOS JRE/JDK archives are packaged as an app bundle (Contents/Home/bin/java)
+// instead of the flat bin/java layout Windows and Linux use.
+function javaBinCandidates(root: string): string[] {
+  return [
+    path.join(root, 'bin', JAVA_EXE),
+    path.join(root, 'Contents', 'Home', 'bin', JAVA_EXE),
+  ];
+}
+
 function findJavawInDir(dir: string): string | null {
   try {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort().reverse();
     for (const d of dirs) {
-      const p = path.join(dir, d, 'bin', 'javaw.exe');
-      if (fs.existsSync(p)) return p;
+      for (const p of javaBinCandidates(path.join(dir, d))) {
+        if (fs.existsSync(p)) return p;
+      }
     }
   } catch {}
   return null;
@@ -132,8 +153,9 @@ async function ensureJava(major: number, log: (msg: string) => void): Promise<st
 
   // 2. Minecraft launcher bundled runtimes
   for (const rtName of (MC_RUNTIME_MAP[major] || [])) {
-    const rtPath = path.join(app.getPath('appData'), '.minecraft', 'runtime', rtName, 'windows-x64', rtName, 'bin', 'javaw.exe');
-    if (fs.existsSync(rtPath)) {
+    const rtBase = path.join(app.getPath('appData'), '.minecraft', 'runtime', rtName, mcRuntimeOsDir(), rtName);
+    for (const rtPath of javaBinCandidates(rtBase)) {
+      if (!fs.existsSync(rtPath)) continue;
       const v = getJavaMajorVersion(rtPath);
       if (v === major || (major === 21 && v >= 21)) {
         log(`[Launcher] Using Minecraft launcher Java ${v} (${rtName})`);
@@ -144,28 +166,54 @@ async function ensureJava(major: number, log: (msg: string) => void): Promise<st
   }
 
   // 3. System Java
-  const programFiles = [process.env.PROGRAMFILES || 'C:\\Program Files', process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)'];
-  const vendors = ['Eclipse Adoptium', 'Temurin', 'Microsoft', 'BellSoft', 'Amazon Corretto', 'Zulu', 'Java', 'OpenJDK'];
   const sysCandidates: string[] = [];
-  if (process.env.JAVA_HOME) sysCandidates.push(path.join(process.env.JAVA_HOME, 'bin', 'javaw.exe'));
-  for (const base of programFiles) {
-    for (const v of vendors) {
-      const found = findJavawInDir(path.join(base, v));
-      if (found) sysCandidates.push(found);
+  if (process.env.JAVA_HOME) sysCandidates.push(...javaBinCandidates(process.env.JAVA_HOME));
+  if (process.platform === 'darwin') {
+    try {
+      const jvmDir = '/Library/Java/JavaVirtualMachines';
+      if (fs.existsSync(jvmDir)) {
+        for (const d of fs.readdirSync(jvmDir)) sysCandidates.push(...javaBinCandidates(path.join(jvmDir, d)));
+      }
+    } catch {}
+    for (const brewBase of ['/opt/homebrew/opt', '/usr/local/opt']) {
+      for (const pkgName of ['openjdk', `openjdk@${major}`]) {
+        sysCandidates.push(...javaBinCandidates(path.join(brewBase, pkgName, 'libexec/openjdk.jdk')));
+      }
+    }
+  } else if (process.platform === 'linux') {
+    for (const base of ['/usr/lib/jvm', '/usr/java']) {
+      try {
+        if (fs.existsSync(base)) {
+          for (const d of fs.readdirSync(base)) sysCandidates.push(...javaBinCandidates(path.join(base, d)));
+        }
+      } catch {}
+    }
+  } else {
+    const programFiles = [process.env.PROGRAMFILES || 'C:\\Program Files', process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)'];
+    const vendors = ['Eclipse Adoptium', 'Temurin', 'Microsoft', 'BellSoft', 'Amazon Corretto', 'Zulu', 'Java', 'OpenJDK'];
+    for (const base of programFiles) {
+      for (const v of vendors) {
+        const found = findJavawInDir(path.join(base, v));
+        if (found) sysCandidates.push(found);
+      }
     }
   }
   for (const c of sysCandidates) {
+    if (!fs.existsSync(c)) continue;
     const v = getJavaMajorVersion(c);
     if (v === major || (major === 21 && v >= 21)) { log(`[Launcher] Using system Java ${v}`); saveCachedJavaPath(major, c); return c; }
   }
 
   // 4. Download from Adoptium
   log(`[Launcher] No Java ${major} found — downloading from Adoptium…`);
-  const info = await fetchJson(`https://api.adoptium.net/v3/assets/latest/${major}/hotspot?architecture=x64&image_type=jre&os=windows&vendor=eclipse`);
+  const adoptiumOs   = process.platform === 'darwin' ? 'mac' : process.platform === 'linux' ? 'linux' : 'windows';
+  const adoptiumArch = process.arch === 'arm64' ? 'aarch64' : process.arch === 'ia32' ? 'x86' : 'x64';
+  const info = await fetchJson(`https://api.adoptium.net/v3/assets/latest/${major}/hotspot?architecture=${adoptiumArch}&image_type=jre&os=${adoptiumOs}&vendor=eclipse`);
   const pkg = info[0]?.binary?.package;
   if (!pkg?.link) throw new Error(`Could not get Java ${major} download URL from Adoptium`);
 
-  const zipPath = path.join(app.getPath('temp'), `voxel-java${major}.zip`);
+  const archiveExt = (pkg.name || '').endsWith('.tar.gz') ? '.tar.gz' : '.zip';
+  const zipPath = path.join(app.getPath('temp'), `voxel-java${major}${archiveExt}`);
   const sizeMB = Math.round((pkg.size || 0) / 1024 / 1024);
   log(`[Launcher] Downloading Java ${major} JRE (${sizeMB}MB) — this only happens once…`);
 
@@ -209,13 +257,13 @@ async function ensureJava(major: number, log: (msg: string) => void): Promise<st
   try { if (fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true }); } catch {}
   fs.mkdirSync(javaDir, { recursive: true });
   try {
-    execSync(`powershell -NoProfile -command "Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${javaDir}' -Force"`, { timeout: 120000 });
+    await extractArchive(zipPath, javaDir);
   } catch (extractErr: any) {
     throw new Error(`Java ${major} extraction failed: ${extractErr.message}`);
   }
 
   const javaw = findJavawInDir(javaDir);
-  if (!javaw) throw new Error(`Java ${major} extracted but javaw.exe not found`);
+  if (!javaw) throw new Error(`Java ${major} extracted but ${JAVA_EXE} not found`);
   const finalVer = getJavaMajorVersion(javaw);
   log(`[Launcher] Java ${finalVer} installed at ${javaw}`);
   gameWin?.webContents.send('mc-status', { msg: `Java ${major} ready`, color: 'green' });
@@ -798,13 +846,26 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
 // ── IPC: force-kill MC ────────────────────────────────────────────────────────
 ipcMain.handle('mc-kill', () => {
   if (mcProcess?.pid) {
-    try { execSync(`taskkill /F /PID ${mcProcess.pid} /T`, { stdio: 'ignore' }); } catch {}
+    try {
+      if (process.platform === 'win32') {
+        execSync(`taskkill /F /PID ${mcProcess.pid} /T`, { stdio: 'ignore' });
+      } else {
+        try { execSync(`pkill -9 -P ${mcProcess.pid}`, { stdio: 'ignore' }); } catch {}
+        process.kill(mcProcess.pid, 'SIGKILL');
+      }
+    } catch {}
     mcProcess = null;
     return;
   }
   // Fallback: kill any java process (covers cases where process ref was lost)
-  try { execSync('taskkill /F /IM java.exe /T',  { stdio: 'ignore' }); } catch {}
-  try { execSync('taskkill /F /IM javaw.exe /T', { stdio: 'ignore' }); } catch {}
+  try {
+    if (process.platform === 'win32') {
+      execSync('taskkill /F /IM java.exe /T',  { stdio: 'ignore' });
+      execSync('taskkill /F /IM javaw.exe /T', { stdio: 'ignore' });
+    } else {
+      execSync('pkill -9 -f java', { stdio: 'ignore' });
+    }
+  } catch {}
 });
 
 // ── IPC: cosmetics ────────────────────────────────────────────────────────────
@@ -1077,11 +1138,13 @@ function extractZipAll(buf: Buffer, destDir: string): void {
   let pos = cdOffset;
   while (pos < cdOffset + cdSize) {
     if (buf.readUInt32LE(pos) !== 0x02014b50) break;
+    const versionMadeBy = buf.readUInt16LE(pos + 4);
     const method     = buf.readUInt16LE(pos + 10);
     const compSize   = buf.readUInt32LE(pos + 20);
     const fnLen      = buf.readUInt16LE(pos + 28);
     const extraLen   = buf.readUInt16LE(pos + 30);
     const commentLen = buf.readUInt16LE(pos + 32);
+    const externalAttrs = buf.readUInt32LE(pos + 38);
     const lhOffset   = buf.readUInt32LE(pos + 42);
     const name       = buf.slice(pos + 46, pos + 46 + fnLen).toString('utf-8');
 
@@ -1097,9 +1160,31 @@ function extractZipAll(buf: Buffer, destDir: string): void {
         const outPath = path.join(destDir, name);
         fs.mkdirSync(path.dirname(outPath), { recursive: true });
         fs.writeFileSync(outPath, data);
+        // "version made by" high byte 3 = Unix — the upper 16 bits of the
+        // external attributes are then the st_mode permission bits. Zip
+        // extraction otherwise loses the executable bit entirely, which
+        // breaks any binary (like a Java runtime's own launcher) unpacked
+        // this way on mac/Linux.
+        if ((versionMadeBy >> 8) === 3) {
+          const unixMode = (externalAttrs >>> 16) & 0o777;
+          if (unixMode) { try { fs.chmodSync(outPath, unixMode); } catch {} }
+        }
       }
     }
     pos += 46 + fnLen + extraLen + commentLen;
+  }
+}
+
+// Dispatches to the right extractor for whichever archive format the
+// download actually came back as — Adoptium serves .zip for Windows but
+// .tar.gz for mac/Linux, and tar's own extraction already preserves Unix
+// permission bits natively (unlike the hand-rolled zip path above).
+async function extractArchive(archivePath: string, destDir: string): Promise<void> {
+  if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
+    await tar.x({ file: archivePath, cwd: destDir });
+  } else {
+    const buf = fs.readFileSync(archivePath);
+    extractZipAll(buf, destDir);
   }
 }
 
@@ -1865,7 +1950,7 @@ ipcMain.handle('mc-install-world', async (_e, filePath: string) => {
     fs.mkdirSync(savesDir, { recursive: true });
     const ext = path.extname(filePath).toLowerCase();
     if (ext === '.zip') {
-      execSync(`powershell -Command "Expand-Archive -LiteralPath '${filePath}' -DestinationPath '${savesDir}' -Force"`, { timeout: 30000 });
+      await extractArchive(filePath, savesDir);
     } else {
       const dest = path.join(savesDir, path.basename(filePath));
       if (fs.statSync(filePath).isDirectory()) {
