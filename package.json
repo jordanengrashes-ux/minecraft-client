@@ -73,6 +73,7 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
+      "runAfterFinish": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Voxel Client",

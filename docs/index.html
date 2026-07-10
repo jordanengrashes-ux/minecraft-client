@@ -196,7 +196,7 @@
         <div class="platform-name">Linux</div>
         <div class="platform-ext">.AppImage / .deb</div>
       </a>
-      <a href="https://github.com/jordanengrashes-ux/minecraft-client/releases/latest" class="platform">
+      <a id="mac-dl" href="https://github.com/jordanengrashes-ux/minecraft-client/releases/latest" class="platform">
         <div class="platform-name">macOS</div>
         <div class="platform-ext">.dmg</div>
       </a>
@@ -220,6 +220,8 @@
         if(d.tag_name) document.getElementById('latest-ver').textContent=d.tag_name;
         const exe=(d.assets||[]).find(a=>a.name.includes('Setup')&&a.name.endsWith('.exe'));
         if(exe){document.getElementById('win-dl').href=exe.browser_download_url;document.getElementById('dl-btn').href=exe.browser_download_url;}
+        const dmg=(d.assets||[]).find(a=>a.name.endsWith('.dmg'));
+        if(dmg){document.getElementById('mac-dl').href=dmg.browser_download_url;}
       }).catch(()=>{});
 
     document.querySelectorAll('.top-feat').forEach(card=>{

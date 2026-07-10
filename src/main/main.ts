@@ -13,6 +13,12 @@ const { Client } = require('minecraft-launcher-core');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tar = require('tar');
 
+// Must be set before any BrowserWindow is created — without it Windows can
+// group/identify the taskbar icon as generic Electron instead of this app,
+// which also affects whether a manually pinned taskbar shortcut stays
+// correctly associated with the app across updates.
+if (process.platform === 'win32') app.setAppUserModelId('com.voxelclient.app');
+
 let loginWin:   BrowserWindow | null = null;
 let gameWin:    BrowserWindow | null = null;
 let overlayWin: BrowserWindow | null = null;
