@@ -22,6 +22,7 @@
   "build": {
     "appId": "com.voxelclient.app",
     "productName": "Voxel Client",
+    "afterPack": "build/afterPack.js",
     "files": [
       "dist/**/*",
       "dist-electron/**/*"
