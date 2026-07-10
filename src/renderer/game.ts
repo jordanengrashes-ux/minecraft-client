@@ -706,7 +706,7 @@ function showPanel(panel: HTMLElement, nav: HTMLElement) {
 }
 navPlay          .addEventListener('click', () => showPanel(contentEl,             navPlay));
 navBedrock       .addEventListener('click', () => { showPanel(bedrockPanelEl,      navBedrock); initBedrock(); if (!bedrockPanelEl.dataset.loaded) { searchBedrockAddons(''); bedrockPanelEl.dataset.loaded = '1'; } });
-navMods          .addEventListener('click', () => { showPanel(modsPanelEl,         navMods); if (!modsPanelEl.dataset.loaded) { loadRecommendedMods(); modsPanelEl.dataset.loaded = '1'; } });
+navMods          .addEventListener('click', () => { showPanel(modsPanelEl,         navMods); if (!modsPanelEl.dataset.loaded) { loadRecommendedMods(); initAvengersFeaturedCard(); modsPanelEl.dataset.loaded = '1'; } });
 navCf            .addEventListener('click', () => { showPanel(cfPanelEl,           navCf);  if (!cfPanelEl.dataset.loaded)  { initCurseForge(); cfPanelEl.dataset.loaded = '1'; } });
 navPvp           .addEventListener('click', () => { showPanel(pvpPanelEl,          navPvp); if (!pvpPanelEl.dataset.loaded) { initPvpMods(); pvpPanelEl.dataset.loaded = '1'; } });
 navBedrockMods   .addEventListener('click', () => { showPanel(bedrockModsPanelEl,  navBedrockMods); if (!bedrockModsPanelEl.dataset.loaded) { searchBedrockMods(''); bedrockModsPanelEl.dataset.loaded = '1'; } });
@@ -1593,6 +1593,33 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
   if (on) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
   queueModBuildVersion(mod.project_id, buildVerEl);
   return card;
+}
+
+// The "Avengers Mod" featured slot used to zip up source code from a path
+// hardcoded to one machine, which meant it never worked for anyone else.
+// It's a real published Modrinth project, so it gets the same toggle-install
+// card as everything else instead of a one-off download button.
+const AVENGERS_MOD_PROJECT_ID = 'jaRugO3N';
+async function initAvengersFeaturedCard() {
+  const slot = document.getElementById('avengers-featured-slot');
+  if (!slot) return;
+  try {
+    const res = await fetch(`https://api.modrinth.com/v2/project/${AVENGERS_MOD_PROJECT_ID}`);
+    if (!res.ok) throw new Error(`Modrinth API ${res.status}`);
+    const proj = await res.json();
+    const hit: ModrinthHit = {
+      project_id: proj.id,
+      title: proj.title,
+      description: proj.description,
+      icon_url: proj.icon_url,
+      downloads: proj.downloads,
+      categories: proj.categories ?? [],
+    };
+    slot.innerHTML = '';
+    slot.appendChild(buildModCard(hit));
+  } catch {
+    slot.innerHTML = '<div style="color:#666;font-size:12px;padding:4px 2px;">Could not load featured mod</div>';
+  }
 }
 
 function buildModpackCard(mod: ModrinthHit): HTMLElement {

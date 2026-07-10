@@ -1909,22 +1909,6 @@ ipcMain.handle('mc-open-folder', async (_e, type: string) => {
   shell.openPath(dir);
 });
 
-ipcMain.handle('download-avengers-mod', async () => {
-  const src  = 'C:\\Users\\Jorda\\Documents\\GitHub\\avengers-mod';
-  const dest = path.join(os.homedir(), 'Downloads', 'avengers-mod-source.zip');
-  try {
-    if (fs.existsSync(dest)) fs.unlinkSync(dest);
-    execSync(
-      `powershell -Command "Compress-Archive -Path '${src}' -DestinationPath '${dest}'"`,
-      { timeout: 30000 }
-    );
-    shell.showItemInFolder(dest);
-    return { ok: true };
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message ?? e) };
-  }
-});
-
 // ── IPC: window controls ──────────────────────────────────────────────────────
 ipcMain.on('win-close',    () => BrowserWindow.getFocusedWindow()?.close());
 ipcMain.on('win-minimize', () => BrowserWindow.getFocusedWindow()?.minimize());

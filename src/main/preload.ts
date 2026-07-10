@@ -34,7 +34,6 @@ contextBridge.exposeInMainWorld('overlay', {
 });
 
 contextBridge.exposeInMainWorld('files', {
-  downloadAvengers: () => ipcRenderer.invoke('download-avengers-mod'),
   listWorlds:       () => ipcRenderer.invoke('mc-list-worlds'),
   savesDir:         () => ipcRenderer.invoke('mc-saves-dir'),
   installWorld:     (p: string) => ipcRenderer.invoke('mc-install-world', p),

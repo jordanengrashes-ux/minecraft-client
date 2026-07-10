@@ -630,21 +630,11 @@
       </div>
       <!-- Avengers Mod featured card -->
       <div style="padding:0 26px 14px;">
-        <div style="background:linear-gradient(135deg,rgba(180,0,0,0.12) 0%,rgba(245,166,35,0.08) 100%);border:1px solid rgba(245,166,35,0.28);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:14px;">
-          <div style="font-size:30px;flex-shrink:0;line-height:1;">&#127738;</div>
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span style="font-size:14px;font-weight:700;color:#ffffff;">Avengers Mod</span>
-              <span style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;background:rgba(245,166,35,0.14);border:1px solid rgba(245,166,35,0.4);color:#f5a623;border-radius:4px;padding:1px 7px;">FEATURED</span>
-              <span style="font-size:9px;color:#444444;">Fabric · 1.21.4 · Source</span>
-            </div>
-            <div style="font-size:11px;color:#aaaaaa;margin-top:3px;line-height:1.5;">14 heroes · Iron Man, Thor, Hulk, Spider-Man &amp; more · Thanos, Loki, Ultron bosses · 6 Infinity Stones + Gauntlet</div>
+        <div style="background:linear-gradient(135deg,rgba(180,0,0,0.12) 0%,rgba(245,166,35,0.08) 100%);border:1px solid rgba(245,166,35,0.28);border-radius:10px;padding:10px 12px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;background:rgba(245,166,35,0.14);border:1px solid rgba(245,166,35,0.4);color:#f5a623;border-radius:4px;padding:1px 7px;">FEATURED</span>
           </div>
-          <button id="avengers-dl-btn"
-            style="flex-shrink:0;padding:8px 16px;background:#e8940d;border:none;border-radius:7px;color:#000000;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background 0.1s;"
-            onmouseover="if(!this.disabled)this.style.background='#f6c356'" onmouseout="if(!this.disabled)this.style.background='#e8940d'">
-            &#8595; Download ZIP
-          </button>
+          <div id="avengers-featured-slot"></div>
         </div>
       </div>
 
@@ -1318,27 +1308,6 @@
   </div>
 
   <script type="module" src="./game.ts"></script>
-  <script>
-    document.getElementById('avengers-dl-btn').addEventListener('click', async function() {
-      this.textContent = 'Zipping…';
-      this.disabled = true;
-      this.style.background = '#888';
-      const result = await (window as any).files.downloadAvengers();
-      if (result.ok) {
-        this.textContent = '✓ Saved to Downloads';
-        this.style.background = '#2ea043';
-        setTimeout(() => {
-          this.textContent = '↓ Download ZIP';
-          this.style.background = '#e8940d';
-          this.disabled = false;
-        }, 3000);
-      } else {
-        this.textContent = 'Error — retry';
-        this.style.background = '#e8940d';
-        this.disabled = false;
-      }
-    });
-  </script>
 </body>
 </html>
 
