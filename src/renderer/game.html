@@ -62,6 +62,28 @@
       border-radius: 4px; padding: 3px 10px; font-size: 11px; color:#ffffff; font-weight: 600;
     }
 
+    /* Quick join */
+    #quick-join { padding: 12px 26px 10px; border-bottom: 1px solid #1e1e1e; background: #0d0d0d; }
+    #qj-bar { display: flex; align-items: center; gap: 9px; background: #080808; border: 1px solid #222222; border-radius: 7px; padding: 4px 4px 4px 12px; transition: border-color 0.1s; }
+    #qj-bar:focus-within { border-color: #f5a623; }
+    #qj-address { flex: 1; min-width: 0; background: none; border: none; outline: none; color: #ffffff; font-size: 13px; padding: 7px 0; font-family: inherit; }
+    #qj-address::placeholder { color: #555555; }
+    #qj-join { background: #f5a623; border: none; border-radius: 5px; color: #000000; font-size: 12px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; padding: 8px 18px; cursor: pointer; transition: background 0.1s; }
+    #qj-join:hover:not(:disabled) { background: #f6c356; }
+    #qj-join:disabled { opacity: 0.3; cursor: not-allowed; }
+    #qj-servers { display: flex; gap: 8px; overflow-x: auto; margin-top: 9px; scrollbar-width: thin; scrollbar-color: #2a2a2a transparent; }
+    #qj-servers:empty { display: none; }
+    .qj-label { flex: none; align-self: center; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #555555; margin-right: 2px; }
+    .qj-chip { flex: none; display: flex; align-items: center; gap: 9px; background: #141414; border: 1px solid #222222; border-radius: 6px; padding: 5px 5px 5px 10px; font-size: 12px; color: #ffffff; }
+    .qj-chip .qj-dot { width: 7px; height: 7px; border-radius: 50%; background: #444444; flex: none; }
+    .qj-chip.online .qj-dot { background: #3fb950; box-shadow: 0 0 6px rgba(63,185,80,0.6); }
+    .qj-chip.starting .qj-dot { background: #f5a623; }
+    .qj-chip .qj-meta { color: #777777; font-size: 11px; }
+    .qj-chip button { background: none; border: 1px solid #2a2a2a; border-radius: 4px; color: #ffffff; font-size: 11px; font-weight: 600; padding: 4px 10px; cursor: pointer; transition: all 0.1s; }
+    .qj-chip button:hover:not(:disabled) { border-color: #f5a623; color: #f5a623; }
+    .qj-chip button:disabled { opacity: 0.35; cursor: not-allowed; }
+    .qj-hint { flex: none; align-self: center; font-size: 11px; color: #555555; }
+
     /* Controls */
     #controls { padding: 18px 26px; flex: 1; overflow-y: auto; }
     .section-label { font-size: 9px; color: #444444; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; margin-top: 18px; font-weight: 700; }
@@ -389,6 +411,17 @@
           <p>Join any Minecraft Java Edition server</p>
           <div id="mc-username-badge" style="display:none">Logged in as <span id="mc-ign"></span></div>
         </div>
+      </div>
+
+      <!-- Quick join: type an address, or pick a server from Server Control Center -->
+      <div id="quick-join">
+        <div id="qj-bar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#777777" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><path d="M6 7h.01M6 17h.01"/></svg>
+          <input id="qj-address" list="qj-datalist" autocomplete="off" spellcheck="false" placeholder="Join a server: type an address (play.example.net, localhost:25566) or pick one below" />
+          <datalist id="qj-datalist"></datalist>
+          <button id="qj-join">Join</button>
+        </div>
+        <div id="qj-servers"></div>
       </div>
 
       <!-- Controls -->

@@ -1,4 +1,4 @@
-﻿// Launcher logic — no Three.js, just UI wiring for Minecraft launch
+// Launcher logic — no Three.js, just UI wiring for Minecraft launch
 
 import { ref, set, push, remove, onValue, onChildAdded, query, limitToLast, serverTimestamp, onDisconnect, update, get, increment } from 'firebase/database';
 import { rtdb } from './firebase';
@@ -411,6 +411,19 @@ shaderpackSelect?.addEventListener('change', () => {
   updateModsBadge();
 }
 
+// Games started from Server Control Center use these same Play settings.
+function saveLaunchSettings() {
+  (window as any).mscc?.saveLaunchSettings?.({
+    maxMem: parseInt(mcMemory.value, 10) || 4,
+    loader: modLoaderSelect.value,
+    vsync: vsyncToggle?.checked !== false,
+    shaderpack: shaderpackSelect?.value ?? '',
+  });
+}
+for (const el of [mcMemory, modLoaderSelect, vsyncToggle, shaderpackSelect]) el?.addEventListener('change', saveLaunchSettings);
+mcMemory.addEventListener('input', saveLaunchSettings);
+setTimeout(saveLaunchSettings, 1500);
+
 // ── Sync localStorage with actual mods on disk ────────────────────────────────
 // Removes entries from the installed-mods map when the JAR is no longer on disk
 // (e.g. after Repair Game or manual deletion) so the UI reflects reality.
@@ -503,13 +516,16 @@ mcPlayBtn.addEventListener('click', async () => {
   let version = mcVersion.value;
   const maxMem = parseInt(mcMemory.value, 10);
   const javaVersion = getEffectiveJavaVersion();
+  // set by the quick-join bar: connect to this server as soon as the game starts
+  const server = pendingServer ?? undefined;
+  pendingServer = null;
 
   running = true;
   mcPlayBtn.disabled = true;
   mcPlayBtn.classList.add('running');
   mcPlayBtn.textContent = 'Launching…';
   mcForceQuitBtn.style.display = 'inline-flex';
-  setStatus(`Launching Minecraft ${version}…`, 'yellow');
+  setStatus(server ? `Launching Minecraft ${version} and joining ${server}…` : `Launching Minecraft ${version}…`, 'yellow');
   setProgress(0);
   logToggle.style.display = 'inline';
   openLog();
@@ -558,8 +574,8 @@ mcPlayBtn.addEventListener('click', async () => {
   const vsync      = vsyncToggle?.checked !== false;
   const shaderpack = shaderpackSelect?.value ?? '';
   const res = offlineToggle.checked
-    ? await mc.launchOffline({ version, maxMem, username: offlineUsername.value.trim() || 'Player', javaVersion, vsync, shaderpack, forgePath })
-    : await mc.launch({ version, maxMem, javaVersion, vsync, shaderpack, forgePath });
+    ? await mc.launchOffline({ version, maxMem, username: offlineUsername.value.trim() || 'Player', javaVersion, vsync, shaderpack, forgePath, server })
+    : await mc.launch({ version, maxMem, javaVersion, vsync, shaderpack, forgePath, server });
   if (!res.ok) {
     setStatus(`Launch failed: ${res.error}`, 'red');
     addLog(`Error: ${res.error}`, 'error');
@@ -5182,3 +5198,119 @@ function initGuide() {
 
 
 
+
+// ── Quick join ─────────────────────────────────────────────────────────────────
+// A bar on the Play page: type any server address, or pick one of the servers
+// running in Minecraft Server Control Center on this PC, and the game starts
+// straight into it.
+let pendingServer: string | null = null;
+
+interface PanelServer {
+  id: string; name: string; software: string; mcVersion: string; status: string;
+  address: string; port: number; onlineMode: boolean; players: number; maxPlayers: number; java: boolean;
+}
+interface PanelServers { available: boolean; panelRunning: boolean; servers: PanelServer[] }
+
+const qjAddress  = document.getElementById('qj-address') as HTMLInputElement;
+const qjJoin     = document.getElementById('qj-join') as HTMLButtonElement;
+const qjServers  = document.getElementById('qj-servers')!;
+const qjDatalist = document.getElementById('qj-datalist')!;
+const QJ_RECENT_KEY = 'voxel_recent_servers';
+let panelServers: PanelServer[] = [];
+
+function qjRecent(): string[] {
+  try { return JSON.parse(localStorage.getItem(QJ_RECENT_KEY) || '[]'); } catch { return []; }
+}
+function qjRemember(addr: string) {
+  const list = [addr, ...qjRecent().filter((a) => a !== addr)].slice(0, 12);
+  try { localStorage.setItem(QJ_RECENT_KEY, JSON.stringify(list)); } catch {}
+  qjRenderDatalist();
+}
+function qjRenderDatalist() {
+  qjDatalist.replaceChildren(...qjRecent().map((a) => Object.assign(document.createElement('option'), { value: a })));
+}
+
+/** "play.example.net" → "play.example.net:25565"; returns null if it isn't an address. */
+function qjNormalize(raw: string): string | null {
+  const s = raw.trim().replace(/^minecraft:\/\//i, '');
+  const m = /^(\[[0-9a-f:]+\]|[A-Za-z0-9.-]+)(?::(\d{1,5}))?$/i.exec(s);
+  if (!m) return null;
+  const port = m[2] ? parseInt(m[2], 10) : 25565;
+  if (port < 1 || port > 65535) return null;
+  return `${m[1]}:${port}`;
+}
+
+function qjSelectVersion(v: string) {
+  if (!Array.from(mcVersion.options).some((o) => o.value === v)) mcVersion.add(new Option(v, v), 0);
+  mcVersion.value = v;
+  mcVersion.dispatchEvent(new Event('change'));
+}
+
+function qjJoinServer(address: string, s?: PanelServer) {
+  if (running) { setStatus('Minecraft is already running — close it first', 'yellow'); return; }
+  if (s) {
+    if (s.onlineMode && offlineToggle.checked) {
+      setStatus(`${s.name} only lets in Microsoft accounts — turn Offline Mode off, or turn off online-mode for it in Server Control Center`, 'red');
+      return;
+    }
+    if (s.software === 'forge' || s.software === 'neoforge') addLog(`${s.name} runs ${s.software}: you need the same mods on this client to join.`, 'warn');
+    qjSelectVersion(s.mcVersion);
+  }
+  pendingServer = address;
+  qjRemember(address);
+  mcPlayBtn.click();
+}
+
+function qjRenderServers(d: PanelServers) {
+  panelServers = d.servers.filter((s) => s.java);
+  if (!d.available) { qjServers.replaceChildren(); return; }
+  const label = Object.assign(document.createElement('span'), { className: 'qj-label', textContent: 'Your servers' });
+  if (!panelServers.length) {
+    qjServers.replaceChildren(label, Object.assign(document.createElement('span'), { className: 'qj-hint', textContent: 'No Java servers in Server Control Center yet' }));
+    return;
+  }
+  const chips = panelServers.map((s) => {
+    const chip = document.createElement('div');
+    chip.className = `qj-chip ${s.status === 'online' ? 'online' : s.status === 'starting' ? 'starting' : ''}`;
+    const dot = Object.assign(document.createElement('span'), { className: 'qj-dot' });
+    const name = Object.assign(document.createElement('span'), { textContent: s.name });
+    const meta = Object.assign(document.createElement('span'), {
+      className: 'qj-meta',
+      textContent: s.status === 'online' ? `${s.mcVersion} · ${s.players}/${s.maxPlayers}` : `${s.mcVersion} · ${d.panelRunning ? s.status : 'panel closed'}`,
+    });
+    const btn = Object.assign(document.createElement('button'), { textContent: 'Join' });
+    const addr = `${s.address}:${s.port}`;
+    btn.disabled = s.status !== 'online';
+    btn.title = s.status === 'online' ? `Start Minecraft ${s.mcVersion} and join ${addr}` : 'Start this server in Server Control Center first';
+    btn.addEventListener('click', () => qjJoinServer(addr, s));
+    chip.append(dot, name, meta, btn);
+    chip.title = `${s.software} ${s.mcVersion} on ${addr}${s.onlineMode ? '' : ' (offline-mode: any username can join)'}`;
+    return chip;
+  });
+  qjServers.replaceChildren(label, ...chips);
+}
+
+qjJoin.addEventListener('click', () => {
+  const addr = qjNormalize(qjAddress.value);
+  if (!addr) { setStatus('That is not a server address — try something like play.example.net or localhost:25566', 'red'); qjAddress.focus(); return; }
+  const s = panelServers.find((p) => `${p.address}:${p.port}` === addr || (p.port === Number(addr.split(':').pop()) && /^(localhost|127\.0\.0\.1)$/.test(addr.split(':')[0])));
+  qjJoinServer(addr, s);
+});
+qjAddress.addEventListener('keydown', (e) => { if (e.key === 'Enter') qjJoin.click(); });
+qjRenderDatalist();
+
+const msccBridge = (window as any).mscc;
+if (msccBridge) {
+  msccBridge.servers().then(qjRenderServers).catch(() => {});
+  msccBridge.onServers(qjRenderServers);
+}
+
+// Server Control Center started the game (its Minecraft tab): show it as running here too.
+mc?.onRemoteLaunch?.((i: { version: string; server?: string; username?: string }) => {
+  running = true;
+  mcPlayBtn.disabled = true;
+  mcPlayBtn.classList.add('running');
+  mcPlayBtn.textContent = 'Launching…';
+  mcForceQuitBtn.style.display = 'inline-flex';
+  setStatus(`Server Control Center is starting Minecraft ${i.version}${i.server ? ` on ${i.server}` : ''}${i.username ? ` as ${i.username}` : ''}…`, 'yellow');
+});

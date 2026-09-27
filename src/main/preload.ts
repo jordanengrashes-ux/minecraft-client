@@ -64,8 +64,8 @@ contextBridge.exposeInMainWorld('cosmetics', {
 contextBridge.exposeInMainWorld('mc', {
   auth:            () => ipcRenderer.invoke('mc-auth'),
   reauth:          () => ipcRenderer.invoke('mc-reauth'),
-  launch:          (opts: { version: string; maxMem: number; javaVersion?: number; forgePath?: string }) => ipcRenderer.invoke('mc-launch', opts),
-  launchOffline:   (opts: { version: string; maxMem: number; username: string; javaVersion?: number; forgePath?: string }) => ipcRenderer.invoke('mc-launch-offline', opts),
+  launch:          (opts: { version: string; maxMem: number; javaVersion?: number; forgePath?: string ; server?: string }) => ipcRenderer.invoke('mc-launch', opts),
+  launchOffline:   (opts: { version: string; maxMem: number; username: string; javaVersion?: number; forgePath?: string ; server?: string }) => ipcRenderer.invoke('mc-launch-offline', opts),
   uploadSkin:      (opts: { base64: string; variant: 'classic' | 'slim' }) => ipcRenderer.invoke('mc-upload-skin', opts),
   kill:            () => ipcRenderer.invoke('mc-kill'),
   repair:          () => ipcRenderer.invoke('mc-repair'),
@@ -98,5 +98,13 @@ contextBridge.exposeInMainWorld('mc', {
   onLog:           (cb: (line: string) => void) => ipcRenderer.on('mc-log',      (_e, l) => cb(l)),
   onProgress:      (cb: (e: any) => void)       => ipcRenderer.on('mc-progress', (_e, e) => cb(e)),
   onClosed:        (cb: (code: number) => void) => ipcRenderer.on('mc-closed',   (_e, c) => cb(c)),
+  onRemoteLaunch:  (cb: (info: { version: string; server?: string; username?: string }) => void) => ipcRenderer.on('mc-remote-launch', (_e, i) => cb(i)),
   onError:         (cb: (msg: string) => void)  => ipcRenderer.on('mc-error',    (_e, m) => cb(m)),
+});
+
+// Minecraft Server Control Center (local server panel) — its servers for the quick-join bar
+contextBridge.exposeInMainWorld('mscc', {
+  servers:   () => ipcRenderer.invoke('mscc-servers'),
+  saveLaunchSettings: (s: any) => ipcRenderer.invoke('save-launch-settings', s),
+  onServers: (cb: (d: any) => void) => ipcRenderer.on('mscc-servers', (_e, d) => cb(d)),
 });

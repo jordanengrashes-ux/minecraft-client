@@ -64,5 +64,11 @@ Two workflows: `auto-version.yml` (bumps patch version in `package.json`, commit
 ### Firebase backend
 `voxel_chat`, `voxel_friends`, `voxel_presence`, `voxel_tokens`, `voxel_users`, `mc_servers`, `voxel_capes`, `voxel_timeouts`, etc. in `database.rules.json` currently have `.read`/`.write: true` with no auth check at all — anyone who knows the database URL can write to almost every path directly, no modified client needed. Only `vhServers` requires `auth != null`. Guest/offline sign-in (`login.ts`) also hardcodes `uid: 'guest'` for every guest instead of using Firebase Anonymous Auth, so concurrent guests collide on the same records. Both are known, not-yet-fixed issues — fixing the rules without first giving guests real (anonymous) auth sessions would lock guests out of chat/friends/presence entirely.
 
+### Version JVM arguments (26.3 crash)
+MCLC ignores `arguments.jvm` in Minecraft's version JSON and passes its own fixed list. `versionJvmArgs()` in main.ts reads them from the vanilla JSON (`ensureVersionJson()` fetches it before a version's first launch) and passes them as `customArgs`, minus `-cp`/`${classpath}`/`-Djava.library.path`/`-XX:HeapDumpPath` which MCLC sets itself. Without this, 26.3 crashes about half the time ~6 s after start (native access violation in jvm.dll, no hs_err file): 26.3 added `-XX:StackShadowPages=32` for its new SDL/shaderc natives. Don't remove it.
+
+### Minecraft Server Control Center link
+`src/main/mscc.ts`: a localhost-only control API (port + random token in `<userData>/control.json`) that Server Control Center uses to start the game (`--mscc-bg` = start without a window, quit ~90 s after the game closes), and the quick-join bar reading the panel's `voxel-link.json`. The Play page saves its settings to `launch-settings.json` so panel launches use them. Force Quit only kills Java processes from our own game folder (never every `java.exe`, which would kill the user's servers); `mcProcess` holds the real ChildProcess (MCLC's `launch()` returns a Promise).
+
 ### Windows-only feature
 Bedrock Edition support (`bedrockComMojangDir`, `mc-launch-bedrock`, Bedrock pack install) is inherently Windows-only — Bedrock has no Mac/Linux client at all, so these paths reading `process.env.LOCALAPPDATA` and failing gracefully ("not installed") on other platforms is correct, not a bug to fix.

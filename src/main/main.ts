@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker, dialog, session } from 'electron';
 import { GEMINI_KEY, CF_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from './ai-key';
+import { startControlServer, watchPanelServers, readPanelServers, javaForMc, quickPlayFor, type PanelLaunchRequest } from './mscc';
 import { autoUpdater } from 'electron-updater';
 import { execSync, spawnSync, spawn, ChildProcess } from 'child_process';
 import https from 'https';
@@ -27,7 +28,34 @@ let mcAuthToken: any = null;
 let updateReady = false;
 let keepAwakeId: number | null = null;
 let mcProcess: ChildProcess | null = null;
+// true while MCLC is still downloading/preparing (before the java process exists)
+let mcStarting = false;
 let javaReadyPromise: Promise<string> | null = null;
+
+// Started by Minecraft Server Control Center with no window: quit again once
+// the game it asked for has closed and nobody opened a window.
+const BG_START = process.argv.includes('--mscc-bg');
+let idleQuitTimer: NodeJS.Timeout | null = null;
+function scheduleIdleQuit() {
+  if (!BG_START) return;
+  if (idleQuitTimer) clearTimeout(idleQuitTimer);
+  idleQuitTimer = setTimeout(() => {
+    if (!mcProcess && !mcStarting && BrowserWindow.getAllWindows().length === 0) app.quit();
+  }, 90_000);
+}
+
+// MCLC's launch() resolves to the java ChildProcess only after all downloads
+// finish, so keep the real process (not the promise) for kill/pid/status.
+function trackLaunch(launching: Promise<ChildProcess | null>) {
+  mcStarting = true;
+  launching
+    .then((child) => { mcStarting = false; if (child) mcProcess = child; else scheduleIdleQuit(); })
+    .catch((e: any) => {
+      mcStarting = false;
+      gameWin?.webContents.send('mc-error', String(e?.message ?? e));
+      scheduleIdleQuit();
+    });
+}
 
 const DEV = !app.isPackaged;
 const AUTH_CACHE            = path.join(app.getPath('userData'), 'mc-auth.json');
@@ -650,6 +678,63 @@ const FORGEWRAPPER_OVERRIDE = {
   size: 29892,
 };
 
+// MCLC ignores the JVM arguments in Minecraft's own version JSON and passes a
+// fixed list instead. Newer versions need theirs: 26.3 added
+// -XX:StackShadowPages=32 (without it the JVM crashes in native code about half
+// the time, ~6 s after start), --enable-native-access, --add-exports and folders
+// for LWJGL/JNA/Netty natives. Read them from the vanilla JSON and pass them on.
+// The vanilla version JSON normally arrives during MCLC's launch; fetch it
+// first so versionJvmArgs() has it on a version's very first launch too.
+async function ensureVersionJson(mcRoot: string, mcVer: string): Promise<void> {
+  const file = path.join(mcRoot, 'versions', mcVer, `${mcVer}.json`);
+  if (fs.existsSync(file)) return;
+  try {
+    const manifest = await fetchJson('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json') as any;
+    const entry = manifest.versions?.find((v: any) => v.id === mcVer);
+    if (!entry) return;
+    const json = await fetchJson(entry.url);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(json));
+  } catch {} // offline: MCLC still downloads it, only the extra JVM args are missed this once
+}
+
+function versionJvmArgs(mcRoot: string, mcVer: string): string[] {
+  let json: any;
+  try { json = JSON.parse(fs.readFileSync(path.join(mcRoot, 'versions', mcVer, `${mcVer}.json`), 'utf-8')); } catch { return []; }
+  const osName = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'osx' : 'linux';
+  const allowed = (rules?: any[]): boolean => {
+    if (!rules?.length) return true;
+    let ok = false;
+    for (const r of rules) {
+      let match = true;
+      if (r.os?.name && r.os.name !== osName) match = false;
+      if (r.os?.arch && !(r.os.arch === 'x86' ? process.arch === 'ia32' : r.os.arch === process.arch)) match = false;
+      if (r.features) match = false; // feature flags only concern game arguments
+      if (match) ok = r.action === 'allow';
+    }
+    return ok;
+  };
+  const vars: Record<string, string> = {
+    natives_directory: path.join(mcRoot, 'natives', mcVer),
+    launcher_name: 'voxel-client',
+    launcher_version: app.getVersion(),
+    classpath_separator: path.delimiter,
+    library_directory: path.join(mcRoot, 'libraries'),
+    version_name: mcVer,
+  };
+  const out: string[] = [];
+  for (const a of json.arguments?.jvm ?? []) {
+    const values = typeof a === 'string' ? [a] : allowed(a.rules) ? ([] as string[]).concat(a.value) : [];
+    for (const v of values) {
+      // MCLC sets these itself
+      if (v === '-cp' || v === '${classpath}' || v.startsWith('-Djava.library.path=') || v.startsWith('-XX:HeapDumpPath=')) continue;
+      const filled = v.replace(/\$\{(\w+)\}/g, (m, k) => vars[k] ?? m);
+      if (!filled.includes('${')) out.push(filled);
+    }
+  }
+  return out;
+}
+
 // Builds the version/forge/mcPath portion of launcher.launch() options shared
 // between online and offline launch — Fabric uses a pre-merged custom version
 // json, Forge/NeoForge use MCLC's built-in ForgeWrapper support.
@@ -665,7 +750,7 @@ function buildLoaderLaunchOptions(mcRoot: string, version: string, forgePath?: s
     fs.mkdirSync(versionModsDir, { recursive: true });
     return {
       version: { number: mcVer, type: 'release' as const, custom: version },
-      customArgs: [`-Dfabric.modsFolder=${versionModsDir}`],
+      customArgs: [`-Dfabric.modsFolder=${versionModsDir}`, ...versionJvmArgs(mcRoot, mcVer)],
     };
   }
   if (forgePath) {
@@ -676,10 +761,14 @@ function buildLoaderLaunchOptions(mcRoot: string, version: string, forgePath?: s
       overridesExtra: { fw: FORGEWRAPPER_OVERRIDE },
     };
   }
-  return { version: { number: version || '1.21.4', type: 'release' as const } };
+  const extra = versionJvmArgs(mcRoot, version || '1.21.4');
+  return { version: { number: version || '1.21.4', type: 'release' as const }, ...(extra.length ? { customArgs: extra } : {}) };
 }
 
-ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; javaVersion?: number; vsync?: boolean; shaderpack?: string; forgePath?: string }) => {
+// server: "host:port" to join as soon as the game starts (quick-join bar / Server Control Center)
+type LaunchOpts = { version: string; maxMem: number; javaVersion?: number; vsync?: boolean; shaderpack?: string; forgePath?: string; server?: string };
+
+async function launchOnline(opts: LaunchOpts): Promise<{ ok: boolean; error?: string }> {
   const requestedJava = opts.javaVersion || 21;
   const javaPromise = (requestedJava === 21 && javaReadyPromise)
     ? javaReadyPromise
@@ -728,7 +817,8 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
     if (fs.existsSync(packDir)) enableVoxelResourcePack(mcRoot);
     setOptionsKey(mcRoot, 'backgroundBlur', '0');
     setOptionsKey(mcRoot, 'enableVsync', opts.vsync !== false ? 'true' : 'false');
-    applyShaderPack(mcRoot, opts.shaderpack || '');
+    skipBrokenShaderPacks(mcRoot, opts.version, (msg) => gameWin?.webContents.send('mc-log', msg));
+    if (opts.shaderpack !== undefined) applyShaderPack(mcRoot, opts.shaderpack || '');
 
     // Auto-install cosmetics mod if bundled — into this version's own mods folder
     try {
@@ -761,30 +851,33 @@ ipcMain.handle('mc-launch', async (_e, opts: { version: string; maxMem: number; 
       }
     } catch {}
 
+    await ensureVersionJson(mcRoot, (opts.version || '1.21.4').replace(/^fabric-loader-[\d.]+-/, ''));
     const { version, forge, mcPath, overridesExtra, customArgs } = buildLoaderLaunchOptions(mcRoot, opts.version, opts.forgePath);
 
-    mcProcess = launcher.launch({
+    trackLaunch(launcher.launch({
       authorization: auth,
       root: mcRoot,
       version,
       ...(forge ? { forge, mcPath } : {}),
       ...(customArgs ? { customArgs } : {}),
+      ...(opts.server ? quickPlayFor(opts.version, opts.server) : {}),
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
       overrides: { maxSockets: 64, checkHash: false, ...overridesExtra },
-    });
+    }));
     launcher.on('data',     (d: string)  => gameWin?.webContents.send('mc-log',      d));
     launcher.on('progress', (e: any)     => gameWin?.webContents.send('mc-progress', e));
-    launcher.on('close',    (c: number)  => { mcProcess = null; gameWin?.webContents.send('mc-closed',   c); });
+    launcher.on('close',    (c: number)  => { mcProcess = null; gameWin?.webContents.send('mc-closed',   c); scheduleIdleQuit(); });
     launcher.on('error',    (e: Error)   => { mcProcess = null; gameWin?.webContents.send('mc-error',    e.message); });
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: err.message };
   }
-});
+}
+ipcMain.handle('mc-launch', (_e, opts: LaunchOpts) => launchOnline(opts));
 
 // ── IPC: offline launch ───────────────────────────────────────────────────────
-ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: number; username: string; javaVersion?: number; vsync?: boolean; shaderpack?: string; forgePath?: string }) => {
+async function launchOffline(opts: LaunchOpts & { username: string }): Promise<{ ok: boolean; error?: string }> {
   const requestedJava = opts.javaVersion || 21;
   try {
     const mcRoot   = path.join(app.getPath('userData'), '.minecraft');
@@ -807,7 +900,8 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
     gameWin?.webContents.send('mc-log', `[Launcher] Offline mode — user: ${opts.username}, uuid: ${uuid}`);
     setOptionsKey(mcRoot, 'backgroundBlur', '0');
     setOptionsKey(mcRoot, 'enableVsync', opts.vsync !== false ? 'true' : 'false');
-    applyShaderPack(mcRoot, opts.shaderpack || '');
+    skipBrokenShaderPacks(mcRoot, opts.version, (msg) => gameWin?.webContents.send('mc-log', msg));
+    if (opts.shaderpack !== undefined) applyShaderPack(mcRoot, opts.shaderpack || '');
 
     // Auto-install bundled shader packs (only on first run — preserves user settings)
     try {
@@ -827,30 +921,33 @@ ipcMain.handle('mc-launch-offline', async (_e, opts: { version: string; maxMem: 
       }
     } catch {}
 
+    await ensureVersionJson(mcRoot, (opts.version || '1.21.4').replace(/^fabric-loader-[\d.]+-/, ''));
     const { version, forge, mcPath, overridesExtra, customArgs } = buildLoaderLaunchOptions(mcRoot, opts.version, opts.forgePath);
 
-    mcProcess = launcher.launch({
+    trackLaunch(launcher.launch({
       authorization: { access_token: 'offline', client_token: 'offline', uuid, name: opts.username, user_properties: '{}', meta: { type: 'mojang', demo: false } },
       root: mcRoot,
       version,
       ...(forge ? { forge, mcPath } : {}),
       ...(customArgs ? { customArgs } : {}),
+      ...(opts.server ? quickPlayFor(opts.version, opts.server) : {}),
       memory:  { max: `${opts.maxMem || 4}G`, min: '512M' },
       javaPath,
       overrides: { maxSockets: 64, checkHash: false, ...overridesExtra },
-    });
+    }));
     launcher.on('data',     (d: string) => gameWin?.webContents.send('mc-log',      d));
     launcher.on('progress', (e: any)    => gameWin?.webContents.send('mc-progress', e));
-    launcher.on('close',    (c: number) => { mcProcess = null; gameWin?.webContents.send('mc-closed',   c); });
+    launcher.on('close',    (c: number) => { mcProcess = null; gameWin?.webContents.send('mc-closed',   c); scheduleIdleQuit(); });
     launcher.on('error',    (e: Error)  => { mcProcess = null; gameWin?.webContents.send('mc-error',    e.message); });
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: err.message };
   }
-});
+}
+ipcMain.handle('mc-launch-offline', (_e, opts: LaunchOpts & { username: string }) => launchOffline(opts));
 
 // ── IPC: force-kill MC ────────────────────────────────────────────────────────
-ipcMain.handle('mc-kill', () => {
+function killMinecraft() {
   if (mcProcess?.pid) {
     try {
       if (process.platform === 'win32') {
@@ -863,16 +960,20 @@ ipcMain.handle('mc-kill', () => {
     mcProcess = null;
     return;
   }
-  // Fallback: kill any java process (covers cases where process ref was lost)
+  // Fallback when the process ref was lost: kill only Java processes running
+  // from OUR game folder. Never every java.exe — that would also kill any
+  // Minecraft servers running on this PC (e.g. from Server Control Center).
+  const gameDir = path.join(app.getPath('userData'), '.minecraft');
   try {
     if (process.platform === 'win32') {
-      execSync('taskkill /F /IM java.exe /T',  { stdio: 'ignore' });
-      execSync('taskkill /F /IM javaw.exe /T', { stdio: 'ignore' });
+      const ps = `Get-CimInstance Win32_Process -Filter "Name='java.exe' or Name='javaw.exe'" | Where-Object { $_.CommandLine -like '*${gameDir.replace(/'/g, "''")}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`;
+      spawnSync('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'ignore', timeout: 15000, windowsHide: true });
     } else {
-      execSync('pkill -9 -f java', { stdio: 'ignore' });
+      execSync(`pkill -9 -f "${gameDir}"`, { stdio: 'ignore' });
     }
   } catch {}
-});
+}
+ipcMain.handle('mc-kill', () => killMinecraft());
 
 // ── IPC: cosmetics ────────────────────────────────────────────────────────────
 ipcMain.handle('mc-get-uuid', async () => {
@@ -1618,6 +1719,38 @@ function setOptionsKey(mcRoot: string, key: string, value: string) {
   try { fs.writeFileSync(optPath, txt, 'utf-8'); } catch {}
 }
 
+// Minecraft 26.x compiles shaders with a new renderer, and resource packs made
+// for older versions that replace its core shaders make it crash on start-up.
+// Leave those packs out when launching 26.x+ (they stay installed and are
+// re-enabled on older versions by the player as usual).
+function skipBrokenShaderPacks(mcRoot: string, version: string, log: (msg: string) => void) {
+  const id = version.replace(/^fabric-loader-[\d.]+-/, '');
+  const major = parseInt(id.split('.')[0], 10);
+  if (!(major >= 26)) return;
+  const optPath = path.join(mcRoot, 'options.txt');
+  if (!fs.existsSync(optPath)) return;
+  const txt = fs.readFileSync(optPath, 'utf-8');
+  const m = /^resourcePacks:(.*)$/m.exec(txt);
+  if (!m) return;
+  let packs: string[];
+  try { packs = JSON.parse(m[1]); } catch { return; }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const AdmZip = require('adm-zip');
+  const overridesCore = (name: string): boolean => {
+    const p = path.join(mcRoot, 'resourcepacks', name);
+    try {
+      if (fs.statSync(p).isDirectory()) return fs.existsSync(path.join(p, 'assets', 'minecraft', 'shaders', 'core'));
+      return new AdmZip(p).getEntries().some((e: any) => e.entryName.startsWith('assets/minecraft/shaders/core/'));
+    } catch { return false; }
+  };
+  const keep = packs.filter((pk) => {
+    if (!pk.startsWith('file/') || !overridesCore(pk.slice(5))) return true;
+    log(`[Launcher] Left out resource pack "${pk.slice(5)}" for this launch — it replaces core shaders, which crashes Minecraft ${id}`);
+    return false;
+  });
+  if (keep.length !== packs.length) setOptionsKey(mcRoot, 'resourcePacks', JSON.stringify(keep));
+}
+
 function applyShaderPack(mcRoot: string, packName: string) {
   try {
     const irisDir = path.join(mcRoot, 'config');
@@ -1704,7 +1837,7 @@ function isValidFabricProfile(profilePath: string): boolean {
   } catch { return false; }
 }
 
-ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
+async function installFabric(opts: { mcVersion: string }): Promise<any> {
   try {
     const mcRoot = path.join(app.getPath('userData'), '.minecraft');
 
@@ -1798,7 +1931,8 @@ ipcMain.handle('mc-install-fabric', async (_e, opts: { mcVersion: string }) => {
   } catch (err: any) {
     return { ok: false, error: err.message };
   }
-});
+}
+ipcMain.handle('mc-install-fabric', (_e, opts: { mcVersion: string }) => installFabric(opts));
 
 // ── Forge / NeoForge install ───────────────────────────────────────────────────
 // minecraft-launcher-core has built-in modern-Forge support: give it the path
@@ -2035,7 +2169,7 @@ function setupAutoUpdater() {
     // handler doesn't trigger a second quitAndInstall call (which would throw and
     // fall through to app.quit() without installing).
     setTimeout(() => {
-      if (updateReady && !mcProcess) {
+      if (updateReady && !mcProcess && !mcStarting) {
         updateReady = false;
         try { autoUpdater.quitAndInstall(true, true); } catch { app.quit(); }
       }
@@ -2175,9 +2309,71 @@ app.whenReady().then(() => {
     return permission === 'media' || permission === 'microphone' || permission === 'notifications';
   });
   loadCachedAuth();
-  createLoginWindow();
+  if (BG_START) scheduleIdleQuit();
+  else createLoginWindow();
   globalShortcut.register('Shift+F9', toggleOverlay);
+
+  // Minecraft Server Control Center: its servers for the quick-join bar, and a
+  // local API so the panel's Minecraft tab can start the game on one of them.
+  watchPanelServers((d) => gameWin?.webContents.send('mscc-servers', d));
+  startControlServer({
+    launch: launchFromPanel,
+    status: () => ({ running: !!mcProcess, starting: mcStarting, pid: mcProcess?.pid }),
+    kill: killMinecraft,
+    show: showMainWindow,
+  });
 });
+
+ipcMain.handle('mscc-servers', () => readPanelServers());
+
+// The Play page's settings (RAM, mod loader, shaders, vsync), saved by the
+// launcher window so games started from Server Control Center use them too.
+const LAUNCH_SETTINGS = path.join(app.getPath('userData'), 'launch-settings.json');
+interface LaunchSettings { maxMem?: number; loader?: string; vsync?: boolean; shaderpack?: string }
+ipcMain.handle('save-launch-settings', (_e, s: LaunchSettings) => {
+  try { fs.writeFileSync(LAUNCH_SETTINGS, JSON.stringify(s)); } catch {}
+});
+function readLaunchSettings(): LaunchSettings {
+  try { return JSON.parse(fs.readFileSync(LAUNCH_SETTINGS, 'utf-8')); } catch { return {}; }
+}
+
+async function launchFromPanel(req: PanelLaunchRequest): Promise<{ ok: boolean; error?: string }> {
+  if (mcProcess || mcStarting) return { ok: false, error: 'Minecraft is already running from Voxel Client. Close it first.' };
+  if (idleQuitTimer) clearTimeout(idleQuitTimer);
+  // Voxel Client's own Play settings; Java always matches the server's version
+  const s = readLaunchSettings();
+  let version = req.version;
+  if (s.loader === 'fabric') {
+    const fab = await installFabric({ mcVersion: req.version }).catch(() => null);
+    if (fab?.ok) version = fab.fabricVersion; // your Fabric mods for this version
+  }
+  const opts: LaunchOpts = { version, maxMem: s.maxMem || req.maxMem || 4, javaVersion: javaForMc(req.version), server: req.server, vsync: s.vsync, shaderpack: s.shaderpack };
+  gameWin?.webContents.send('mc-remote-launch', { version: req.version, server: req.server, username: req.username });
+  // windowed, so the panel can show the game inside its own window
+  setOptionsKey(path.join(app.getPath('userData'), '.minecraft'), 'fullscreen', 'false');
+  const res = req.offline === false ? await launchOnline(opts) : await launchOffline({ ...opts, username: req.username || 'Player' });
+  if (!res.ok) scheduleIdleQuit();
+  return res;
+}
+
+function showMainWindow() {
+  const w = gameWin ?? loginWin;
+  if (!w) { createLoginWindow(); return; }
+  if (w.isMinimized()) w.restore();
+  w.show();
+  w.focus();
+}
+
+// One copy at a time: a second start (e.g. the Start menu while the panel had
+// us running in the background) just brings up the window.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+} else {
+  app.on('second-instance', (_e, argv) => {
+    if (!argv.includes('--mscc-bg')) showMainWindow();
+  });
+}
 app.on('will-quit', () => { globalShortcut.unregisterAll(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (!loginWin && !gameWin) createLoginWindow(); });
