@@ -254,6 +254,19 @@ async function readConfig(serverId, file, cfg) {
   await pushConfigToRtdb(serverId, file, content);
 }
 
+// The database only lets a server's owner read it or send it commands. The
+// first account to write vhServers/<id>/owner is the owner, and the rules
+// refuse anyone else, so claim each server before listening to it. If the
+// write is refused, someone else owns that id: ignore it.
+async function claimServer(serverId, uid) {
+  try {
+    await set(ref(rtdb, `vhServers/${serverId}/owner`), uid);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function watchServerCommands(serverId, cfgRef) {
   const cmdRef = ref(rtdb, `vhServers/${serverId}/cmd`);
   onChildAdded(cmdRef, async snap => {
@@ -324,8 +337,14 @@ async function main() {
       configs.set(d.id, { id: d.id, ...d.data() });
       if (!watched.has(d.id)) {
         watched.add(d.id);
-        watchServerCommands(d.id, () => configs.get(d.id));
-        console.log(`Watching server: ${d.data().name} (${d.id})`);
+        claimServer(d.id, user.uid).then(ok => {
+          if (!ok) {
+            console.log(`Skipping server ${d.data().name} (${d.id}): another account owns it in the database.`);
+            return;
+          }
+          watchServerCommands(d.id, () => configs.get(d.id));
+          console.log(`Watching server: ${d.data().name} (${d.id})`);
+        });
       }
     });
   });

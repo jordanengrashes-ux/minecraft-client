@@ -1,80 +1,463 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTHORITATIVE RULES FOR THE SHARED tank-d367c REALTIME DATABASE.
+//
+// Three apps share this one database: 2D TANK GAME, minecraft-client and
+// voxelhosting. Deploying database rules from ANY of them replaces the rules
+// for ALL of them, so this exact file is kept byte-identical in every repo that
+// can deploy it. Edit it in one place, then copy it to the others.
+//
+// Before this file existed, minecraft-client shipped a version granting
+// ".read": true / ".write": true on a dozen paths, and it was the one live —
+// silently undoing the tank game stricter rules for all three games.
+//
+// 2026-09-29 — the launcher's admin powers are now checked by the database.
+//   Until today the launcher decided who was an admin by Minecraft *name*,
+//   in the client, and the rules never checked at all. So any signed-in
+//   account — including an anonymous one made in a single request, because
+//   the tank game needs anonymous sign-in switched on — could clear the whole
+//   chat, time anybody out, point anybody's username at itself, or write
+//   into anybody's friend list. Now:
+//     * voxel_admin_uids lists admins by account id; the destructive actions
+//       (clear chat, delete a message, time out, read or clear feedback)
+//       check it. voxel_admins stays as it was, for the launcher's display.
+//     * the launcher's nodes need a real account (Google or password). The
+//       launcher never signs in anonymously, so this costs it nothing; the
+//       tank game's nodes are untouched and still take anonymous players.
+//     * a friend list can only be written by its owner or by the one friend
+//       the entry is about; a username can only be claimed once and only for
+//       yourself; the play counters only ever go up by one.
+//   Everything the three apps do was checked against their source first.
+//
+// 2026-10-01 — StudyQuest (the homework helper) moved its players to the
+//   shared hub account. Its old progress is still here under users/$uid,
+//   which nothing could read or write since the root was closed. Each player
+//   may now READ their own old record (only their own, never write), so the
+//   site can bring it over once when they type their old login.
+//
+// 2026-10-12 — StudyQuest's study rooms became a real multiplayer game and
+//   moved from "rooms" (the tank game's node, open to any signed-in player)
+//   to their own node, sqRooms. There each member writes only their own entry
+//   and score, only the host starts a round, a round's question seed is
+//   written once, and names, scores and settings are checked for type and
+//   size. "rooms" itself is unchanged, because the tank game still uses it.
+//
+// 2026-10-22 — owners only. The tank game needs anonymous sign-in, so anyone
+//   can get an account in one request, and "auth != null" stopped nobody.
+//   Each of these now belongs to someone, checked against the tank game's
+//   source and its live build:
+//     * rooms: the host (hostId) may write the whole room; any other player
+//       only their own players/, inputs/ and votes/ entry, new chat lines,
+//       and status "ended" (the Return to lobby button).
+//     * roomCodes: only the host of the room a code points to may set or
+//       remove it; a code whose room has ended may be reused.
+//     * gameRooms: only the two players listed in the room.
+//     * chess/games: only white and black; black may be claimed once, by
+//       the account accepting the invite.
+//     * the three invite inboxes: a new invite must name its real sender in
+//       "from"; only the inbox owner (or that sender) may remove one; nobody
+//       can overwrite another person's invite.
+//     * tank, voxel_users, voxel_local_server: no app writes these any more,
+//       so only an admin may.
+//
+// 2026-10-22 (step 2) — vhServers had no owner, so any real account could
+//   read every server's logs and settings and send any server commands. Now
+//   the VoxelHosting agent writes vhServers/<id>/owner = its own account
+//   before it listens, the first owner wins, and only the owner can read or
+//   write that server. The node was empty when this went live.
+// ─────────────────────────────────────────────────────────────────────────────
 {
   "rules": {
+    ".read": false,
+    ".write": false,
 
-    "voxel_admins": {
+    // StudyQuest's old progress: read-only, and only by its owner (see the top).
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "messages": {
+      "$convId": {
+        ".read":  "auth != null && ($convId.contains(auth.uid))",
+        ".write": "auth != null && ($convId.contains(auth.uid))"
+      }
+    },
+
+    "chess": {
+      "open": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && auth.uid == $uid"
+        }
+      },
+      "games": {
+        "$gameId": {
+          ".read":  "auth != null",
+          ".write": "auth != null && (data.exists() ? (data.child('white').val() === auth.uid || data.child('black').val() === auth.uid || (!data.child('black').exists() && newData.child('black').val() === auth.uid)) : newData.child('white').val() === auth.uid)"
+        }
+      },
+      "invites": {
+        "$toUid": {
+          ".read":  "auth != null && auth.uid == $toUid",
+          ".write": "auth != null && auth.uid == $toUid",
+          "$inviteId": {
+            ".write": "auth != null && (data.exists() ? (!newData.exists() && data.child('from').val() === auth.uid) : newData.child('from').val() === auth.uid)"
+          }
+        }
+      }
+    },
+
+    "gameQueue": {
+      "$gameId": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && auth.uid == $uid"
+        }
+      }
+    },
+
+    "gameRooms": {
+      "$roomId": {
+        ".read":  "auth != null",
+        ".write": "auth != null && (data.exists() ? data.child('players').child(auth.uid).exists() : newData.child('players').child(auth.uid).exists())"
+      }
+    },
+
+    "gameInvites": {
+      "$toUid": {
+        ".read":  "auth != null && auth.uid == $toUid",
+        ".write": "auth != null && auth.uid == $toUid",
+        "$inviteId": {
+          ".write": "auth != null && (data.exists() ? (!newData.exists() && data.child('from').val() === auth.uid) : newData.child('from').val() === auth.uid)"
+        }
+      }
+    },
+
+    // The tank game's rooms (see the 2026-10-22 note at the top).
+    "rooms": {
+      "$roomId": {
+        ".read":  "auth != null",
+        ".write": "auth != null && (data.exists() ? data.child('hostId').val() === auth.uid : newData.child('hostId').val() === auth.uid)",
+        "players": {
+          "$uid": { ".write": "auth != null && auth.uid === $uid && data.parent().parent().exists()" }
+        },
+        "inputs": {
+          "$uid": { ".write": "auth != null && auth.uid === $uid && data.parent().parent().child('players').child(auth.uid).exists()" }
+        },
+        "votes": {
+          "$uid": { ".write": "auth != null && auth.uid === $uid && data.parent().parent().child('players').child(auth.uid).exists()" }
+        },
+        "chat": {
+          "$msgId": {
+            ".write": "auth != null && !data.exists() && data.parent().parent().child('players').child(auth.uid).exists()",
+            ".validate": "newData.child('text').isString() && newData.child('text').val().length <= 500"
+          }
+        },
+        "status": {
+          ".write": "auth != null && newData.val() === 'ended' && data.parent().child('players').child(auth.uid).exists()"
+        }
+      }
+    },
+
+    // A code points at a room id; only that room's host may set or remove it.
+    "roomCodes": {
+      "$code": {
+        ".read":  "auth != null",
+        ".write": "auth != null && (newData.exists() ? (newData.isString() && root.child('rooms').child(newData.val()).child('hostId').val() === auth.uid && (!data.exists() || data.val() === newData.val() || root.child('rooms').child(data.val()).child('status').val() === 'ended' || !root.child('rooms').child(data.val()).exists())) : root.child('rooms').child(data.val()).child('hostId').val() === auth.uid)"
+      }
+    },
+
+    // StudyQuest's study rooms (see the 2026-10-12 note at the top). They
+    // have their own node because "rooms" above belongs to the tank game and
+    // any signed-in player may write anything there.
+    "sqRooms": {
+      "$code": {
+        // anyone signed in who knows the code can see the room
+        ".read": "auth != null",
+        // make a room (with yourself as host), or remove an empty one
+        ".write": "auth != null && ((!data.exists() && newData.child('createdBy').val() === auth.uid && newData.child('host').val() === auth.uid) || (data.exists() && !newData.exists() && !data.child('members').exists()))",
+        ".validate": "$code.matches(/^[A-Z0-9]{6}$/) && newData.hasChildren(['createdBy', 'createdAt', 'host'])",
+        "createdBy": { ".validate": "newData.isString() && (data.exists() ? newData.val() === data.val() : newData.val() === auth.uid)" },
+        "createdAt": { ".validate": "newData.isNumber() && newData.val() <= now && (!data.exists() || newData.val() === data.val())" },
+        // the host hands over to another member; when the host's entry is gone
+        // or has been silent for 2 minutes, a member may take it
+        "host": {
+          ".write": "auth != null && newData.isString() && newData.parent().child('members').child(newData.val()).exists() && (data.val() === auth.uid || (newData.val() === auth.uid && (!data.exists() || !data.parent().child('members').child(data.val()).exists() || data.parent().child('members').child(data.val()).child('seen').val() < now - 120000)))",
+          ".validate": "newData.isString() && newData.val().length <= 128"
+        },
+        // each member writes only their own entry and their own score; anyone
+        // in the room may tidy away a member silent for 2 minutes
+        "members": {
+          "$uid": {
+            ".write": "auth != null && (auth.uid === $uid || (!newData.exists() && data.child('seen').val() < now - 120000 && root.child('sqRooms').child($code).child('members').child(auth.uid).exists()))",
+            ".validate": "newData.hasChildren(['name', 'joinedAt', 'seen']) && newData.parent().parent().child('createdBy').exists()",
+            "name":     { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 24" },
+            "coins":    { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000000" },
+            "joinedAt": { ".validate": "newData.isNumber() && newData.val() <= now" },
+            "seen":     { ".validate": "newData.isNumber() && newData.val() <= now" },
+            // progress in the current round: r = round id, n = answered,
+            // c = right, s = score (at most 20 a right answer), t = ms used, d = done
+            "p": {
+              ".validate": "newData.hasChildren(['r', 'n', 'c', 's', 't', 'd']) && newData.child('r').val() === newData.parent().parent().parent().child('round').child('id').val()",
+              "r": { ".validate": "newData.isString() && newData.val().length <= 20" },
+              "n": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().parent().parent().parent().child('round').child('count').val()" },
+              "c": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('n').val()" },
+              "s": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('c').val() * 20" },
+              "t": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3600000" },
+              "d": { ".validate": "newData.isBoolean()" },
+              "$other": { ".validate": false }
+            },
+            "$other": { ".validate": false }
+          }
+        },
+        // only the host starts a round, and each round gets a new id, so its
+        // question seed is written once and never changed afterwards
+        "round": {
+          ".write": "auth != null && root.child('sqRooms').child($code).child('host').val() === auth.uid",
+          ".validate": "newData.hasChildren(['id', 'seed', 'subject', 'grade', 'mode', 'count', 'limit', 'startAt', 'bank', 'by']) && (!data.exists() || newData.child('id').val() !== data.child('id').val())",
+          "id":      { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{4,20}$/)" },
+          "seed":    { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 4294967295" },
+          "subject": { ".validate": "newData.isString() && newData.val().matches(/^[a-z]{2,20}$/)" },
+          "grade":   { ".validate": "newData.isNumber() && newData.val() >= 3 && newData.val() <= 12" },
+          "mode":    { ".validate": "newData.val() === 'quiz' || newData.val() === 'race'" },
+          "count":   { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 20" },
+          "limit":   { ".validate": "newData.isNumber() && newData.val() >= 5 && newData.val() <= 60" },
+          "startAt": { ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 60000" },
+          "bank":    { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000" },
+          "by":      { ".validate": "newData.val() === auth.uid" },
+          "$other":  { ".validate": false }
+        },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "tankQueue": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+
+    "tankInvites": {
+      "$toUid": {
+        ".read":  "auth != null && auth.uid == $toUid",
+        ".write": "auth != null && auth.uid == $toUid",
+        "$inviteId": {
+          ".write": "auth != null && (data.exists() ? (!newData.exists() && data.child('from').val() === auth.uid) : newData.child('from').val() === auth.uid)"
+        }
+      }
+    },
+
+    // The hub counts who is online by reading this whole list, so the list
+    // itself has to be readable — before 2026-09-29 only single entries were,
+    // and the counter could never load. Each entry is a random session id and
+    // a time; there is nothing personal in it.
+    "presence": {
+      ".read": "auth != null",
+      "$sessionId": {
+        ".read":  "auth != null",
+        ".write": "auth != null",
+        ".validate": "!newData.exists() || newData.child('ts').isNumber()"
+      }
+    },
+
+    "fpsGames": {
+      "$mapId": {
+        "players": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid"
+          }
+        },
+        "hits": {
+          "$targetUid": {
+            ".read":  "auth != null && auth.uid == $targetUid",
+            ".write": "auth != null"
+          }
+        }
+      }
+    },
+
+    "vehiclesim": {
+      "players": {
+        ".read": "auth != null",
+        "$sessionId": {
+          ".write": "auth != null"
+        }
+      }
+    },
+
+    // The game adds one with a transaction; nothing else ever needs to.
+    "gamePlays": {
       ".read": true,
+      "$cardId": {
+        ".write": "auth != null && newData.isNumber() && newData.val() === (data.exists() ? data.val() + 1 : 1)"
+      }
+    },
+
+    "tank": {
+      ".read": "auth != null",
+      "$key": {
+        ".write": "auth != null && root.child('voxel_admin_uids').child(auth.uid).exists()"
+      }
+    },
+
+    "mc_servers": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+
+    // ── the launcher ───────────────────────────────────────────────────────
+
+    // Shown in the launcher: who wears the ADMIN badge. Keyed by name.
+    "voxel_admins": {
+      ".read":  "auth != null",
+      ".write": false
+    },
+
+    // What the database trusts: the same admins, keyed by account id.
+    // Managed from the Firebase console or the CLI, never from a client.
+    "voxel_admin_uids": {
+      ".read":  "auth != null",
       ".write": false
     },
 
     "voxel_chat": {
-      ".read": true,
-      ".write": true
+      ".read": "auth != null",
+      "messages": {
+        // clearing the whole chat is an admin's job
+        ".write": "auth != null && root.child('voxel_admin_uids').child(auth.uid).exists()",
+        "$msgId": {
+          // anyone with a real account may post; deleting or editing is an admin's job
+          ".write": "auth != null && ((auth.token.firebase.sign_in_provider != 'anonymous' && !data.exists() && newData.exists()) || root.child('voxel_admin_uids').child(auth.uid).exists())",
+          ".validate": "newData.hasChild('text')",
+          "user": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "text": { ".validate": "newData.isString() && newData.val().length <= 1000" },
+          "ts":   { ".validate": "newData.isNumber()" },
+          // only an admin can post something that looks like an announcement
+          "type": { ".validate": "newData.isString() && newData.val().length <= 20 && (newData.val() != 'announcement' || root.child('voxel_admin_uids').child(auth.uid).exists())" }
+        }
+      }
     },
 
     "voxel_chat_online": {
-      ".read": true,
-      ".write": true
+      ".read": "auth != null",
+      "$key": {
+        ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'"
+      }
     },
 
     "voxel_timeouts": {
-      ".read": true,
-      ".write": true
+      ".read": "auth != null",
+      "$name": {
+        // an admin sets and lifts timeouts; anyone may tidy away one that has run out
+        ".write": "auth != null && (root.child('voxel_admin_uids').child(auth.uid).exists() || (data.exists() && !newData.exists() && data.child('until').val() < now))",
+        "reason": { ".validate": "newData.isString() && newData.val().length <= 200" }
+      }
     },
 
     "voxel_feedback": {
-      ".read": true,
-      ".write": true
+      // the feedback panel is admin-only in the launcher, and now in the database too
+      ".read": "auth != null && root.child('voxel_admin_uids').child(auth.uid).exists()",
+      "$key": {
+        ".write": "auth != null && ((auth.token.firebase.sign_in_provider != 'anonymous' && !data.exists() && newData.exists()) || root.child('voxel_admin_uids').child(auth.uid).exists())",
+        "text":     { ".validate": "newData.isString() && newData.val().length <= 4000" },
+        "user":     { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "category": { ".validate": "newData.isString() && newData.val().length <= 30" }
+      }
     },
 
     "voxel_voice": {
-      ".read": true,
-      ".write": true
+      ".read": "auth != null",
+      "$key": {
+        ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'"
+      }
     },
 
     "voxel_tokens": {
-      ".read": true,
-      ".write": true
-    },
-
-    "voxel_presence": {
-      ".read": true,
-      ".write": true
-    },
-
-    "voxel_user_index": {
-      ".read": true,
-      ".write": true
-    },
-
-    "voxel_friends": {
-      ".read": true,
-      ".write": true
+      "$uid": {
+        ".read":  "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
     },
 
     "voxel_capes": {
-      ".read": true,
-      ".write": true
+      ".read": "auth != null",
+      "$capeKey": {
+        ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
+        "cape_id":  { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "enabled":  { ".validate": "newData.isBoolean()" },
+        "username": { ".validate": "newData.isString() && newData.val().length <= 40" }
+      }
+    },
+
+    // A friendship entry can be written by the list's owner, or by the one
+    // person the entry is about (sending a request, accepting one).
+    "voxel_friends": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        "list": {
+          "$other": {
+            ".write": "auth != null && (auth.uid == $uid || auth.uid == $other)"
+          }
+        },
+        "requests": {
+          "incoming": {
+            "$from": {
+              ".write": "auth != null && (auth.uid == $uid || auth.uid == $from)"
+            }
+          },
+          "outgoing": {
+            "$to": {
+              ".write": "auth != null && (auth.uid == $uid || auth.uid == $to)"
+            }
+          }
+        }
+      }
+    },
+
+    "voxel_presence": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+
+    // A name can be claimed once, and only ever pointed at yourself.
+    "voxel_user_index": {
+      ".read": "auth != null",
+      "$name": {
+        ".write": "auth != null && (root.child('voxel_admin_uids').child(auth.uid).exists() || (auth.token.firebase.sign_in_provider != 'anonymous' && newData.child('uid').val() == auth.uid && (!data.exists() || data.child('uid').val() == auth.uid)))",
+        "name": { ".validate": "newData.isString() && newData.val().length <= 40" }
+      }
     },
 
     "voxel_users": {
-      ".read": true,
-      ".write": true
-    },
-
-    "mc_servers": {
-      ".read": true,
-      ".write": true
-    },
-
-    "vhServers": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$key": {
+        ".write": "auth != null && root.child('voxel_admin_uids').child(auth.uid).exists()"
+      }
     },
 
     "voxel_local_server": {
-      ".read": true,
-      ".write": true
-    }
+      ".read": "auth != null",
+      "$key": {
+        ".write": "auth != null && root.child('voxel_admin_uids').child(auth.uid).exists()"
+      }
+    },
 
+    // VoxelHosting servers (see the 2026-10-22 step 2 note at the top). Each
+    // server belongs to the account that wrote its "owner" first: only that
+    // account may read it, change it or send it commands.
+    "vhServers": {
+      "$serverId": {
+        ".read":  "auth != null && data.child('owner').val() === auth.uid",
+        ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && (data.child('owner').val() === auth.uid || (!data.child('owner').exists() && newData.child('owner').val() === auth.uid))",
+        "owner": { ".validate": "newData.isString() && newData.val() === auth.uid" }
+      }
+    }
   }
 }
