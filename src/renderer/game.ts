@@ -3,6 +3,7 @@
 import { ref, set, push, remove, onValue, onChildAdded, query, limitToLast, serverTimestamp, onDisconnect, update, get, increment } from 'firebase/database';
 import { rtdb } from './firebase';
 import { auth, signOut } from './firebase';
+import { initVersionPicker, loadBedrockArt } from './version-picker';
 
 
 const mc     = (window as any).mc;
@@ -20,6 +21,7 @@ function myDisplayName(): string {
 }
 const mcAuthBtn     = document.getElementById('mc-auth-btn') as HTMLButtonElement;
 const mcPlayBtn     = document.getElementById('mc-play-btn') as HTMLButtonElement;
+const mcPlayLabel   = document.getElementById('mc-play-label')!;
 const mcVersion     = document.getElementById('mc-version') as HTMLSelectElement;
 const javaVersionSel = document.getElementById('java-version') as HTMLSelectElement;
 const mcMemory      = document.getElementById('mc-memory') as HTMLInputElement;
@@ -113,7 +115,7 @@ function setMcAuthed(name: string) {
 function clearMcAuthed() {
   authed = false;
   mcPlayBtn.disabled = true;
-  mcAuthBtn.textContent = 'Login with Microsoft to Play';
+  mcAuthBtn.textContent = 'Sign in with Microsoft';
   mcAuthBtn.classList.remove('authed');
   if (mcSwitchBtn) mcSwitchBtn.style.display = 'none';
   mcIgnBadge.style.display = 'none';
@@ -141,9 +143,10 @@ mcSwitchBtn?.addEventListener('click', async () => {
 // ── Version list from Mojang ───────────────────────────────────────────────────
 const snapshotsToggle = document.getElementById('snapshots-toggle') as HTMLInputElement;
 
-type MCVersion = { id: string; type: 'release' | 'snapshot' | 'old_beta' | 'old_alpha' };
+type MCVersion = { id: string; type: 'release' | 'snapshot' | 'old_beta' | 'old_alpha'; releaseTime?: string };
 let allVersions: MCVersion[] = [];
 let latestRelease = '';
+const versionPicker = initVersionPicker(mcVersion);
 
 // Returns true for versions that work with Java 21.
 // Old scheme: 1.17+ — new year-based scheme: 26.x.x and above.
@@ -179,6 +182,7 @@ function populateVersions() {
     mcVersion.appendChild(opt);
   }
   if (filtered.find(v => v.id === prev)) mcVersion.value = prev;
+  versionPicker.render(filtered, latestRelease);
 }
 
 fetch('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json')
@@ -208,8 +212,11 @@ javaVersionSel.addEventListener('change', () => {
 mcVersion.addEventListener('change', () => {
   localStorage.setItem('voxel_mc_version', mcVersion.value);
   // Re-filter mod browse results for the newly selected version
-  if (modsPanelEl.style.display !== 'none') searchModrinth(modsSearch.value.trim());
-  if (cfPanelEl.style.display   !== 'none') searchCurseForge((document.getElementById('cf-search') as HTMLInputElement)?.value.trim() || '');
+  // (the picker lives on the Play page, so a loaded tab is re-searched when next opened)
+  if (modsPanelEl.dataset.loaded) modsPanelEl.dataset.stale = '1';
+  if (cfPanelEl.dataset.loaded)   cfPanelEl.dataset.stale = '1';
+  if (modsPanelEl.style.display === 'flex') searchModrinth(modsSearch.value.trim());
+  if (cfPanelEl.style.display   === 'flex') searchCurseForge((document.getElementById('cf-search') as HTMLInputElement)?.value.trim() || '');
   // Re-check mod/modpack compatibility immediately against the newly
   // selected version, not just whenever Play happens to get clicked next.
   if (modAutoUpdateToggle.checked && !running) runModUpdateCheck(mcVersion.value, true);
@@ -217,21 +224,28 @@ mcVersion.addEventListener('change', () => {
 });
 
 // ── Memory slider ──────────────────────────────────────────────────────────────
+// --fill paints the amber part of the track up to the thumb.
+function paintMemoryFill() {
+  const pct = (+mcMemory.value - +mcMemory.min) / (+mcMemory.max - +mcMemory.min) * 100;
+  mcMemory.style.setProperty('--fill', `${pct}%`);
+}
 mcMemory.addEventListener('input', () => {
   mcMemoryVal.textContent = mcMemory.value;
   localStorage.setItem('voxel_mc_memory', mcMemory.value);
+  paintMemoryFill();
 });
+paintMemoryFill();
 
 // ── Log panel open/close ──────────────────────────────────────────────────────
 function openLog() {
   logVisible = true;
   logPanel.style.display = 'flex';
-  logToggle.textContent = 'Hide log ▼';
+  logToggle.textContent = 'Hide log';
 }
 function closeLog() {
   logVisible = false;
   logPanel.style.display = 'none';
-  logToggle.textContent = 'Show log ▲';
+  logToggle.textContent = 'Show log';
 }
 
 logToggle.addEventListener('click', () => { logVisible ? closeLog() : openLog(); });
@@ -286,7 +300,7 @@ offlineUsername.addEventListener('input', () => {
 
 function applyOfflineState(on: boolean) {
   offlineNameRow.style.display   = on ? 'block'  : 'none';
-  mcAuthBtn.style.display        = on ? 'none'   : 'block';
+  mcAuthBtn.style.display        = on ? 'none'   : '';
   offlineBanner.style.display    = on ? 'block'  : 'none';
   if (on) {
     mcPlayBtn.disabled = false;
@@ -402,7 +416,7 @@ shaderpackSelect?.addEventListener('change', () => {
   offlineToggle.checked = savedOffline;
   applyOfflineState(savedOffline);
   const savedMemory = localStorage.getItem('voxel_mc_memory');
-  if (savedMemory) { mcMemory.value = savedMemory; mcMemoryVal.textContent = savedMemory; }
+  if (savedMemory) { mcMemory.value = savedMemory; mcMemoryVal.textContent = savedMemory; paintMemoryFill(); }
   const savedJava = localStorage.getItem('voxel_java_version');
   if (savedJava && javaVersionSel) javaVersionSel.value = savedJava;
   const savedVsync = localStorage.getItem('voxel_vsync');
@@ -523,7 +537,7 @@ mcPlayBtn.addEventListener('click', async () => {
   running = true;
   mcPlayBtn.disabled = true;
   mcPlayBtn.classList.add('running');
-  mcPlayBtn.textContent = 'Launching…';
+  mcPlayLabel.textContent = 'Launching…';
   mcForceQuitBtn.style.display = 'inline-flex';
   setStatus(server ? `Launching Minecraft ${version} and joining ${server}…` : `Launching Minecraft ${version}…`, 'yellow');
   setProgress(0);
@@ -583,19 +597,20 @@ mcPlayBtn.addEventListener('click', async () => {
   }
 });
 
+const forceQuitLabel = mcForceQuitBtn.querySelector('span')!;
 mcForceQuitBtn.addEventListener('click', async () => {
   mcForceQuitBtn.disabled = true;
-  mcForceQuitBtn.textContent = 'Killing…';
+  forceQuitLabel.textContent = 'Stopping…';
   await mc.kill();
   mcForceQuitBtn.disabled = false;
-  mcForceQuitBtn.textContent = '⏹ Force Quit';
+  forceQuitLabel.textContent = 'Force quit';
 });
 
 function resetPlay() {
   running = false;
   mcPlayBtn.disabled = false;
   mcPlayBtn.classList.remove('running');
-  mcPlayBtn.textContent = '▶  PLAY';
+  mcPlayLabel.textContent = 'Play';
   mcForceQuitBtn.style.display = 'none';
   setProgress(null);
 }
@@ -631,7 +646,7 @@ if (mc) {
     if (t.includes('Backend library') || t.includes('Game engine started')) {
       setStatus('Minecraft is running', 'green');
       setProgress(null);
-      mcPlayBtn.textContent = 'Running';
+      mcPlayLabel.textContent = 'Running';
     }
   });
 
@@ -685,8 +700,9 @@ const resourcePacksPanelEl= document.getElementById('resourcepacks-panel')!;
 const skinsPanelEl        = document.getElementById('skins-panel')!;
 const screenshotsPanelEl  = document.getElementById('screenshots-panel')!;
 const accountsPanelEl     = document.getElementById('accounts-panel')!;
-const customizePanelEl    = document.getElementById('customize-panel')!;
 const settingsPanelEl     = document.getElementById('settings-panel')!;
+const libraryPanelEl      = document.getElementById('library-panel')!;
+const managePanelEl       = document.getElementById('manage-panel')!;
 const navPlay             = document.getElementById('nav-play')!;
 const navBedrock          = document.getElementById('nav-bedrock')!;
 const navMods             = document.getElementById('nav-mods')!;
@@ -698,8 +714,9 @@ const navScreenshots      = document.getElementById('nav-screenshots')!;
 const navAccounts         = document.getElementById('nav-accounts')!;
 const navFiles            = document.getElementById('nav-files')!;
 const filesPanelEl        = document.getElementById('files-panel')!;
-const navCustomize        = document.getElementById('nav-customize')!;
 const navSettings         = document.getElementById('nav-settings')!;
+const navLibrary          = document.getElementById('nav-library')!;
+const navManage           = document.getElementById('nav-manage')!;
 const navServer         = document.getElementById('nav-server')!;
 const navCosmetics      = document.getElementById('nav-cosmetics')!;
 const navFriends        = document.getElementById('nav-friends')!;
@@ -711,19 +728,41 @@ const aiPanelEl   = document.getElementById('ai-panel')!;
 const navAi       = document.getElementById('nav-ai')!;
 const cfPanelEl   = document.getElementById('curseforge-panel')!;
 const navCf       = document.getElementById('nav-curseforge')!;
-const allPanels = [contentEl, bedrockPanelEl, modsPanelEl, cfPanelEl, pvpPanelEl, bedrockModsPanelEl, resourcePacksPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, cosmeticsPanelEl, friendsPanelEl, customizePanelEl, settingsPanelEl, chatPanelEl, aiPanelEl];
-const allNavs   = [navPlay, navBedrock, navMods, navCf, navPvp, navBedrockMods, navResourcePacks, navSkins, navScreenshots, navAccounts, navFiles, navCosmetics, navFriends, navCustomize, navSettings, navChat, navAi];
+// The five library tabs share one page (#library-panel) with its own header
+// and tab bar; the sidebar has a single "Mods & packs" entry for all of them.
+const libraryPanels = [modsPanelEl, cfPanelEl, pvpPanelEl, resourcePacksPanelEl, managePanelEl];
+const allPanels = [contentEl, bedrockPanelEl, ...libraryPanels, bedrockModsPanelEl, skinsPanelEl, screenshotsPanelEl, accountsPanelEl, filesPanelEl, cosmeticsPanelEl, friendsPanelEl, settingsPanelEl, chatPanelEl, aiPanelEl];
+const allNavs   = [navPlay, navBedrock, navMods, navCf, navPvp, navResourcePacks, navManage, navBedrockMods, navSkins, navScreenshots, navAccounts, navFiles, navCosmetics, navFriends, navSettings, navChat, navAi];
 
 function showPanel(panel: HTMLElement, nav: HTMLElement) {
   allPanels.forEach(p => p.style.display = 'none');
   allNavs.forEach(n => n.classList.remove('active'));
   panel.style.display = 'flex';
   nav.classList.add('active');
+  const inLibrary = libraryPanels.includes(panel);
+  libraryPanelEl.style.display = inLibrary ? 'flex' : 'none';
+  navLibrary.classList.toggle('active', inLibrary);
+  if (inLibrary) localStorage.setItem('voxel_library_tab', nav.id);
 }
+navLibrary       .addEventListener('click', () => {
+  const last = document.getElementById(localStorage.getItem('voxel_library_tab') || '');
+  (last && allNavs.includes(last) ? last : navMods).click();
+});
 navPlay          .addEventListener('click', () => showPanel(contentEl,             navPlay));
-navBedrock       .addEventListener('click', () => { showPanel(bedrockPanelEl,      navBedrock); initBedrock(); if (!bedrockPanelEl.dataset.loaded) { searchBedrockAddons(''); bedrockPanelEl.dataset.loaded = '1'; } });
-navMods          .addEventListener('click', () => { showPanel(modsPanelEl,         navMods); if (!modsPanelEl.dataset.loaded) { loadRecommendedMods(); initAvengersFeaturedCard(); modsPanelEl.dataset.loaded = '1'; } });
-navCf            .addEventListener('click', () => { showPanel(cfPanelEl,           navCf);  if (!cfPanelEl.dataset.loaded)  { initCurseForge(); cfPanelEl.dataset.loaded = '1'; } });
+navBedrock       .addEventListener('click', () => { showPanel(bedrockPanelEl,      navBedrock); initBedrock(); if (!bedrockPanelEl.dataset.loaded) { loadBedrockArt(document.getElementById('bedrock-stage')!, document.getElementById('bedrock-art-caption')!); bedrockPanelEl.dataset.loaded = '1'; } });
+navManage        .addEventListener('click', () => showPanel(managePanelEl,         navManage));
+navMods          .addEventListener('click', () => {
+  showPanel(modsPanelEl, navMods);
+  if (!modsPanelEl.dataset.loaded) { loadRecommendedMods(); initAvengersFeaturedCard(); modsPanelEl.dataset.loaded = '1'; }
+  else if (modsPanelEl.dataset.stale) searchModrinth(modsSearch.value.trim());
+  delete modsPanelEl.dataset.stale;
+});
+navCf            .addEventListener('click', () => {
+  showPanel(cfPanelEl, navCf);
+  if (!cfPanelEl.dataset.loaded) { initCurseForge(); cfPanelEl.dataset.loaded = '1'; }
+  else if (cfPanelEl.dataset.stale) searchCurseForge((document.getElementById('cf-search') as HTMLInputElement).value.trim());
+  delete cfPanelEl.dataset.stale;
+});
 navPvp           .addEventListener('click', () => { showPanel(pvpPanelEl,          navPvp); if (!pvpPanelEl.dataset.loaded) { initPvpMods(); pvpPanelEl.dataset.loaded = '1'; } });
 navBedrockMods   .addEventListener('click', () => { showPanel(bedrockModsPanelEl,  navBedrockMods); if (!bedrockModsPanelEl.dataset.loaded) { searchBedrockMods(''); bedrockModsPanelEl.dataset.loaded = '1'; } });
 navResourcePacks .addEventListener('click', () => { showPanel(resourcePacksPanelEl,navResourcePacks); if (!resourcePacksPanelEl.dataset.loaded) { initResourcePacks(); resourcePacksPanelEl.dataset.loaded = '1'; } });
@@ -737,8 +776,7 @@ navServer        .addEventListener('click', () => {
 });
 navCosmetics     .addEventListener('click', () => { showPanel(cosmeticsPanelEl,    navCosmetics); if (!cosmeticsPanelEl.dataset.loaded) { initCosmetics(); cosmeticsPanelEl.dataset.loaded = '1'; } });
 navFriends       .addEventListener('click', () => { showPanel(friendsPanelEl,      navFriends);   if (!friendsPanelEl.dataset.loaded) { initFriendsPanel(); friendsPanelEl.dataset.loaded = '1'; } });
-navCustomize     .addEventListener('click', () => { showPanel(customizePanelEl,    navCustomize); if (!customizePanelEl.dataset.loaded) { initCustomize(); searchTexturePacks(''); customizePanelEl.dataset.loaded = '1'; } });
-navSettings      .addEventListener('click', () => { showPanel(settingsPanelEl,       navSettings); initShaderpackSettings(); });
+navSettings      .addEventListener('click', () => { showPanel(settingsPanelEl,       navSettings); initShaderpackSettings(); if (!settingsPanelEl.dataset.loaded) { initTitleScreenBg(); settingsPanelEl.dataset.loaded = '1'; } });
 
 // ── Bedrock Edition ────────────────────────────────────────────────────────────
 const bedrockIcon       = document.getElementById('bedrock-icon')!;
@@ -782,66 +820,6 @@ function initBedrock() {
     bedrockStatusSub.textContent = 'Click Launch to open Bedrock, or Get to install it from the Microsoft Store';
   }
 }
-
-// ── Bedrock addon search (Modrinth) ───────────────────────────────────────────
-const bedrockAddonList    = document.getElementById('bedrock-addon-list')!;
-const bedrockAddonLoading = document.getElementById('bedrock-addon-loading')!;
-const bedrockAddonSearch  = document.getElementById('bedrock-addon-search') as HTMLInputElement;
-let bedrockSearchTimer: ReturnType<typeof setTimeout> | null = null;
-
-async function searchBedrockAddons(query: string) {
-  bedrockAddonLoading.style.display = 'flex';
-  bedrockAddonList.innerHTML = '';
-  try {
-    const facets = JSON.stringify([
-      ['project_type:resourcepack', 'project_type:shader'],
-    ]);
-    const params = new URLSearchParams({
-      query, facets, limit: '50',
-      index: query ? 'relevance' : 'downloads',
-    });
-    const res  = await fetch(`https://api.modrinth.com/v2/search?${params}`);
-    const data = await res.json() as { hits: ModrinthHit[] };
-    bedrockAddonLoading.style.display = 'none';
-    if (!data.hits.length) {
-      bedrockAddonList.innerHTML = '<p style="color:#484f58;text-align:center;padding:16px">No results</p>';
-      return;
-    }
-    const frag = document.createDocumentFragment();
-    data.hits.forEach(h => {
-      const card = document.createElement('div');
-      card.className = 'mod-card';
-      const icon = h.icon_url
-        ? `<img src="${h.icon_url}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
-        : `<div class="mod-icon"></div>`;
-      const type = h.categories.includes('shaders') ? 'Shader' : 'Resource Pack';
-      const typeCls = h.categories.includes('shaders') ? 'visual' : 'util';
-      card.innerHTML = `${icon}
-        <div class="mod-info">
-          <div class="mod-name">${h.title}</div>
-          <div class="mod-desc">${h.description}</div>
-          <div class="mod-tags">
-            <span class="mod-tag ${typeCls}">${type}</span>
-            <span class="mod-tag" style="margin-left:auto">⬇ ${fmtDownloads(h.downloads)}</span>
-          </div>
-        </div>
-        <div class="mod-right">
-          <a href="https://modrinth.com/resourcepack/${h.project_id}" target="_blank"
-            style="padding:7px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:12px;text-decoration:none;white-space:nowrap;">Get →</a>
-        </div>`;
-      frag.appendChild(card);
-    });
-    bedrockAddonList.appendChild(frag);
-  } catch {
-    bedrockAddonLoading.style.display = 'none';
-    bedrockAddonList.innerHTML = '<p style="color:#e05500;text-align:center;padding:16px">Could not reach Modrinth — check your connection</p>';
-  }
-}
-
-bedrockAddonSearch?.addEventListener('input', () => {
-  if (bedrockSearchTimer) clearTimeout(bedrockSearchTimer);
-  bedrockSearchTimer = setTimeout(() => searchBedrockAddons(bedrockAddonSearch.value.trim()), 400);
-});
 
 // ── Bedrock Mods tab (full panel, like Java mods) ─────────────────────────────
 const bedrockModsList    = document.getElementById('bedrock-mods-list')!;
@@ -1038,7 +1016,8 @@ async function installGameBg(statusEl: HTMLElement) {
   }
 }
 
-function initCustomize() {
+// Settings › Custom title screen (installs the VoxelClient panorama resource pack)
+function initTitleScreenBg() {
   const toggle = document.getElementById('install-bg-toggle') as HTMLInputElement | null;
   const status = document.getElementById('install-bg-status') as HTMLElement | null;
   if (!toggle || !status) return;
@@ -1063,131 +1042,6 @@ function initCustomize() {
     }
   });
 }
-
-// ── Customize: Skin ───────────────────────────────────────────────────────────
-const skinCanvas   = document.getElementById('skin-canvas') as HTMLCanvasElement;
-const skinStatus   = document.getElementById('skin-status')!;
-const skinApplyBtn = document.getElementById('skin-apply-btn') as HTMLButtonElement;
-const skinPickBtn  = document.getElementById('skin-pick-btn') as HTMLButtonElement;
-let skinBase64 = '';
-let skinVariant: 'classic' | 'slim' = 'classic';
-
-function drawSkinPreview(img: HTMLImageElement) {
-  const ctx = skinCanvas.getContext('2d')!;
-  ctx.clearRect(0, 0, 92, 148);
-  ctx.imageSmoothingEnabled = false;
-  const s = 4; // scale factor
-  // Head front (8,8 -> 16,16 on skin = 8x8 px)
-  ctx.drawImage(img, 8, 8, 8, 8, 14, 0, 8*s, 8*s);
-  // Body front (20,20 -> 28,32)
-  ctx.drawImage(img, 20, 20, 8, 12, 14, 34, 8*s, 12*s);
-  // Right arm front (44,20 -> 48,32) classic=4wide slim=3wide
-  const armW = skinVariant === 'slim' ? 3 : 4;
-  ctx.drawImage(img, 44, 20, armW, 12, 0, 34, armW*s, 12*s);
-  // Left arm front (36,52 -> 40,64) — 1.8 skin layout
-  ctx.drawImage(img, 36, 52, armW, 12, 14+8*s, 34, armW*s, 12*s);
-  // Right leg (4,20 -> 8,32)
-  ctx.drawImage(img, 4, 20, 4, 12, 14, 34+12*s, 4*s, 12*s);
-  // Left leg (20,52 -> 24,64)
-  ctx.drawImage(img, 20, 52, 4, 12, 14+4*s, 34+12*s, 4*s, 12*s);
-}
-
-skinPickBtn.addEventListener('click', () => {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/png';
-  input.onchange = () => {
-    const file = input.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      skinBase64 = dataUrl.split(',')[1];
-      const img = new Image();
-      img.onload = () => { drawSkinPreview(img); };
-      img.src = dataUrl;
-      document.getElementById('skin-name')!.textContent = file.name;
-      skinApplyBtn.disabled = false;
-      skinApplyBtn.style.opacity = '1';
-      skinStatus.textContent = 'Skin loaded — click Apply to upload';
-      skinStatus.style.color = '#f5a623';
-    };
-    reader.readAsDataURL(file);
-  };
-  input.click();
-});
-
-skinApplyBtn.addEventListener('click', async () => {
-  if (!mc || !skinBase64) return;
-  skinApplyBtn.disabled = true;
-  skinStatus.textContent = 'Uploading…';
-  skinStatus.style.color = '#f6c356';
-  const res = await mc.uploadSkin({ base64: skinBase64, variant: skinVariant });
-  if (res.ok) {
-    skinStatus.textContent = '✓ Skin applied!';
-    skinStatus.style.color = '#f5a623';
-  } else {
-    skinStatus.textContent = `Failed: ${res.error}`;
-    skinStatus.style.color = '#e05500';
-  }
-  skinApplyBtn.disabled = false;
-});
-
-document.querySelectorAll('.model-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.model-btn').forEach(b => {
-      (b as HTMLElement).style.background = '#21262d';
-      (b as HTMLElement).style.borderColor = '#30363d';
-      (b as HTMLElement).style.color = '#8b949e';
-    });
-    const el = btn as HTMLElement;
-    el.style.background = '#c07000';
-    el.style.borderColor = '#f5a623';
-    el.style.color = '#fff';
-    skinVariant = (el.dataset.model as 'classic' | 'slim') || 'classic';
-  });
-});
-
-// ── Customize: Texture Packs ───────────────────────────────────────────────────
-const tpList    = document.getElementById('tp-list')!;
-const tpLoading = document.getElementById('tp-loading')!;
-const tpSearch  = document.getElementById('tp-search') as HTMLInputElement;
-let tpTimer: ReturnType<typeof setTimeout> | null = null;
-
-async function searchTexturePacks(query: string) {
-  tpLoading.style.display = 'flex';
-  tpList.innerHTML = '';
-  try {
-    const facets = JSON.stringify([['project_type:resourcepack']]);
-    const params = new URLSearchParams({ query, facets, limit: '30', index: query ? 'relevance' : 'downloads' });
-    const res  = await fetch(`https://api.modrinth.com/v2/search?${params}`);
-    const data = await res.json() as { hits: ModrinthHit[] };
-    tpLoading.style.display = 'none';
-    if (!data.hits.length) { tpList.innerHTML = '<p style="color:#484f58;text-align:center;padding:16px">No results</p>'; return; }
-    data.hits.forEach(h => {
-      const row = document.createElement('div');
-      row.className = 'mod-card';
-      const icon = h.icon_url ? `<img src="${h.icon_url}" class="mod-icon-img" alt="">` : `<div class="mod-icon"></div>`;
-      row.innerHTML = `${icon}
-        <div class="mod-info">
-          <div class="mod-name">${h.title}</div>
-          <div class="mod-desc">${h.description}</div>
-          <div class="mod-tags"><span class="mod-tag util">Resource Pack</span><span class="mod-tag" style="margin-left:auto">⬇ ${fmtDownloads(h.downloads)}</span></div>
-        </div>
-        <div class="mod-right">
-          <a href="https://modrinth.com/resourcepack/${h.project_id}" target="_blank"
-            style="padding:7px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:12px;text-decoration:none;white-space:nowrap;">View →</a>
-        </div>`;
-      tpList.appendChild(row);
-    });
-  } catch {
-    tpLoading.style.display = 'none';
-    tpList.innerHTML = '<p style="color:#e05500;text-align:center;padding:16px">Could not reach Modrinth</p>';
-  }
-}
-
-tpSearch.addEventListener('input', () => {
-  if (tpTimer) clearTimeout(tpTimer);
-  tpTimer = setTimeout(() => searchTexturePacks(tpSearch.value.trim()), 400);
-});
 
 // ── Installed mods (persisted) ────────────────────────────────────────────────
 interface InstalledMod { filename: string; name: string; mcVersion?: string; disabled?: boolean; cfId?: number; fileId?: number; modrinthVersionId?: string; }
@@ -1444,18 +1298,16 @@ const modsLabelPacks = document.getElementById('mods-label-packs')!;
 // Restore saved mods/modpacks tab choice
 if (localStorage.getItem('voxel_mods_tab') === 'modpack') {
   modsTypeSwitch.checked = true; modsTabType = 'modpack';
-  modsLabelMods.style.color = '#484f58'; modsLabelMods.style.fontWeight = '400';
-  modsLabelPacks.style.color = '#f5a623'; modsLabelPacks.style.fontWeight = '700';
+  modsLabelMods.classList.remove('on');
+  modsLabelPacks.classList.add('on');
 }
 
 function setModsTab(type: 'mod' | 'modpack') {
   modsTabType = type;
   const isMod = type === 'mod';
-  modsTypeSwitch.checked         = !isMod;
-  modsLabelMods.style.color      = isMod  ? '#f5a623' : '#484f58';
-  modsLabelMods.style.fontWeight = isMod  ? '700'     : '400';
-  modsLabelPacks.style.color     = !isMod ? '#f5a623' : '#484f58';
-  modsLabelPacks.style.fontWeight= !isMod ? '700'     : '400';
+  modsTypeSwitch.checked = !isMod;
+  modsLabelMods.classList.toggle('on', isMod);
+  modsLabelPacks.classList.toggle('on', !isMod);
   modsSearch.placeholder = isMod ? 'Search mods…' : 'Search modpacks…';
   localStorage.setItem('voxel_mods_tab', type);
   searchModrinth(modsSearch.value.trim());
@@ -2340,13 +2192,7 @@ function initCurseForge() {
       const type = (btn as HTMLElement).dataset.type as CfContentType;
       if (type === cfContentType) return;
       cfContentType = type;
-      document.querySelectorAll('.cf-type-tab').forEach(b => {
-        const active = b === btn;
-        (b as HTMLElement).classList.toggle('active', active);
-        (b as HTMLElement).style.background   = active ? 'rgba(241,100,54,0.12)' : '#0d0d0d';
-        (b as HTMLElement).style.borderColor  = active ? 'rgba(241,100,54,0.4)' : '#2a2a2a';
-        (b as HTMLElement).style.color        = active ? '#f16436' : '#aaaaaa';
-      });
+      document.querySelectorAll('.cf-type-tab').forEach(b => b.classList.toggle('active', b === btn));
       const labels: Record<CfContentType, string> = {
         mod: 'mods', modpack: 'modpacks', resourcepack: 'resource packs', shader: 'shaders', world: 'worlds',
       };
@@ -3755,13 +3601,6 @@ function initFiles() {
     btn.addEventListener('click', () => filesApi?.openFolder((btn as HTMLElement).dataset.folder || 'root'));
   });
 
-  // Quick-open button styles
-  document.querySelectorAll<HTMLElement>('.files-folder-btn').forEach(btn => {
-    btn.style.cssText = 'padding:7px 14px;background:rgba(33,38,45,0.6);border:1px solid #30363d;border-radius:7px;color:#8b949e;font-size:12px;cursor:pointer;';
-    btn.onmouseenter = () => { btn.style.borderColor = '#f5a623'; btn.style.color = '#f5a623'; };
-    btn.onmouseleave = () => { btn.style.borderColor = '#30363d'; btn.style.color = '#8b949e'; };
-  });
-
   refreshFileLists();
 }
 
@@ -4406,13 +4245,10 @@ function initChat() {
   let selectedCat   = 'feature';
 
   document.querySelectorAll<HTMLButtonElement>('.feedback-cat').forEach(btn => {
-    if (btn.dataset.cat === 'feature') btn.style.cssText += ';border-color:#d4810a;color:#d4810a;';
+    btn.classList.toggle('on', btn.dataset.cat === 'feature');
     btn.addEventListener('click', () => {
       selectedCat = btn.dataset.cat || 'feature';
-      document.querySelectorAll<HTMLButtonElement>('.feedback-cat').forEach(b => {
-        b.style.borderColor = '#2a2a2a'; b.style.color = '#8b949e';
-      });
-      btn.style.borderColor = '#d4810a'; btn.style.color = '#d4810a';
+      document.querySelectorAll<HTMLButtonElement>('.feedback-cat').forEach(b => b.classList.toggle('on', b === btn));
     });
   });
 
@@ -5310,7 +5146,7 @@ mc?.onRemoteLaunch?.((i: { version: string; server?: string; username?: string }
   running = true;
   mcPlayBtn.disabled = true;
   mcPlayBtn.classList.add('running');
-  mcPlayBtn.textContent = 'Launching…';
+  mcPlayLabel.textContent = 'Launching…';
   mcForceQuitBtn.style.display = 'inline-flex';
   setStatus(`Server Control Center is starting Minecraft ${i.version}${i.server ? ` on ${i.server}` : ''}${i.username ? ` as ${i.username}` : ''}…`, 'yellow');
 });
