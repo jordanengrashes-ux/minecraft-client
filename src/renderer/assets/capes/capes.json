@@ -1,0 +1,50 @@
+{
+  "voxel_green": {
+    "frames": 1,
+    "frametime": 1,
+    "width": 128,
+    "height": 64
+  },
+  "midnight": {
+    "frames": 1,
+    "frametime": 1,
+    "width": 128,
+    "height": 64
+  },
+  "crimson": {
+    "frames": 1,
+    "frametime": 1,
+    "width": 128,
+    "height": 64
+  },
+  "amethyst": {
+    "frames": 8,
+    "frametime": 3,
+    "width": 128,
+    "height": 64
+  },
+  "golden": {
+    "frames": 12,
+    "frametime": 2,
+    "width": 128,
+    "height": 64
+  },
+  "nether": {
+    "frames": 8,
+    "frametime": 3,
+    "width": 128,
+    "height": 64
+  },
+  "ocean": {
+    "frames": 8,
+    "frametime": 3,
+    "width": 128,
+    "height": 64
+  },
+  "void": {
+    "frames": 8,
+    "frametime": 3,
+    "width": 128,
+    "height": 64
+  }
+}

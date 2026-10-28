@@ -205,8 +205,8 @@
 
     #sidebar-bottom { padding: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
     #user-chip { display: flex; align-items: center; gap: 10px; padding: 0 0 0 6px; border-radius: var(--radius); }
-    #user-avatar { width: 30px; height: 46px; border-radius: 5px; background: var(--surface-2); display: flex; align-items: flex-start; justify-content: center; flex-shrink: 0; overflow: hidden; }
-    #user-avatar img { height: 46px !important; }
+    #user-avatar { width: 36px; height: 36px; border-radius: 8px; background: var(--surface-2); display: grid; place-items: center; flex-shrink: 0; overflow: hidden; color: var(--text-2); font-weight: 700; font-size: 15px; }
+    #user-avatar img { width: 100%; height: 100%; image-rendering: pixelated; }
     #user-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #user-sub { font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #mc-username-badge::before { content: 'Playing as '; }
@@ -258,16 +258,14 @@
     #stage { position: relative; flex: 1; min-height: 110px; overflow: hidden; isolation: isolate; background: var(--bg-sunk); }
     .stage-layer { position: absolute; inset: 0; opacity: 0; transition: opacity .45s var(--ease-out); }
     .stage-layer.is-front { opacity: 1; }
-    .stage-ambient { position: absolute; inset: -80px; width: calc(100% + 160px); height: calc(100% + 160px); object-fit: cover; filter: blur(56px) saturate(1.35) brightness(.42); }
-    .stage-art {
-      position: absolute; top: 0; right: 0; height: 100%; aspect-ratio: 1; object-fit: cover; transform-origin: 70% 40%;
-      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 42%), linear-gradient(to top, transparent 0, #000 30%);
-      -webkit-mask-composite: source-in; mask-composite: intersect;
-    }
+    /* The artwork fills the whole stage; a shade along the bottom keeps the text readable. */
+    .stage-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 40%; }
     .is-pixel { image-rendering: pixelated; }
-    .stage-ambient.is-pixel { image-rendering: auto; }
-    #stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, rgba(8,8,10,.85), rgba(8,8,10,0) 55%), linear-gradient(to right, rgba(8,8,10,.6), rgba(8,8,10,0) 60%); }
-    #stage-copy { position: absolute; left: 32px; bottom: 24px; right: 40%; z-index: 1; }
+    /* A version with only a small square thumbnail: show it sharp at its own size, not stretched. */
+    .stage-layer.is-card .stage-art { inset: 0 32px 0 auto; margin: auto 0; width: auto; height: min(240px, 84%); aspect-ratio: 1; border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); }
+    #stage:has(.stage-layer.is-front.is-card) #stage-copy { right: max(30%, 300px); }
+    #stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, rgba(8,8,10,.86) 0%, rgba(8,8,10,.35) 42%, rgba(8,8,10,0) 68%); }
+    #stage-copy { position: absolute; left: 32px; bottom: 24px; right: 30%; z-index: 1; text-shadow: 0 1px 12px rgba(0,0,0,.55); }
     #stage-ver { font-size: 68px; font-weight: 800; font-stretch: 78%; letter-spacing: -.02em; line-height: .95; text-shadow: 0 2px 24px rgba(0,0,0,.45); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #stage-name { margin-top: 8px; font-size: 19px; font-weight: 600; text-wrap: balance; }
     #stage-meta { display: flex; align-items: center; gap: 10px; margin-top: 8px; color: var(--text-2); font-size: 12.5px; }
@@ -279,34 +277,31 @@
     #ver-lines::-webkit-scrollbar { display: none; }
     .snap-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 12.5px; cursor: pointer; flex-shrink: 0; }
 
-    .strip-wrap { position: relative; margin-top: 8px; }
+    /* Starts at the page gutter like any list; the edges only fade where more versions are scrolled off. */
+    .strip-wrap { position: relative; margin-top: 8px; --fade-l: 0px; --fade-r: 0px; }
+    .strip-wrap.can-left  { --fade-l: 64px; }
+    .strip-wrap.can-right { --fade-r: 64px; }
     #ver-strip {
       position: relative; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
-      padding: 6px calc(50% - 42px) 4px; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; cursor: grab;
-      -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+      padding: 6px 32px 4px; overscroll-behavior-x: contain;
+      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
     }
     #ver-strip::-webkit-scrollbar { display: none; }
-    #ver-strip.is-dragging { scroll-snap-type: none; cursor: grabbing; }
+    #ver-strip.is-dragging { cursor: grabbing; }
     #ver-strip.is-dragging .ver-tile { pointer-events: none; }
-    .ver-tile { flex: 0 0 84px; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 0; border: 0; background: none; cursor: pointer; scroll-snap-align: center; }
-    .ver-art { display: block; width: 76px; height: 76px; border-radius: 7px; overflow: hidden; background: var(--surface-2); box-shadow: 0 4px 14px rgba(0,0,0,.45); transition: box-shadow .2s; }
+    .ver-tile { flex: 0 0 84px; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 0; border: 0; background: none; cursor: pointer; }
+    .ver-art { display: block; width: 76px; height: 76px; border-radius: 7px; overflow: hidden; background: var(--surface-2); box-shadow: 0 4px 14px rgba(0,0,0,.45); transition: box-shadow .2s, transform .2s var(--ease-out); }
+    .ver-tile:hover .ver-art { transform: translateY(-2px); }
     .ver-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .ver-id { max-width: 84px; font-size: 12px; font-weight: 500; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .2s; }
     .ver-tile.is-snapshot .ver-id { font-style: italic; }
     .ver-tile:hover .ver-id { color: var(--text-2); }
     .ver-tile.is-selected .ver-art { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--amber), 0 6px 18px rgba(0,0,0,.5); }
     .ver-tile.is-selected .ver-id { color: var(--text); font-weight: 600; }
-    @supports (animation-timeline: view()) {
-      .ver-tile { animation: tile-depth linear both; animation-timeline: view(inline); }
-      @keyframes tile-depth {
-        0%, 100% { transform: scale(.74); opacity: .3; }
-        50%      { transform: scale(1);   opacity: 1; }
-      }
-    }
-    @media (prefers-reduced-motion: reduce) { .ver-tile { animation: none; } }
-    .strip-nav { position: absolute; top: 30px; z-index: 2; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text-2); cursor: pointer; transition: color .15s, border-color .15s; }
+    .strip-nav { position: absolute; top: 30px; z-index: 2; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text-2); cursor: pointer; opacity: 0; pointer-events: none; transition: color .15s, border-color .15s, opacity .15s; }
     .strip-nav:hover { color: var(--text); border-color: #45454c; }
-    #ver-prev { left: 24px; } #ver-next { right: 24px; }
+    .can-left #ver-prev, .can-right #ver-next { opacity: 1; pointer-events: auto; }
+    #ver-prev { left: 16px; } #ver-next { right: 16px; }
 
     #loadout { flex-shrink: 0; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 10px 20px; padding: 14px 32px 16px; border-top: 1px solid var(--line); background: var(--bg); }
     .lo-fields { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; min-width: 0; }
@@ -427,9 +422,9 @@
 
     /* ── Bedrock ────────────────────────────────────────────────────────────── */
     #bedrock-stage { position: relative; flex-shrink: 0; height: 250px; overflow: hidden; isolation: isolate; background: var(--bg-sunk); }
-    #bedrock-stage .stage-ambient, #bedrock-stage .stage-art { opacity: 0; transition: opacity .6s var(--ease-out); }
-    #bedrock-stage.has-art .stage-ambient, #bedrock-stage.has-art .stage-art { opacity: 1; }
-    #bedrock-stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, rgba(8,8,10,.9), rgba(8,8,10,0) 60%), linear-gradient(to right, rgba(8,8,10,.65), rgba(8,8,10,0) 65%); }
+    #bedrock-stage .stage-art { opacity: 0; transition: opacity .6s var(--ease-out); }
+    #bedrock-stage.has-art .stage-art { opacity: 1; }
+    #bedrock-stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, rgba(8,8,10,.9) 0%, rgba(8,8,10,.4) 45%, rgba(8,8,10,0) 70%); }
     .bedrock-copy { position: absolute; left: 32px; right: 32px; bottom: 22px; z-index: 1; display: flex; align-items: flex-end; gap: 20px; }
     .bedrock-copy h1 { font-size: 38px; font-weight: 800; font-stretch: 80%; letter-spacing: -.01em; line-height: 1; }
     #bedrock-art-caption { margin-top: 8px; color: var(--text-2); font-size: 12.5px; }
@@ -460,14 +455,27 @@
     .wardrobe-card span { font-size: 11.5px; color: var(--text-2); width: 100%; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* ── Cosmetics ──────────────────────────────────────────────────────────── */
-    #cosmetics-preview { width: 38px; height: 54px; border-radius: 5px; border: 1px solid var(--line-strong); background: var(--surface-2); flex-shrink: 0; }
+    .cosm-stage { position: relative; height: 340px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: radial-gradient(70% 90% at 50% 38%, #26262c 0%, #17171a 55%, #0f0f11 100%); }
+    .cape-viewer { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+    .cape-viewer:active { cursor: grabbing; }
+    .cape-viewer canvas { display: block; width: 100%; height: 100%; }
+    .cape-viewer.unavailable::after { content: '3D preview isn\'t available on this PC'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-3); }
+    .cosm-overlay { position: absolute; bottom: 18px; pointer-events: none; }
+    .cosm-overlay > * { pointer-events: auto; }
+    .cosm-overlay-left { left: 22px; }
+    .cosm-overlay-right { right: 22px; }
+    .cosm-name { font-size: 26px; font-weight: 800; font-stretch: 85%; line-height: 1.05; }
+    .cosm-state { margin-top: 4px; color: var(--text-2); font-size: 12.5px; }
+    .cosm-stage + .group { margin-top: 14px; }
+    .cosm-hint { position: absolute; top: 14px; right: 16px; font-size: 11.5px; color: var(--text-3); pointer-events: none; }
     #cosmetics-status { color: var(--text-2); font-size: 12.5px; margin-top: 2px; }
     #cosmetics-remove-btn { display: none; }
     .cape-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
     .cape-card { border-radius: var(--radius); overflow: hidden; cursor: pointer; background: var(--surface); border: 1px solid var(--line); transition: border-color .12s, transform .12s; }
     .cape-card:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+    .cape-card.previewing { border-color: var(--text-3); }
     .cape-card.equipped { border-color: var(--amber); }
-    .cape-swatch { height: 64px; width: 100%; }
+    .cape-swatch { display: block; height: 96px; width: 100%; background: radial-gradient(80% 80% at 50% 40%, #222226, #161618); image-rendering: pixelated; }
     .cape-label { padding: 8px 10px 10px; }
     .cape-name { font-weight: 600; font-size: 12.5px; }
     .cape-cost { font-size: 11.5px; color: var(--text-2); margin-top: 2px; }
@@ -475,7 +483,6 @@
     .cape-equip:hover, .cape-buy:hover:not(:disabled) { border-color: #45454c; background: var(--surface-3); }
     .cape-equip.on { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); }
     .cape-buy:disabled { opacity: .4; cursor: not-allowed; }
-    #mod-install-status { margin-left: 10px; font-size: 12.5px; color: var(--text-2); }
 
     /* ── Friends ────────────────────────────────────────────────────────────── */
     #friend-add-status { font-size: 12.5px; color: var(--text-3); margin-top: 8px; min-height: 18px; }
@@ -616,6 +623,7 @@
       .page-head, .toolbar, .tabs, .picker-bar, #loadout, #status-bar { padding-left: 22px; padding-right: 22px; }
       .page-body { padding-left: 22px; padding-right: 22px; }
       #stage-copy { left: 22px; }
+      #ver-strip { padding-left: 22px; padding-right: 22px; }
       .lo-field select { width: 128px; }
       .lo-ram { width: 140px; }
       #mc-play-btn { min-width: 150px; }
@@ -627,7 +635,6 @@
       #picker { padding-top: 8px; }
       .ver-tile { flex-basis: 70px; }
       .ver-art { width: 60px; height: 60px; }
-      #ver-strip { padding-inline: calc(50% - 35px); }
       .strip-nav { top: 22px; }
       #loadout { padding-top: 10px; padding-bottom: 10px; }
       .lo-label { display: none; }
@@ -744,8 +751,8 @@
     <!-- ═══ Play: Java ═══ -->
     <main id="content">
       <section id="stage" aria-live="polite">
-        <div class="stage-layer is-front"><img class="stage-ambient" alt=""><img class="stage-art" alt=""></div>
-        <div class="stage-layer"><img class="stage-ambient" alt=""><img class="stage-art" alt=""></div>
+        <div class="stage-layer is-front"><img class="stage-art" alt=""></div>
+        <div class="stage-layer"><img class="stage-art" alt=""></div>
         <div id="stage-copy">
           <div id="stage-ver">Minecraft</div>
           <div id="stage-name">Loading versions…</div>
@@ -838,7 +845,7 @@
     <!-- ═══ Play: Bedrock ═══ -->
     <section id="bedrock-panel" class="page">
       <div id="bedrock-stage">
-        <img class="stage-ambient" alt=""><img class="stage-art" alt="">
+        <img class="stage-art" alt="">
         <div class="bedrock-copy">
           <div>
             <h1>Bedrock Edition</h1>
@@ -1069,13 +1076,24 @@
       <header class="page-head" id="cosmetics-hero">
         <div>
           <h1>Cosmetics</h1>
-          <p>Capes that every other Voxel Client player can see.</p>
+          <p>Capes other Voxel Client players see on you in-game. Click one to try it on.</p>
         </div>
       </header>
       <div class="page-body" id="cosmetics-body">
+        <div class="cosm-stage">
+          <div id="cape-viewer" class="cape-viewer" title="Drag to turn"></div>
+          <div class="cosm-overlay cosm-overlay-left">
+            <div id="cosmetics-preview-name" class="cosm-name">No cape</div>
+            <div id="cosmetics-preview-state" class="cosm-state"></div>
+          </div>
+          <div class="cosm-overlay cosm-overlay-right">
+            <button id="cosmetics-preview-action" class="btn btn-primary" hidden></button>
+          </div>
+          <div class="cosm-hint">Drag to turn</div>
+        </div>
+
         <div class="section group">
           <div class="row">
-            <div id="cosmetics-preview"></div>
             <div class="row-text">
               <div class="row-title">Equipped: <span id="cosmetics-equipped-name">None</span></div>
               <div id="cosmetics-status">Sign in with Microsoft to equip a cape</div>
@@ -1094,13 +1112,7 @@
         <div class="section">
           <div class="section-title">Capes</div>
           <div class="cape-grid" id="cape-grid" style="margin-top:10px;"></div>
-        </div>
-
-        <div class="section" id="mod-install-card">
-          <div class="section-title">See capes in-game</div>
-          <div class="section-desc">Your cape is saved already, no mod needed. Install this only if you also want to see capes inside Minecraft. It needs the Fabric loader.</div>
-          <button id="mod-install-btn" class="btn">Install cosmetics mod</button>
-          <span id="mod-install-status"></span>
+          <p class="note" style="margin-top:14px;max-width:70ch;">In-game, capes show on Minecraft 1.21.4 with the Fabric loader, for everyone playing through Voxel Client. The cosmetics mod installs itself when you launch. Newer versions are coming next.</p>
         </div>
       </div>
     </section>

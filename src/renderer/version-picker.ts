@@ -1,11 +1,12 @@
-// Version picker — a snap-scrolling strip of Minecraft versions, each tile
+// Version picker — a scrolling strip of Minecraft versions, each tile
 // showing that update's artwork, plus the big "stage" preview above it.
 //
 // The hidden #mc-version <select> stays the source of truth: game.ts reads
 // mcVersion.value everywhere, so picking a tile just sets the select's value
 // and fires its normal 'change' event.
 //
-// Artwork comes from the same patch-notes feed the official launcher uses.
+// Artwork comes from the same patch-notes feed the official launcher uses;
+// the stage shows a wide screenshot from that version's patch notes.
 // It covers every release since 1.13 and every snapshot since early 2020;
 // anything older gets a procedurally drawn block texture instead.
 
@@ -14,7 +15,7 @@ export interface PickerVersion { id: string; type: string; releaseTime?: string 
 const CONTENT_HOST   = 'https://launchercontent.mojang.com';
 const JAVA_FEED      = `${CONTENT_HOST}/v2/javaPatchNotes.json`;
 const BEDROCK_FEED   = `${CONTENT_HOST}/v2/bedrockPatchNotes.json`;
-const FEED_CACHE_KEY = 'voxel_java_patchnotes';
+const FEED_CACHE_KEY = 'voxel_java_patchnotes_v3';
 const FEED_MAX_AGE   = 6 * 60 * 60 * 1000;
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -91,11 +92,82 @@ function formatDate(iso?: string): string {
 }
 
 // ── Artwork ───────────────────────────────────────────────────────────────────
-const art = new Map<string, string>();
+const art = new Map<string, string>();      // version → square thumbnail (240 or 540px)
+const articles = new Map<string, string>(); // version → patch-notes article path
+let releaseOrder: string[] = [];            // releases in the feed, newest first
 
-function ingestFeed(entries: Array<{ version: string; image?: { url: string } }>) {
+type FeedEntry = { version: string; type?: string; image?: { url: string }; contentPath?: string };
+function ingestFeed(entries: FeedEntry[]) {
   art.clear();
-  for (const e of entries) if (e.image?.url) art.set(e.version, CONTENT_HOST + e.image.url);
+  articles.clear();
+  for (const e of entries) {
+    if (e.image?.url) art.set(e.version, CONTENT_HOST + e.image.url);
+    if (e.contentPath) articles.set(e.version, e.contentPath);
+  }
+  releaseOrder = entries.filter(e => e.type === 'release').map(e => e.version);
+}
+
+// The stage wants a wide screenshot: the thumbnails are small squares (only
+// 240px before 1.20.5) and go soft when stretched across it. The patch-notes
+// articles carry 1280×720 screenshots, but only big updates have them — a
+// hotfix's notes are text, so it borrows from the other releases of its
+// update (1.21.10 shows The Copper Age art from 1.21.9).
+function articleCandidates(v: PickerVersion): string[] {
+  const own = articles.get(v.id);
+  const out = own ? [own] : [];
+  if (v.type !== 'release') return out;
+  const group = (id: string) => { const p = parseVer(id); return p ? `${p.a}.${p.b}|${updateName(id) ?? ''}` : null; };
+  const g = group(v.id);
+  if (!g) return out;
+  const at = releaseOrder.indexOf(v.id);
+  const siblings = releaseOrder.filter(id => id !== v.id && group(id) === g);
+  if (at >= 0) siblings.sort((a, b) => Math.abs(releaseOrder.indexOf(a) - at) - Math.abs(releaseOrder.indexOf(b) - at));
+  for (const id of siblings) { const p = articles.get(id); if (p) out.push(p); }
+  return out.slice(0, 4);
+}
+
+const articleImageCache = new Map<string, Promise<string[]>>();
+function articleImages(path: string): Promise<string[]> {
+  let p = articleImageCache.get(path);
+  if (!p) {
+    p = fetch(`${CONTENT_HOST}/v2/${path}`)
+      .then(r => r.json())
+      .then(j => [...String(j.body || '').matchAll(/<img[^>]*?src=["']?([^"'\s>]+)/g)]
+        .map(m => m[1].startsWith('/') ? CONTENT_HOST + m[1] : m[1]))
+      .catch(() => []);
+    articleImageCache.set(path, p);
+  }
+  return p;
+}
+
+// Filenames don't reliably say the size, so measure. A decoded image is
+// cached by the browser, so the winner shows instantly afterwards.
+async function isWide(src: string): Promise<boolean> {
+  const img = new Image();
+  img.src = src;
+  try { await img.decode(); } catch { return false; }
+  return img.naturalWidth >= 720 && img.naturalWidth > img.naturalHeight * 1.3;
+}
+
+async function findWide(paths: string[]): Promise<string | null> {
+  let probes = 0;
+  for (const path of paths) {
+    for (const src of await articleImages(path)) {
+      if (probes++ >= 6) return null;
+      if (await isWide(src)) return src;
+    }
+  }
+  return null;
+}
+
+const heroCache = new Map<string, Promise<string | null>>();
+function heroFor(v: PickerVersion): Promise<string | null> {
+  let p = heroCache.get(v.id);
+  if (!p) {
+    p = findWide(articleCandidates(v));
+    heroCache.set(v.id, p);
+  }
+  return p;
 }
 
 // Exact match first; a release the feed skips (e.g. 1.14.4) borrows the art
@@ -181,7 +253,7 @@ async function loadFeed(onFresh: () => void) {
   } catch { /* cache unreadable — fetch below */ }
   try {
     const data = await (await fetch(JAVA_FEED)).json();
-    const entries = (data.entries as any[]).map(e => ({ version: e.version, image: e.image ? { url: e.image.url } : undefined }));
+    const entries: FeedEntry[] = (data.entries as any[]).map(e => ({ version: e.version, type: e.type, image: e.image ? { url: e.image.url } : undefined, contentPath: e.contentPath }));
     ingestFeed(entries);
     try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ at: Date.now(), entries })); } catch { /* storage full */ }
     onFresh();
@@ -191,6 +263,7 @@ async function loadFeed(onFresh: () => void) {
 // ── Picker ────────────────────────────────────────────────────────────────────
 export function initVersionPicker(select: HTMLSelectElement) {
   const strip   = document.getElementById('ver-strip')!;
+  const wrap    = strip.parentElement!;
   const chips   = document.getElementById('ver-lines')!;
   const stage   = document.getElementById('stage')!;
   const layers  = Array.from(stage.querySelectorAll<HTMLElement>('.stage-layer'));
@@ -202,9 +275,7 @@ export function initVersionPicker(select: HTMLSelectElement) {
   let list: PickerVersion[] = [];
   let tiles: HTMLButtonElement[] = [];
   let latestId = '';
-  let selectedIdx = -1;   // committed to the <select>
-  let targetIdx = 0;      // where wheel/keys are heading
-  let centeredIdx = -1;   // nearest the middle right now
+  let selectedIdx = -1;
   let stageId = '';
   let frontLayer = 0;
   let stageToken = 0;
@@ -254,9 +325,10 @@ export function initVersionPicker(select: HTMLSelectElement) {
     const idx = Math.max(0, list.findIndex(v => v.id === select.value));
     selectedIdx = -1;
     mark(idx);
-    targetIdx = idx;
-    centerOn(idx, false);
+    strip.scrollLeft = 0;
+    reveal(idx, false);
     showStage(list[idx], false);
+    updateEdges();
   }
 
   function renderChips() {
@@ -273,7 +345,7 @@ export function initVersionPicker(select: HTMLSelectElement) {
       chip.className = 'chip';
       chip.dataset.line = key;
       chip.textContent = lineLabel(key);
-      chip.addEventListener('click', () => { targetIdx = i; centerOn(i, true); });
+      chip.addEventListener('click', () => { commit(i); reveal(i, true, true); });
       chips.appendChild(chip);
     }
   }
@@ -304,29 +376,113 @@ export function initVersionPicker(select: HTMLSelectElement) {
     }
   }
 
-  // Tiles are evenly spaced, so the one nearest the middle is plain arithmetic.
-  function nearestIndex(): number {
-    const first = tiles[0];
-    if (!first) return -1;
-    const pitch = tiles.length > 1 ? tiles[1].offsetLeft - first.offsetLeft : first.offsetWidth;
-    const mid = strip.scrollLeft + strip.clientWidth / 2;
-    const i = Math.round((mid - first.offsetLeft - first.offsetWidth / 2) / pitch);
-    return Math.max(0, Math.min(tiles.length - 1, i));
+  // ── Scrolling ──
+  // The strip starts at the left edge like any list; scrolling only browses,
+  // and the selected tile is wherever it happens to sit.
+  let scrollTarget: number | null = null;
+  function scrollStripTo(left: number, smooth: boolean) {
+    const max = strip.scrollWidth - strip.clientWidth;
+    scrollTarget = Math.max(0, Math.min(max, left));
+    strip.scrollTo({ left: scrollTarget, behavior: smooth && !reduceMotion ? 'smooth' : 'instant' });
   }
 
-  function centerOn(idx: number, smooth: boolean) {
+  // Scrolls just far enough to show a tile in full; `toStart` puts it at the
+  // left edge instead (used by the jump chips).
+  function reveal(idx: number, smooth: boolean, toStart = false) {
     const tile = tiles[idx];
     if (!tile) return;
-    strip.scrollTo({
-      left: tile.offsetLeft + tile.offsetWidth / 2 - strip.clientWidth / 2,
-      behavior: smooth && !reduceMotion ? 'smooth' : 'instant',
-    });
+    const pad = 44; // clear of the arrow buttons
+    const left = tile.offsetLeft;
+    const right = left + tile.offsetWidth;
+    if (toStart || left - pad < strip.scrollLeft) scrollStripTo(left - pad, smooth);
+    else if (right + pad > strip.scrollLeft + strip.clientWidth) scrollStripTo(right + pad - strip.clientWidth, smooth);
   }
 
-  function move(delta: number) {
-    targetIdx = Math.max(0, Math.min(tiles.length - 1, targetIdx + delta));
-    centerOn(targetIdx, true);
+  function updateEdges() {
+    const max = strip.scrollWidth - strip.clientWidth;
+    wrap.classList.toggle('can-left', strip.scrollLeft > 2);
+    wrap.classList.toggle('can-right', strip.scrollLeft < max - 2);
   }
+  let edgeRaf = 0;
+  strip.addEventListener('scroll', () => {
+    if (!edgeRaf) edgeRaf = requestAnimationFrame(() => { edgeRaf = 0; updateEdges(); });
+  }, { passive: true });
+  strip.addEventListener('scrollend', () => { scrollTarget = null; });
+
+  // A vertical mouse wheel scrolls the strip sideways, about two tiles a notch.
+  strip.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // horizontal trackpad swipe: native
+    e.preventDefault();
+    const delta = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 33 : e.deltaY;
+    scrollStripTo((scrollTarget ?? strip.scrollLeft) + delta * 1.8, true);
+  }, { passive: false });
+
+  // Arrow keys move the selection itself, like any list box.
+  strip.addEventListener('keydown', e => {
+    const steps: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, PageUp: -5, PageDown: 5 };
+    let to: number;
+    if (e.key in steps) to = selectedIdx + steps[e.key];
+    else if (e.key === 'Home') to = 0;
+    else if (e.key === 'End') to = tiles.length - 1;
+    else return;
+    e.preventDefault();
+    to = Math.max(0, Math.min(tiles.length - 1, to));
+    commit(to);
+    reveal(to, true);
+  });
+
+  // Click-and-drag with a mouse, like flicking through a record crate.
+  let dragging = false;
+  let dragMoved = false;
+  let dragStartX = 0;
+  let dragStartScroll = 0;
+  strip.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    dragging = true;
+    dragMoved = false;
+    dragStartX = e.clientX;
+    dragStartScroll = strip.scrollLeft;
+  });
+  window.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - dragStartX;
+    if (!dragMoved && Math.abs(dx) > 4) {
+      dragMoved = true;
+      strip.classList.add('is-dragging');
+    }
+    if (dragMoved) strip.scrollLeft = dragStartScroll - dx;
+  });
+  window.addEventListener('pointerup', () => {
+    if (!dragging) return;
+    dragging = false;
+    strip.classList.remove('is-dragging');
+  });
+
+  strip.addEventListener('click', e => {
+    if (dragMoved) { dragMoved = false; return; }
+    const tile = (e.target as HTMLElement).closest<HTMLButtonElement>('.ver-tile');
+    if (!tile) return;
+    const i = +tile.dataset.i!;
+    commit(i);
+    reveal(i, true);
+  });
+
+  const page = () => Math.max(120, strip.clientWidth - 160);
+  document.getElementById('ver-prev')?.addEventListener('click', () => scrollStripTo(strip.scrollLeft - page(), true));
+  document.getElementById('ver-next')?.addEventListener('click', () => scrollStripTo(strip.scrollLeft + page(), true));
+
+  // Follow version changes made elsewhere (e.g. quick-join picking a server's version).
+  select.addEventListener('change', () => {
+    const i = list.findIndex(v => v.id === select.value);
+    // A version the strip doesn't list (e.g. a snapshot while snapshots are hidden): still show it.
+    if (i < 0) { showStage({ id: select.value, type: /^\d+\.\d+(\.\d+)?$/.test(select.value) ? 'release' : 'snapshot' }, true); return; }
+    if (i === selectedIdx) return;
+    mark(i);
+    reveal(i, true);
+    showStage(list[i], true);
+  });
+
+  new ResizeObserver(updateEdges).observe(strip);
 
   // ── Stage ──
   function showStage(v: PickerVersion | undefined, animate: boolean) {
@@ -356,22 +512,44 @@ export function initVersionPicker(select: HTMLSelectElement) {
       );
     }
 
-    const real = artFor(v);
-    const src = real ?? pixelArt(v);
+    // Prefer a wide screenshot, full-bleed. Give it a moment to arrive so the
+    // stage changes once; if it's slow, show the fallback first and swap when
+    // it lands. The fallback never gets stretched: a thumbnail shows at its
+    // own size as a card, and drawn block art scales up pixel-sharp.
     const token = ++stageToken;
+    const thumb = artFor(v);
+    const fallback = (): void => swapArt(thumb ?? pixelArt(v), thumb ? 'card' : 'pixel', token, animate);
+    let shown = false;
+    const showFallback = () => {
+      if (shown || token !== stageToken) return;
+      shown = true;
+      fallback();
+    };
+    if (!articleCandidates(v).length) { showFallback(); return; }
+    const timer = setTimeout(showFallback, 400);
+    heroFor(v).then(hero => {
+      if (token !== stageToken) return;
+      clearTimeout(timer);
+      if (!hero) { showFallback(); return; }
+      swapArt(hero, 'full', token, animate && !shown);
+      shown = true;
+    });
+  }
+
+  function swapArt(src: string, mode: 'full' | 'card' | 'pixel', token: number, animate: boolean) {
     const back = layers[frontLayer ^ 1];
+    const img = back.querySelector('img')!;
     const swap = () => {
       if (token !== stageToken) return;
-      back.querySelectorAll('img').forEach(img => {
-        img.src = src;
-        img.classList.toggle('is-pixel', !real);
-      });
+      img.src = src;
+      img.classList.toggle('is-pixel', mode === 'pixel');
+      back.classList.toggle('is-card', mode === 'card');
       back.classList.add('is-front');
       layers[frontLayer].classList.remove('is-front');
       frontLayer ^= 1;
       if (animate && !reduceMotion) {
-        back.querySelector('.stage-art')?.animate(
-          [{ transform: 'scale(1.06)' }, { transform: 'scale(1)' }],
+        img.animate(
+          [{ transform: 'scale(1.05)' }, { transform: 'scale(1)' }],
           { duration: 900, easing: 'cubic-bezier(.16,1,.3,1)' },
         );
       }
@@ -380,114 +558,6 @@ export function initVersionPicker(select: HTMLSelectElement) {
     pre.src = src;
     pre.decode().then(swap, swap);
   }
-
-  // ── Input ──
-  let previewTimer: ReturnType<typeof setTimeout> | null = null;
-  let scrollRaf = 0;
-  strip.addEventListener('scroll', () => {
-    if (scrollRaf) return;
-    scrollRaf = requestAnimationFrame(() => {
-      scrollRaf = 0;
-      const i = nearestIndex();
-      if (i === centeredIdx) return;
-      centeredIdx = i;
-      // Preview while gliding past; the select only changes once scrolling settles.
-      if (previewTimer) clearTimeout(previewTimer);
-      previewTimer = setTimeout(() => showStage(list[i], true), 90);
-    });
-  }, { passive: true });
-
-  strip.addEventListener('scrollend', () => {
-    if (dragging) return;
-    const i = nearestIndex();
-    targetIdx = i;
-    commit(i);
-  });
-
-  // A mouse wheel notch (100px in Chromium) moves exactly one version;
-  // smaller trackpad deltas add up until they make a whole step.
-  let wheelAcc = 0;
-  let wheelReset: ReturnType<typeof setTimeout> | null = null;
-  strip.addEventListener('wheel', e => {
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // horizontal trackpad swipe: native
-    e.preventDefault();
-    wheelAcc += e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 33 : e.deltaY;
-    const step = 100;
-    while (Math.abs(wheelAcc) >= step) {
-      const dir = Math.sign(wheelAcc);
-      move(dir);
-      wheelAcc -= dir * step;
-    }
-    if (wheelReset) clearTimeout(wheelReset);
-    wheelReset = setTimeout(() => { wheelAcc = 0; }, 180);
-  }, { passive: false });
-
-  strip.addEventListener('keydown', e => {
-    const steps: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, PageUp: -5, PageDown: 5 };
-    if (e.key in steps) move(steps[e.key]);
-    else if (e.key === 'Home') move(-tiles.length);
-    else if (e.key === 'End') move(tiles.length);
-    else return;
-    e.preventDefault();
-  });
-
-  // Click-and-drag with a mouse, like flicking through a record crate.
-  let dragging = false;
-  let dragMoved = false;
-  let dragStartX = 0;
-  let dragStartScroll = 0;
-  strip.addEventListener('pointerdown', e => {
-    if (e.pointerType !== 'mouse' || e.button !== 0) return;
-    dragging = true;
-    dragMoved = false;
-    dragStartX = e.clientX;
-    dragStartScroll = strip.scrollLeft;
-  });
-  window.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    const dx = e.clientX - dragStartX;
-    if (!dragMoved && Math.abs(dx) > 4) {
-      dragMoved = true;
-      strip.classList.add('is-dragging');
-    }
-    if (dragMoved) strip.scrollLeft = dragStartScroll - dx;
-  });
-  window.addEventListener('pointerup', () => {
-    if (!dragging) return;
-    dragging = false;
-    if (!dragMoved) return;
-    strip.classList.remove('is-dragging');
-    targetIdx = nearestIndex();
-    centerOn(targetIdx, true);
-  });
-
-  strip.addEventListener('click', e => {
-    if (dragMoved) { dragMoved = false; return; }
-    const tile = (e.target as HTMLElement).closest<HTMLButtonElement>('.ver-tile');
-    if (!tile) return;
-    const i = +tile.dataset.i!;
-    targetIdx = i;
-    if (i === nearestIndex()) commit(i);
-    else centerOn(i, true);
-  });
-
-  // Follow version changes made elsewhere (e.g. quick-join picking a server's version).
-  select.addEventListener('change', () => {
-    const i = list.findIndex(v => v.id === select.value);
-    // A version the strip doesn't list (e.g. a snapshot while snapshots are hidden): still show it.
-    if (i < 0) { showStage({ id: select.value, type: /^\d+\.\d+(\.\d+)?$/.test(select.value) ? 'release' : 'snapshot' }, true); return; }
-    if (i === selectedIdx) return;
-    mark(i);
-    targetIdx = i;
-    centerOn(i, true);
-    showStage(list[i], true);
-  });
-
-  document.getElementById('ver-prev')?.addEventListener('click', () => move(-1));
-  document.getElementById('ver-next')?.addEventListener('click', () => move(1));
-
-  // Keep the chosen tile centred when the window (or the strip) resizes.
-  new ResizeObserver(() => { if (!dragging && selectedIdx >= 0) centerOn(selectedIdx, false); }).observe(strip);
 
   loadFeed(() => {
     tiles.forEach(t => { if (t.dataset.painted) paintTile(t); });
@@ -499,7 +569,8 @@ export function initVersionPicker(select: HTMLSelectElement) {
   return { render };
 }
 
-// Bedrock page header art: the latest retail release from the Bedrock feed.
+// Bedrock page header art: the latest retail release from the Bedrock feed,
+// using a wide screenshot from its patch notes when there is one.
 export async function loadBedrockArt(stageEl: HTMLElement, caption: HTMLElement) {
   try {
     const data = await (await fetch(BEDROCK_FEED)).json();
@@ -507,7 +578,10 @@ export async function loadBedrockArt(stageEl: HTMLElement, caption: HTMLElement)
       .filter(e => e.patchNoteType === 'retail' && e.image?.url)
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
     if (!entry) return;
-    stageEl.querySelectorAll('img').forEach(img => { img.src = CONTENT_HOST + entry.image.url; });
+    const hero = entry.contentPath ? await findWide([entry.contentPath]) : null;
+    const img = stageEl.querySelector('img')!;
+    img.src = hero ?? CONTENT_HOST + entry.image.url;
+    await img.decode().catch(() => {});
     stageEl.classList.add('has-art');
     // Titles are either "26.50 - Wilderness Bound" or "Minecraft: Bedrock Edition 26.60 Changelog"
     const dropName = String(entry.title).split(' - ')[1];

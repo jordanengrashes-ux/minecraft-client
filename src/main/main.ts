@@ -820,18 +820,7 @@ async function launchOnline(opts: LaunchOpts): Promise<{ ok: boolean; error?: st
     skipBrokenShaderPacks(mcRoot, opts.version, (msg) => gameWin?.webContents.send('mc-log', msg));
     if (opts.shaderpack !== undefined) applyShaderPack(mcRoot, opts.shaderpack || '');
 
-    // Auto-install cosmetics mod if bundled — into this version's own mods folder
-    try {
-      const modsDir = modsDirFor((opts.version || '').replace(/^fabric-loader-[\d.]+-/, ''));
-      const cosmeticsSrc = app.isPackaged
-        ? path.join(process.resourcesPath, 'mods', 'voxel-cosmetics.jar')
-        : path.join(__dirname, '../../resources/mods/voxel-cosmetics.jar');
-      if (fs.existsSync(cosmeticsSrc)) {
-        if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
-        fs.copyFileSync(cosmeticsSrc, path.join(modsDir, 'voxel-cosmetics.jar'));
-        gameWin?.webContents.send('mc-log', '[Launcher] Cosmetics mod installed');
-      }
-    } catch {}
+    syncCosmeticsMod(opts.version);
 
     // Auto-install bundled shader packs (only on first run — preserves user settings)
     try {
@@ -902,6 +891,7 @@ async function launchOffline(opts: LaunchOpts & { username: string }): Promise<{
     setOptionsKey(mcRoot, 'enableVsync', opts.vsync !== false ? 'true' : 'false');
     skipBrokenShaderPacks(mcRoot, opts.version, (msg) => gameWin?.webContents.send('mc-log', msg));
     if (opts.shaderpack !== undefined) applyShaderPack(mcRoot, opts.shaderpack || '');
+    syncCosmeticsMod(opts.version);
 
     // Auto-install bundled shader packs (only on first run — preserves user settings)
     try {
@@ -997,15 +987,41 @@ ipcMain.handle('mc-get-uuid', async () => {
   return null;
 });
 
+// The bundled cosmetics mod is compiled against one Minecraft version. Its
+// fabric.mod.json accepts any 1.21+ and its mixin is marked required, so on
+// a version whose player-skin code differs Fabric would load it and the game
+// would fail to start. Only put it where it was built for, and take it back
+// out of versions that older launcher builds copied it into.
+const COSMETICS_MC_VERSION = '1.21.4';
+const cosmeticsJarSrc = () => app.isPackaged
+  ? path.join(process.resourcesPath, 'mods', 'voxel-cosmetics.jar')
+  : path.join(__dirname, '../../resources/mods/voxel-cosmetics.jar');
+
+function syncCosmeticsMod(version: string) {
+  const mcVer = (version || '').replace(/^fabric-loader-[\d.]+-/, '');
+  const dest = path.join(modsDirFor(mcVer), 'voxel-cosmetics.jar');
+  try {
+    if (mcVer !== COSMETICS_MC_VERSION) {
+      if (fs.existsSync(dest)) {
+        fs.rmSync(dest, { force: true });
+        gameWin?.webContents.send('mc-log', `[Launcher] Cosmetics mod removed from ${mcVer} — it only supports ${COSMETICS_MC_VERSION} for now`);
+      }
+      return;
+    }
+    if (!fs.existsSync(cosmeticsJarSrc())) return;
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(cosmeticsJarSrc(), dest);
+    gameWin?.webContents.send('mc-log', '[Launcher] Cosmetics mod installed');
+  } catch {}
+}
+
 ipcMain.handle('cosmetics-install-mod', async (_e, opts: { mcVersion: string }) => {
   try {
-    const modsDir = modsDirFor(opts.mcVersion);
-    if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
-    const src = app.isPackaged
-      ? path.join(process.resourcesPath, 'mods', 'voxel-cosmetics.jar')
-      : path.join(__dirname, '../../resources/mods/voxel-cosmetics.jar');
-    if (!fs.existsSync(src)) return { ok: false, error: 'Mod JAR not found — build the fabric-mod project first' };
-    fs.copyFileSync(src, path.join(modsDir, 'voxel-cosmetics.jar'));
+    if (opts.mcVersion !== COSMETICS_MC_VERSION) {
+      return { ok: false, error: `The cosmetics mod supports Minecraft ${COSMETICS_MC_VERSION} for now` };
+    }
+    if (!fs.existsSync(cosmeticsJarSrc())) return { ok: false, error: 'Mod JAR not found — build the fabric-mod project first' };
+    syncCosmeticsMod(opts.mcVersion);
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: err.message };

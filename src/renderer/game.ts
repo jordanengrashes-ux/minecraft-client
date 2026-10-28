@@ -4,6 +4,7 @@ import { ref, set, push, remove, onValue, onChildAdded, query, limitToLast, serv
 import { rtdb } from './firebase';
 import { auth, signOut } from './firebase';
 import { initVersionPicker, loadBedrockArt } from './version-picker';
+import { createCapeViewer, loadCape, drawCapeFront, frameAt, type CapeViewer } from './cape-viewer';
 
 
 const mc     = (window as any).mc;
@@ -57,6 +58,9 @@ const recentLines: string[] = [];
 // ── User data from Electron ────────────────────────────────────────────────────
 function applyAccountName(name: string) {
   userName.textContent = name || 'Player';
+  // Until a Microsoft account gives us a skin to show, the avatar is the initial.
+  const avatarEl = document.getElementById('user-avatar')!;
+  if (!avatarEl.querySelector('img')) avatarEl.textContent = (name || 'P').charAt(0).toUpperCase();
   // Prefill the offline/Minecraft username with the account name the first
   // time — after that the user's own edits (saved below) take priority.
   if (!localStorage.getItem('voxel_offline_username') && name) {
@@ -108,8 +112,24 @@ function setMcAuthed(name: string) {
   mcPlayBtn.disabled = false;
   setStatus(`Authenticated as ${name}`, 'green');
   if (myUid) registerUserIndex(myUid, name);
+  showSkinAvatar(name);
+}
+
+// The sidebar profile picture: the player's skin face (with hat layer).
+// Crafatar only takes UUIDs (usernames get a 422), so this uses mc-heads,
+// which takes either — the account's UUID once known, so a recent name change
+// can't briefly show someone else's skin. Falls back to the name's initial.
+function showSkinAvatar(name: string) {
   const avatarEl = document.getElementById('user-avatar')!;
-  avatarEl.innerHTML = `<img src="https://crafatar.com/renders/body/${encodeURIComponent(name)}?scale=2&overlay" style="height:52px;width:auto;image-rendering:pixelated;" onerror="this.style.display='none'">`;
+  const initial = () => { avatarEl.textContent = (name || 'P').charAt(0).toUpperCase(); };
+  const img = new Image();
+  img.alt = '';
+  img.onerror = initial;
+  img.src = `https://mc-heads.net/avatar/${encodeURIComponent(name)}/72`;
+  avatarEl.replaceChildren(img);
+  (window as any).cosmetics?.getUuid?.()
+    .then((uuid: string | null) => { if (uuid) img.src = `https://mc-heads.net/avatar/${uuid}/72`; })
+    .catch(() => {});
 }
 
 function clearMcAuthed() {
@@ -3024,7 +3044,7 @@ function renderAccountsList() {
     row.style.cssText = 'display:flex;align-items:center;gap:12px;background:rgba(13,17,23,0.6);border:1px solid #21262d;border-radius:10px;padding:11px 16px;';
     const isActive = offlineInput?.value === acc.name;
     row.innerHTML = `
-      <img src="https://crafatar.com/avatars/${encodeURIComponent(acc.name)}?size=32&overlay" onerror="this.src=''" style="width:32px;height:32px;border-radius:4px;image-rendering:pixelated;background:#21262d;" />
+      <img src="https://mc-heads.net/avatar/${encodeURIComponent(acc.name)}/32" onerror="this.src=''" style="width:32px;height:32px;border-radius:4px;image-rendering:pixelated;background:#21262d;" />
       <div style="flex:1;">
         <div style="color:#e6edf3;font-size:13px;font-weight:600;">${acc.name}</div>
         <div style="color:#6e7681;font-size:11px;">Added ${new Date(acc.added).toLocaleDateString()}</div>
@@ -3284,15 +3304,90 @@ function initFriendsPanel() {
   if (myUid) initFriends(myUid);
 }
 
-// Cape grid renderer (called by initCosmetics and after token updates)
+// ── Cosmetics page ────────────────────────────────────────────────────────────
+// Capes are previewed on a walking 3D player (cape-viewer.ts). Clicking a card
+// tries that cape on; its button, or the one on the preview, buys or equips
+// it. An equipped cape is stored under the Minecraft UUID, which is what the
+// in-game mod looks up for every player it renders.
 let capeGridInitialized = false;
+let capeViewer: CapeViewer | null = null;
+let previewCapeId: string | null = null;
+
+async function capeAction(cape: typeof CAPE_DEFS[number]) {
+  const cosmeticsStatus = document.getElementById('cosmetics-status');
+  const capeKey = mcUuid || myUid;
+  if (!capeKey) {
+    if (cosmeticsStatus) cosmeticsStatus.textContent = 'Sign in to your launcher account first';
+    return;
+  }
+  if (!purchasedCapes.has(cape.id)) {
+    // Buy — renderCapeGrid runs again from the token listener once it lands
+    if (!myUid || tokenBalance < cape.cost) return;
+    try {
+      await update(ref(rtdb, `voxel_tokens/${myUid}`), { balance: increment(-cape.cost), [`purchased/${cape.id}`]: true });
+    } catch { /* leave the button usable */ }
+    return;
+  }
+  // Equip — store under MC UUID (Fabric mod) or Firebase UID (launcher only)
+  try {
+    await set(ref(rtdb, `voxel_capes/${capeKey}`), { cape_id: cape.id, enabled: true, username: myDisplayName() });
+    equippedCapeId = cape.id;
+    const equippedNameEl = document.getElementById('cosmetics-equipped-name');
+    const removeBtn = document.getElementById('cosmetics-remove-btn');
+    if (equippedNameEl) equippedNameEl.textContent = cape.name;
+    if (removeBtn) removeBtn.style.display = 'inline-flex';
+    if (cosmeticsStatus) cosmeticsStatus.textContent = mcUuid
+      ? 'Cape saved — visible in-game after next launch'
+      : 'Cape saved — sign in with Microsoft to see it in-game';
+    renderCapeGrid();
+  } catch { if (cosmeticsStatus) cosmeticsStatus.textContent = 'Failed to save — check connection'; }
+}
+
+// Puts a cape on the preview player and fills in its name, state and button.
+function showCapePreview(id: string | null) {
+  previewCapeId = id;
+  capeViewer?.setCape(id);
+  document.querySelectorAll<HTMLElement>('#cape-grid .cape-card').forEach(c => c.classList.toggle('previewing', c.dataset.cape === id));
+  const def = CAPE_DEFS.find(c => c.id === id);
+  const owned = !!def && purchasedCapes.has(def.id);
+  const equipped = !!def && def.id === equippedCapeId;
+  const nameEl = document.getElementById('cosmetics-preview-name');
+  const stateEl = document.getElementById('cosmetics-preview-state');
+  const actionEl = document.getElementById('cosmetics-preview-action') as HTMLButtonElement | null;
+  if (nameEl) nameEl.textContent = def?.name ?? 'No cape';
+  if (stateEl) stateEl.textContent = !def ? 'Pick a cape below to try it on'
+    : equipped ? 'Equipped'
+    : owned ? 'Yours — not equipped'
+    : `${def.cost} tokens`;
+  if (actionEl) {
+    actionEl.hidden = !def || equipped;
+    if (def && !equipped) {
+      actionEl.textContent = owned ? 'Equip' : `Buy for ${def.cost} tokens`;
+      actionEl.disabled = !owned && tokenBalance < def.cost;
+      actionEl.onclick = async () => {
+        actionEl.disabled = true;
+        try { await capeAction(def); } finally { actionEl.disabled = false; }
+      };
+    }
+  }
+}
+
+// Card swatches show each cape's outside; animated ones play while the page is open.
+let swatchTimer: ReturnType<typeof setInterval> | null = null;
+function startSwatchTicker() {
+  if (swatchTimer) return;
+  swatchTimer = setInterval(() => {
+    if (cosmeticsPanelEl.style.display !== 'flex') return;
+    document.querySelectorAll<HTMLCanvasElement>('#cape-grid canvas[data-animated]').forEach(c => {
+      loadCape(c.dataset.cape!).then(s => { if (s) drawCapeFront(c.getContext('2d')!, s, frameAt(s, performance.now())); });
+    });
+  }, 100);
+}
+
+// Cape grid renderer (called by initCosmetics and after token updates)
 function renderCapeGrid() {
   if (!capeGridInitialized) return;
   const grid = document.getElementById('cape-grid');
-  const cosmeticsStatus = document.getElementById('cosmetics-status');
-  const equippedNameEl  = document.getElementById('cosmetics-equipped-name');
-  const preview         = document.getElementById('cosmetics-preview');
-  const removeBtn       = document.getElementById('cosmetics-remove-btn') as HTMLButtonElement | null;
   if (!grid) return;
   grid.innerHTML = '';
   for (const cape of CAPE_DEFS) {
@@ -3300,6 +3395,8 @@ function renderCapeGrid() {
     const equipped = cape.id === equippedCapeId;
     const card     = document.createElement('div');
     card.className = 'cape-card' + (equipped ? ' equipped' : '');
+    card.dataset.cape = cape.id;
+    card.title = `Try on ${cape.name}`;
     const costLabel = cape.cost === 0 ? 'Free' : `${cape.cost} tokens`;
     const canAfford = tokenBalance >= cape.cost;
     let actionBtn = '';
@@ -3311,79 +3408,44 @@ function renderCapeGrid() {
       actionBtn = `<button class="cape-buy"${!canAfford ? ' disabled' : ''}>${costLabel}</button>`;
     }
     card.innerHTML = `
-      <canvas class="cape-swatch" width="80" height="64"></canvas>
+      <canvas class="cape-swatch" width="120" height="96"></canvas>
       <div class="cape-label">
         <div class="cape-name">${cape.name}</div>
         ${!owned && cape.cost > 0 ? `<div class="cape-cost">${costLabel}</div>` : ''}
         ${actionBtn}
       </div>`;
-    const canvas = card.querySelector('canvas') as HTMLCanvasElement;
-    const ctx2   = canvas.getContext('2d')!;
-    // Cloth-like gradient instead of two flat color blocks, plus a collar
-    // band and vertical fold lines so it actually reads as a cape swatch.
-    const grad = ctx2.createLinearGradient(0, 0, 0, 64);
-    grad.addColorStop(0,    cape.top);
-    grad.addColorStop(0.48, cape.top);
-    grad.addColorStop(0.52, cape.bot);
-    grad.addColorStop(1,    cape.bot);
-    ctx2.fillStyle = grad;
-    ctx2.fillRect(0, 0, 80, 64);
-    ctx2.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx2.fillRect(0, 0, 80, 6);
-    ctx2.strokeStyle = 'rgba(255,255,255,0.10)';
-    ctx2.lineWidth = 1;
-    for (let x = 14; x < 80; x += 16) {
-      ctx2.beginPath(); ctx2.moveTo(x, 6); ctx2.lineTo(x, 64); ctx2.stroke();
-    }
-    const shine = ctx2.createLinearGradient(0, 0, 80, 0);
-    shine.addColorStop(0, 'rgba(255,255,255,0.08)');
-    shine.addColorStop(0.5, 'rgba(255,255,255,0)');
-    shine.addColorStop(1, 'rgba(0,0,0,0.12)');
-    ctx2.fillStyle = shine;
-    ctx2.fillRect(0, 0, 80, 64);
+    const canvas = card.querySelector('canvas')!;
+    canvas.dataset.cape = cape.id;
+    loadCape(cape.id).then(s => {
+      if (!s) return;
+      drawCapeFront(canvas.getContext('2d')!, s, frameAt(s, performance.now()));
+      if (s.frames > 1) canvas.dataset.animated = '1';
+    });
+    card.addEventListener('click', () => showCapePreview(cape.id));
     const btn = card.querySelector('button');
-    if (!btn) { grid.appendChild(card); continue; }
-    btn.addEventListener('click', async () => {
-      const capeKey = mcUuid || myUid;
-      if (!capeKey) {
-        if (cosmeticsStatus) cosmeticsStatus.textContent = 'Sign in to your launcher account first';
-        return;
-      }
-      if (!owned) {
-        // Buy
-        if (!myUid || tokenBalance < cape.cost) return;
-        btn.disabled = true;
-        try {
-          await update(ref(rtdb, `voxel_tokens/${myUid}`), { balance: increment(-cape.cost), [`purchased/${cape.id}`]: true });
-          // renderCapeGrid called by onValue
-        } catch { btn.disabled = false; }
-        return;
-      }
-      // Equip — store under MC UUID (Fabric mod) or Firebase UID (launcher only)
-      try {
-        await set(ref(rtdb, `voxel_capes/${capeKey}`), { cape_id: cape.id, enabled: true, username: myDisplayName() });
-        equippedCapeId = cape.id;
-        if (equippedNameEl) equippedNameEl.textContent = cape.name;
-        if (preview) preview.style.background = `linear-gradient(to bottom, ${cape.top}, ${cape.bot})`;
-        if (removeBtn) removeBtn.style.display = 'inline-block';
-        if (cosmeticsStatus) cosmeticsStatus.textContent = mcUuid
-          ? 'Cape saved — visible in-game after next launch'
-          : 'Cape saved — sign in with Microsoft to see it in-game';
-        renderCapeGrid();
-      } catch { if (cosmeticsStatus) cosmeticsStatus.textContent = 'Failed to save — check connection'; }
+    btn?.addEventListener('click', async e => {
+      e.stopPropagation();
+      showCapePreview(cape.id);
+      btn.disabled = true;
+      try { await capeAction(cape); } finally { if (btn.isConnected) btn.disabled = false; }
     });
     grid.appendChild(card);
   }
+  startSwatchTicker();
+  showCapePreview(previewCapeId);
 }
 
 async function initCosmetics() {
   const cosm         = (window as any).cosmetics;
   const equippedNameEl = document.getElementById('cosmetics-equipped-name')!;
   const cosmeticsStatus = document.getElementById('cosmetics-status')!;
-  const preview      = document.getElementById('cosmetics-preview')!;
   const removeBtn    = document.getElementById('cosmetics-remove-btn') as HTMLButtonElement;
-  const installBtn   = document.getElementById('mod-install-btn') as HTMLButtonElement;
-  const installStatus = document.getElementById('mod-install-status')!;
+  const viewerEl     = document.getElementById('cape-viewer')!;
+
+  // three.js loads on first open; without WebGL the page still works.
+  createCapeViewer(viewerEl)
+    .then(v => { capeViewer = v; v.setCape(previewCapeId); })
+    .catch(() => viewerEl.classList.add('unavailable'));
 
   // Try to get Minecraft UUID (optional — falls back to Firebase UID)
   if (cosm) mcUuid = await cosm.getUuid();
@@ -3403,12 +3465,12 @@ async function initCosmetics() {
       const def = CAPE_DEFS.find(c => c.id === snap.cape_id);
       if (def) {
         equippedNameEl.textContent = def.name;
-        preview.style.background = `linear-gradient(to bottom, ${def.top}, ${def.bot})`;
-        removeBtn.style.display = 'inline-block';
+        removeBtn.style.display = 'inline-flex';
       }
     }
   }
 
+  previewCapeId = equippedCapeId ?? CAPE_DEFS[0].id;
   capeGridInitialized = true;
   renderCapeGrid();
 
@@ -3418,26 +3480,9 @@ async function initCosmetics() {
     await set(ref(rtdb, `voxel_capes/${key}/enabled`), false);
     equippedCapeId = null;
     equippedNameEl.textContent = 'None';
-    preview.style.background = '';
     removeBtn.style.display = 'none';
     cosmeticsStatus.textContent = 'Cape removed';
     renderCapeGrid();
-  });
-
-  installBtn?.addEventListener('click', async () => {
-    if (!cosm) return;
-    installBtn.disabled = true;
-    installBtn.textContent = 'Installing…';
-    const res = await cosm.installMod({ mcVersion: mcVersion.value });
-    if (res.ok) {
-      installStatus.textContent = 'Installed! Launch with Fabric Loader to see capes.';
-      installStatus.style.color = '#f5a623';
-    } else {
-      installStatus.textContent = res.error;
-      installStatus.style.color = '#e05500';
-    }
-    installBtn.disabled = false;
-    installBtn.textContent = 'Install Cosmetics Mod';
   });
 }
 

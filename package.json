@@ -17,7 +17,8 @@
     "dist:win": "npm run build && electron-builder --win   --publish never",
     "dist:mac": "npm run build && electron-builder --mac   --publish never",
     "dist:linux": "npm run build && electron-builder --linux --publish never",
-    "release": "npm run build && electron-builder --win --linux --publish always"
+    "release": "npm run build && electron-builder --win --linux --publish always",
+    "capes": "node scripts/generate-capes.mjs"
   },
   "build": {
     "appId": "com.voxelclient.app",
