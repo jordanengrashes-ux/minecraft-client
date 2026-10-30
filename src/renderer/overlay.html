@@ -2,113 +2,175 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>PvP Mods</title>
+  <title>PvP mods</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" />
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
+    /* ── Tokens (same as game.html) ─────────────────────────────────────────── */
+    /* No color-scheme: dark here: the window is transparent and a dark scheme
+       would paint an opaque canvas behind the rounded panel. */
+    :root {
+      --font: 'Archivo', system-ui, 'Segoe UI', sans-serif;
+      --mono: 'Cascadia Mono', Consolas, monospace;
+
+      --bg:          #0c0c0d;
+      --bg-sunk:     #08080a;
+      --surface:     #141416;
+      --surface-2:   #1b1b1e;
+      --surface-3:   #232327;
+      --line:        #222226;
+      --line-strong: #323238;
+
+      --text:   #f3f1ed;
+      --text-2: #b0aca5;
+      --text-3: #85817a;
+
+      --amber:      #f5a623;
+      --amber-hi:   #ffbe4d;
+      --amber-ink:  #1c1203;
+      --amber-wash: rgba(245, 166, 35, 0.12);
+      --amber-line: rgba(245, 166, 35, 0.38);
+      --danger:      #f0574b;
+      --danger-wash: rgba(240, 87, 75, 0.12);
+      --ok:          #4cc38a;
+      --ok-wash:     rgba(76, 195, 138, 0.13);
+
+      --radius:    8px;
+      --radius-sm: 6px;
+      --ease-out:  cubic-bezier(.16, 1, .3, 1);
+    }
+
+    /* ── Base ───────────────────────────────────────────────────────────────── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       width: 330px; height: 540px;
       background: transparent;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      color: #e6edf3;
+      font: 400 13px/1.45 var(--font);
+      color: var(--text);
       overflow: hidden;
+      -webkit-font-smoothing: antialiased;
       user-select: none;
       -webkit-user-select: none;
     }
+    ::selection { background: rgba(245, 166, 35, 0.35); color: #fff; }
+    :focus { outline: none; }
+    :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 4px; }
+    button { font: inherit; color: inherit; }
+
+    * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+    ::-webkit-scrollbar-thumb:hover { background-color: #45454c; }
+    ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+
+    .sprite { position: absolute; }
+    .icon { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 14px; height: 14px; border: 2px solid var(--line-strong); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+
+    /* Switch (markup built by overlay.ts: label.toggle > input + .toggle-slider) */
+    .toggle { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; cursor: pointer; }
+    .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; inset: 0; background: var(--surface-3); border: 1px solid var(--line-strong); border-radius: 20px; transition: background .18s, border-color .18s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px; background: var(--text-3); border-radius: 50%; transition: transform .2s var(--ease-out), background .18s; }
+    .toggle input:checked + .toggle-slider { background: var(--amber); border-color: var(--amber); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: var(--amber-ink); }
+    .toggle input:focus-visible + .toggle-slider { outline: 2px solid var(--amber); outline-offset: 2px; }
+    .toggle input:disabled + .toggle-slider { opacity: .5; cursor: not-allowed; }
+
+    /* ── Panel ──────────────────────────────────────────────────────────────── */
     #overlay {
       width: 100%; height: 100%;
-      background: rgba(8, 13, 22, 0.94);
-      border: 1px solid rgba(63,185,80,0.35);
+      display: flex; flex-direction: column; overflow: hidden;
+      background: rgba(12, 12, 13, 0.96);
+      border: 1px solid var(--line-strong);
       border-radius: 10px;
-      display: flex; flex-direction: column;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(63,185,80,0.08);
-      overflow: hidden;
     }
     #header {
-      background: linear-gradient(135deg, rgba(63,185,80,0.18) 0%, rgba(88,166,255,0.08) 100%);
-      border-bottom: 1px solid rgba(63,185,80,0.2);
-      padding: 10px 14px 9px;
+      flex-shrink: 0; height: 44px;
       display: flex; align-items: center; justify-content: space-between;
+      padding: 0 6px 0 14px;
+      background: var(--bg-sunk); border-bottom: 1px solid var(--line);
       -webkit-app-region: drag;
       cursor: move;
     }
-    #header-left {}
-    #header-label { font-size: 9px; color: #3a4048; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
-    #header-title { font-size: 14px; font-weight: 800; letter-spacing: 1px; color: #3fb950; margin-top: 1px; }
+    #header-left { display: flex; align-items: center; gap: 9px; }
+    .brand-mark { width: 18px; height: 18px; flex-shrink: 0; }
+    #header-title { font-size: 14px; font-weight: 700; font-stretch: 92%; letter-spacing: -.005em; }
     #close-btn {
       -webkit-app-region: no-drag;
-      background: none; border: none; color: #484f58; font-size: 16px; cursor: pointer;
-      padding: 2px 8px; border-radius: 5px; line-height: 1; transition: background 0.12s, color 0.12s;
+      width: 30px; height: 30px; display: grid; place-items: center;
+      background: none; border: 0; border-radius: var(--radius-sm); color: var(--text-3); cursor: pointer;
+      transition: background .12s, color .12s;
     }
-    #close-btn:hover { background: rgba(248,81,73,0.15); color: #f85149; }
+    #close-btn .icon { width: 14px; height: 14px; }
+    #close-btn:hover { background: var(--surface-2); color: var(--text); }
 
-    #mod-list { flex: 1; overflow-y: auto; padding: 6px 10px 6px; }
-    #mod-list::-webkit-scrollbar { width: 3px; }
-    #mod-list::-webkit-scrollbar-track { background: transparent; }
-    #mod-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+    #mod-list { flex: 1; overflow-y: auto; padding: 4px 6px 10px; }
 
-    .group-label {
-      font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
-      padding: 8px 4px 4px; margin-top: 2px; opacity: 0.85;
-    }
-    .group-label:first-child { padding-top: 4px; }
+    /* Rows (built by overlay.ts) */
+    .group-label { padding: 14px 10px 4px; font-size: 12px; font-weight: 500; color: var(--text-3); }
+    .group-label:first-child { padding-top: 8px; }
 
     .mod-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 6px 8px; border-radius: 6px; margin: 1px 0;
-      background: rgba(255,255,255,0.025);
-      border: 1px solid rgba(255,255,255,0.04);
-      transition: border-color 0.15s, background 0.15s;
+      display: flex; align-items: center; gap: 12px;
+      min-height: 46px; padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      transition: background .12s;
     }
-    .mod-row.active { background: rgba(63,185,80,0.07); border-color: rgba(63,185,80,0.22); }
-    .mod-row.error  { border-color: rgba(248,81,73,0.3); }
-
-    .mod-emoji { font-size: 13px; flex-shrink: 0; width: 18px; text-align: center; }
+    .mod-row:hover { background: var(--surface); }
     .mod-info  { flex: 1; min-width: 0; }
-    .mod-name  { font-size: 11px; font-weight: 600; color: #c9d1d9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .mod-sub   { font-size: 9px; color: #484f58; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mod-name  { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mod-status { display: flex; align-items: center; gap: 5px; margin-top: 1px; font-size: 11.5px; color: var(--text-3); }
+    .mod-sub   { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mod-status .icon { display: none; width: 12px; height: 12px; stroke-width: 2; }
+    .mod-status .spinner { display: none; width: 11px; height: 11px; border-width: 1.5px; }
 
-    .toggle { position: relative; width: 34px; height: 18px; flex-shrink: 0; cursor: pointer; }
-    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .toggle-slider {
-      position: absolute; inset: 0;
-      background: #21262d; border: 1px solid #30363d;
-      border-radius: 18px; transition: 0.18s;
-    }
-    .toggle-slider::before {
-      content: ''; position: absolute;
-      width: 12px; height: 12px; left: 2px; top: 2px;
-      background: #8b949e; border-radius: 50%; transition: 0.18s;
-    }
-    .toggle input:checked + .toggle-slider { background: rgba(63,185,80,0.25); border-color: #3fb950; }
-    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: #3fb950; }
-    .toggle input:disabled + .toggle-slider { opacity: 0.4; cursor: default; }
+    .mod-row.active .mod-status { color: var(--text-2); }
+    .mod-row.active .st-ok { display: block; }
+    .mod-row.busy .mod-status { color: var(--text-2); }
+    .mod-row.busy .spinner { display: block; }
+    .mod-row.error .mod-status { align-items: flex-start; color: #ff8a80; }
+    .mod-row.error .st-err { display: block; margin-top: 2px; }
+    .mod-row.error .mod-sub { white-space: normal; }
 
     #footer {
-      padding: 7px 14px;
-      border-top: 1px solid rgba(33,38,45,0.6);
-      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 9px 14px;
+      background: var(--bg-sunk); border-top: 1px solid var(--line);
     }
-    #footer-note { font-size: 9px; color: #3a4048; }
-    #shortcut-badge {
-      font-size: 9px; color: #484f58; font-family: monospace;
-      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 4px; padding: 1px 7px;
+    #footer-note { font-size: 11.5px; color: var(--text-3); }
+    #shortcut-badge { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    kbd {
+      display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px;
+      border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line-strong); border-bottom-width: 2px;
+      font: 500 11px/1 var(--font); color: var(--text-2);
     }
   </style>
 </head>
 <body>
+<!-- Icons: one stroke weight, 24px grid (from game.html) -->
+<svg width="0" height="0" class="sprite" aria-hidden="true">
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+</svg>
+
 <div id="overlay">
   <div id="header">
     <div id="header-left">
-      <div id="header-label">Voxel Client</div>
-      <div id="header-title">⚔ PvP Mods</div>
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 20.5 7.25 12 12 3.5 7.25Z" fill="#ffc35a"/><path d="M3.5 7.25 12 12v9.5l-8.5-4.75Z" fill="#f5a623"/><path d="M20.5 7.25 12 12v9.5l8.5-4.75Z" fill="#a8680b"/></svg>
+      <div id="header-title">PvP mods</div>
     </div>
-    <button id="close-btn">✕</button>
+    <button id="close-btn" aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
   </div>
   <div id="mod-list"></div>
   <div id="footer">
-    <span id="footer-note">Changes take effect on next launch</span>
-    <span id="shortcut-badge">Shift+F9</span>
+    <span id="footer-note">Changes apply on your next launch.</span>
+    <span id="shortcut-badge" title="Show or hide this panel"><kbd>Shift</kbd><kbd>F9</kbd></span>
   </div>
 </div>
 <script type="module" src="./overlay.ts"></script>

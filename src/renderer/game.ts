@@ -46,6 +46,55 @@ const offlineBanner   = document.getElementById('offline-banner')!;
 const vsyncToggle       = document.getElementById('vsync-toggle')      as HTMLInputElement | null;
 const shaderpackSelect  = document.getElementById('shaderpack-select') as HTMLSelectElement | null;
 
+// ── UI helpers ────────────────────────────────────────────────────────────────
+// Icons come from the SVG sprite at the top of game.html; tones are the status
+// colours defined in its CSS ([data-tone]), so nothing here hard-codes a colour.
+type Tone = 'accent' | 'ok' | 'pending' | 'error' | 'muted' | '';
+const icon = (name: string) => `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+function setTone(el: HTMLElement, tone: Tone) {
+  if (tone) el.dataset.tone = tone; else delete el.dataset.tone;
+}
+// Status mark beside a card: working (…), done (check), failed (x), downloading.
+function setMark(el: HTMLElement, state: 'busy' | 'done' | 'failed' | 'download' | '', label = '') {
+  const glyph = { busy: '…', done: icon('check'), failed: icon('x'), download: icon('download'), '': '' }[state];
+  el.innerHTML = glyph + (label ? ` ${label}` : '');
+  setTone(el, ({ busy: 'pending', done: 'accent', failed: 'error', download: 'pending', '': '' } as const)[state]);
+}
+// A one-line message in place of an empty or failed list.
+const listMsg = (text: string, tone: Tone = 'muted') => `<p class="list-msg"${tone ? ` data-tone="${tone}"` : ''}>${text}</p>`;
+
+// A notice in the bottom-right corner (#toasts). `text` is HTML — escape anything
+// that came from another player. Returns the element so callers can update it.
+interface ToastAction { label: string; primary?: boolean; onClick: () => void }
+function showToast(o: { id?: string; title: string; text?: string; icon?: string; tone?: Tone; actions?: ToastAction[]; timeout?: number }): HTMLElement {
+  if (o.id) document.getElementById(o.id)?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  if (o.id) el.id = o.id;
+  el.setAttribute('role', 'status');
+  el.innerHTML = `
+    <span class="toast-icon"${o.tone ? ` data-tone="${o.tone}"` : ''}>${icon(o.icon ?? 'info')}</span>
+    <div class="toast-body">
+      <div class="toast-title"></div>
+      ${o.text ? `<div class="toast-text">${o.text}</div>` : ''}
+      ${o.actions?.length ? '<div class="toast-actions"></div>' : ''}
+    </div>
+    <button class="toast-close btn btn-ghost btn-icon btn-sm" aria-label="Dismiss">${icon('x')}</button>`;
+  el.querySelector('.toast-title')!.textContent = o.title;
+  const actions = el.querySelector('.toast-actions');
+  for (const a of o.actions ?? []) {
+    const b = document.createElement('button');
+    b.className = 'btn btn-sm' + (a.primary ? ' btn-primary' : '');
+    b.textContent = a.label;
+    b.addEventListener('click', () => { el.remove(); a.onClick(); });
+    actions!.appendChild(b);
+  }
+  el.querySelector('.toast-close')!.addEventListener('click', () => el.remove());
+  document.getElementById('toasts')!.appendChild(el);
+  if (o.timeout) setTimeout(() => el.remove(), o.timeout);
+  return el;
+}
+
 declare const __APP_VERSION__: string;
 const appVersionEl = document.getElementById('app-version');
 if (appVersionEl) appVersionEl.textContent = `v${__APP_VERSION__}`;
@@ -197,7 +246,7 @@ function populateVersions() {
     opt.textContent = v.id === latestRelease
       ? `${v.id} — Latest Release`
       : v.type === 'snapshot'
-        ? `${v.id} ✦ Snapshot`
+        ? `${v.id} (snapshot)`
         : v.id;
     mcVersion.appendChild(opt);
   }
@@ -276,9 +325,9 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && logVisib
 function copyToClipboard(text: string, btn: HTMLButtonElement) {
   (window as any).electron?.copyText(text);
   const orig = btn.textContent;
-  btn.textContent = '✓ Copied!';
-  btn.style.color = '#f5a623';
-  setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+  btn.innerHTML = `${icon('check')}Copied`;
+  setTone(btn, 'accent');
+  setTimeout(() => { btn.textContent = orig; setTone(btn, ''); }, 1500);
 }
 
 logCopy?.addEventListener('click', () => copyToClipboard(recentLines.join('\n'), logCopy));
@@ -367,11 +416,9 @@ function updateModsBadge() {
   modsBadge.style.display    = 'inline-block';
   const loaderOn = modLoaderSelect.value !== 'none';
   modsBadge.textContent     = loaderOn
-    ? `✓ ${count} mod${count !== 1 ? 's' : ''} ready`
-    : `${count} mod${count !== 1 ? 's' : ''} installed — enable a mod loader above`;
-  modsBadge.style.color      = loaderOn ? '#f5a623'                  : '#f6c356';
-  modsBadge.style.background = loaderOn ? 'rgba(245,166,35,0.10)'     : 'rgba(246,195,86,0.10)';
-  modsBadge.style.borderColor= loaderOn ? 'rgba(245,166,35,0.30)'     : 'rgba(246,195,86,0.35)';
+    ? `${count} mod${count !== 1 ? 's' : ''} ready`
+    : `${count} mod${count !== 1 ? 's' : ''} installed — pick a loader to use them`;
+  setTone(modsBadge, loaderOn ? 'accent' : 'pending');
 
   const currentVerMods = modsForCurrentVersion();
   const currentPackFiles = packFilesForCurrentVersion();
@@ -578,28 +625,28 @@ mcPlayBtn.addEventListener('click', async () => {
   const loader = modLoaderSelect.value;
   if (loader === 'fabric') {
     fabricStatus.textContent = 'Installing Fabric…';
-    fabricStatus.style.color = '#f5a623';
+    setTone(fabricStatus, 'accent');
     const fab = await mc.installFabric({ mcVersion: version });
     if (fab.ok) {
       version = fab.fabricVersion; // launch with fabric version id
       fabricStatus.textContent = `Fabric ${fab.loaderVersion}`;
-      fabricStatus.style.color = '#f5a623';
+      setTone(fabricStatus, 'accent');
     } else {
       fabricStatus.textContent = `Fabric install failed (${fab.error}) — launching vanilla`;
-      fabricStatus.style.color = '#f6c356';
+      setTone(fabricStatus, 'pending');
     }
   } else if (loader === 'forge' || loader === 'neoforge') {
     const label = loader === 'forge' ? 'Forge' : 'NeoForge';
     fabricStatus.textContent = `Installing ${label}…`;
-    fabricStatus.style.color = '#f5a623';
+    setTone(fabricStatus, 'accent');
     const res = loader === 'forge' ? await mc.installForge({ mcVersion: version }) : await mc.installNeoForge({ mcVersion: version });
     if (res.ok) {
       forgePath = res.installerPath;
       fabricStatus.textContent = `${label} ${res.loaderVersion}`;
-      fabricStatus.style.color = '#f5a623';
+      setTone(fabricStatus, 'accent');
     } else {
       fabricStatus.textContent = `${label} install failed (${res.error}) — launching vanilla`;
-      fabricStatus.style.color = '#f6c356';
+      setTone(fabricStatus, 'pending');
     }
   }
 
@@ -867,7 +914,7 @@ async function searchBedrockMods(query: string) {
     const data = await res.json() as { hits: ModrinthHit[] };
     bedrockModsLoading.style.display = 'none';
     if (!data.hits.length) {
-      bedrockModsList.innerHTML = '<p style="color:#484f58;padding:20px;text-align:center">No results found</p>';
+      bedrockModsList.innerHTML = listMsg('No add-ons match that search.');
       return;
     }
     const frag = document.createDocumentFragment();
@@ -882,7 +929,7 @@ async function searchBedrockMods(query: string) {
       const tagHtml = h.categories.slice(0, 3).map(cat => {
         const cls = ['shaders'].includes(cat) ? 'visual' : ['optimization','performance'].includes(cat) ? 'perf' : 'util';
         return `<span class="mod-tag ${cls}">${cat}</span>`;
-      }).join('') + `<span class="mod-tag" style="margin-left:auto">⬇ ${fmtDownloads(h.downloads)}</span>`;
+      }).join('') + `<span class="mod-tag dl push">${icon('download')}${fmtDownloads(h.downloads)}</span>`;
       card.innerHTML = `${iconHtml}
         <div class="mod-info">
           <div class="mod-name">${h.title}</div>
@@ -899,13 +946,13 @@ async function searchBedrockMods(query: string) {
 
       const input    = card.querySelector('input') as HTMLInputElement;
       const statusEl = card.querySelector('.mod-version') as HTMLElement;
-      if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+      if (isOn) { setMark(statusEl, 'done'); }
 
       input.addEventListener('change', async e => {
         const checked = (e.target as HTMLInputElement).checked;
         input.disabled = true;
         if (checked) {
-          statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
+          setMark(statusEl, 'busy');
           try {
             const vRes = await fetch(`https://api.modrinth.com/v2/project/${h.project_id}/version?limit=5`);
             const versions: any[] = await vRes.json();
@@ -915,11 +962,11 @@ async function searchBedrockMods(query: string) {
             const install = await (window as any).mc.installBedrockPack({ url: file.url, name: h.title });
             if (!install.ok) throw new Error(install.error);
             card.className = 'mod-card enabled';
-            statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+            setMark(statusEl, 'done');
             await refreshBedrockInstalled();
           } catch (err: any) {
             input.checked = false; card.className = 'mod-card';
-            statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+            setMark(statusEl, 'failed');
             statusEl.title = err.message.includes('manifest.json')
               ? 'Not a Bedrock-format pack (Modrinth mostly hosts Java Edition content)'
               : err.message;
@@ -928,7 +975,7 @@ async function searchBedrockMods(query: string) {
           const pack = bedrockInstalledPacks.find(p => p.name === h.title);
           if (pack) await (window as any).mc.removeBedrockPack({ packId: pack.packId, packType: pack.packType });
           card.className = 'mod-card';
-          statusEl.textContent = '';
+          setMark(statusEl, '');
           await refreshBedrockInstalled();
         }
         input.disabled = false;
@@ -939,7 +986,7 @@ async function searchBedrockMods(query: string) {
     bedrockModsList.appendChild(frag);
   } catch {
     bedrockModsLoading.style.display = 'none';
-    bedrockModsList.innerHTML = '<p style="color:#e05500;padding:20px;text-align:center">Could not reach Modrinth — check your connection</p>';
+    bedrockModsList.innerHTML = listMsg('Could not reach Modrinth. Check your connection and try again.', 'error');
   }
 }
 
@@ -955,7 +1002,7 @@ document.getElementById('repair-btn')?.addEventListener('click', async () => {
   btn.disabled = true; btn.textContent = 'Repairing…';
   const res = await mc.repair();
   if (res.ok) {
-    btn.textContent = '✓ Done — relaunch to redownload';
+    btn.innerHTML = `${icon('check')}Done — launch again to re-download`;
     setStatus('Game files cleared — press Play to redownload', 'yellow');
   } else {
     btn.textContent = 'Repair Game';
@@ -980,7 +1027,7 @@ document.getElementById('repair-btn')?.addEventListener('click', async () => {
       await ai.setKey(key);
       keyInput.value = '';
       keyInput.placeholder = '••••' + key.slice(-4);
-      if (keyStatus) { keyStatus.textContent = '✓ Saved'; keyStatus.style.color = '#f5a623'; }
+      if (keyStatus) { keyStatus.textContent = 'Saved'; setTone(keyStatus, 'accent'); }
     });
   }
 }
@@ -1001,7 +1048,7 @@ document.getElementById('mc-reauth-btn')?.addEventListener('click', async () => 
 // ── In-game background (resource pack) ───────────────────────────────────────
 async function installGameBg(statusEl: HTMLElement) {
   statusEl.textContent = 'Generating panorama…';
-  statusEl.style.color = '#f6c356';
+  setTone(statusEl, 'pending');
 
   const glowColors = [
     [68, 10, 130], [10, 40, 100], [10, 50, 32],
@@ -1028,11 +1075,11 @@ async function installGameBg(statusEl: HTMLElement) {
   const res = await mc.installBg({ images });
   if (res.ok) {
     statusEl.textContent = 'Installed — enable "VoxelClient" in Options › Resource Packs';
-    statusEl.style.color = '#f5a623';
+    setTone(statusEl, 'accent');
     localStorage.setItem('bg_installed', '1');
   } else {
     statusEl.textContent = res.error;
-    statusEl.style.color = '#e05500';
+    setTone(statusEl, 'error');
   }
 }
 
@@ -1046,7 +1093,7 @@ function initTitleScreenBg() {
   if (localStorage.getItem('bg_installed') === '1') {
     toggle.checked = true;
     status.textContent = 'Installed — enable "VoxelClient" in Options › Resource Packs';
-    status.style.color = '#f5a623';
+    setTone(status, 'accent');
   }
 
   toggle.addEventListener('change', async () => {
@@ -1058,7 +1105,7 @@ function initTitleScreenBg() {
     } else {
       localStorage.removeItem('bg_installed');
       status.textContent = 'Background pack disabled';
-      status.style.color = '#484f58';
+      setTone(status, 'muted');
     }
   });
 }
@@ -1307,8 +1354,8 @@ let modpackProgressEl: HTMLElement | null = null;
 mc?.onModpackProgress?.((e: any) => {
   if (!modpackProgressEl) return;
   if (e.phase === 'fetching')    modpackProgressEl.textContent = '…';
-  else if (e.phase === 'downloading') modpackProgressEl.textContent = `⬇ ${e.pct}%`;
-  else if (e.phase === 'mods')        modpackProgressEl.textContent = `⬇ ${e.current}/${e.total}`;
+  else if (e.phase === 'downloading') setMark(modpackProgressEl, 'download', `${e.pct}%`);
+  else if (e.phase === 'mods')        setMark(modpackProgressEl, 'download', `${e.current}/${e.total}`);
 });
 
 const modsTypeSwitch = document.getElementById('mods-type-switch') as HTMLInputElement;
@@ -1372,7 +1419,7 @@ async function flushModBuildVerQueue() {
       const versions: any[] = await res.json();
       if (Array.isArray(versions) && versions.length && versions[0].version_number) {
         el.textContent = versions[0].version_number;
-        el.style.color = '#f5a623';
+        setTone(el, 'accent');
       } else {
         el.textContent = '';
       }
@@ -1393,7 +1440,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
     const cls = ['optimization','performance'].includes(cat) ? 'perf'
               : ['shader','decoration','magic'].includes(cat) ? 'visual' : 'util';
     return `<span class="mod-tag ${cls}">${cat}</span>`;
-  }).join('') + `<span class="mod-tag mod-build-ver" style="margin-left:auto;color:#666666;">…</span><span class="mod-tag">⬇ ${fmtDownloads(mod.downloads)}</span>`;
+  }).join('') + `<span class="mod-tag mod-build-ver push">…</span><span class="mod-tag dl">${icon('download')}${fmtDownloads(mod.downloads)}</span>`;
 
   card.innerHTML = `
     ${iconHtml}
@@ -1419,8 +1466,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
     input.disabled = true;
 
     if (checked) {
-      statusEl.textContent = '…';
-      statusEl.style.color = '#f6c356';
+      setMark(statusEl, 'busy');
       try {
         const ver = mcVersion.value || '26.1.2';
         const params = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '20' });
@@ -1432,7 +1478,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
         const chosenVer  = byVerNum2 ?? byExact2 ?? searchData[0];
         const file = chosenVer.files.find((f: any) => f.primary) ?? chosenVer.files[0];
         if (!file) throw new Error('No download file found');
-        statusEl.textContent = '⬇';
+        setMark(statusEl, 'download');
         const res = await mc.installMod({ url: file.url, filename: file.filename, mcVersion: ver });
         if (!res.ok) throw new Error(res.error);
         // Install required dependencies declared in the Modrinth version metadata
@@ -1441,7 +1487,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
         for (const dep of reqDeps) {
           if (installedNow[dep.project_id]) continue;
           try {
-            statusEl.textContent = '⬇ dep';
+            setMark(statusEl, 'download', 'dependency');
             const dp = new URLSearchParams({ game_versions: `["${ver}"]`, loaders: '["fabric"]', limit: '5' });
             const dvRes = await fetch(`https://api.modrinth.com/v2/project/${dep.project_id}/version?${dp}`);
             const dvData: any[] = await dvRes.json();
@@ -1456,13 +1502,11 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
         saveInstalledMods(installedNow);
         enabledMods.add(mod.project_id);
         card.className = 'mod-card enabled';
-        statusEl.textContent = '✓';
-        statusEl.style.color = '#f5a623';
+        setMark(statusEl, 'done');
       } catch (err: any) {
         input.checked = false;
         card.className = 'mod-card';
-        statusEl.textContent = '✗';
-        statusEl.style.color = '#e05500';
+        setMark(statusEl, 'failed');
         statusEl.title = err.message;
       }
     } else {
@@ -1478,7 +1522,7 @@ function buildModCard(mod: ModrinthHit): HTMLElement {
     input.disabled = false;
   });
 
-  if (on) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+  if (on) { setMark(statusEl, 'done'); }
   queueModBuildVersion(mod.project_id, buildVerEl);
   return card;
 }
@@ -1506,7 +1550,7 @@ async function initAvengersFeaturedCard() {
     slot.innerHTML = '';
     slot.appendChild(buildModCard(hit));
   } catch {
-    slot.innerHTML = '<div style="color:#666;font-size:12px;padding:4px 2px;">Could not load featured mod</div>';
+    slot.innerHTML = '';
   }
 }
 
@@ -1520,7 +1564,7 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
     : `<div class="mod-icon"></div>`;
   const tagHtml = mod.categories.slice(0, 3).map(cat =>
     `<span class="mod-tag util">${cat}</span>`
-  ).join('') + `<span class="mod-tag" style="margin-left:auto">⬇ ${fmtDownloads(mod.downloads)}</span>`;
+  ).join('') + `<span class="mod-tag dl push">${icon('download')}${fmtDownloads(mod.downloads)}</span>`;
   card.innerHTML = `
     ${iconHtml}
     <div class="mod-info">
@@ -1528,9 +1572,9 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
       <div class="mod-desc">${mod.description}</div>
       <div class="mod-tags">${tagHtml}</div>
     </div>
-    <div class="mod-right" style="gap:6px;">
-      <div class="mod-version" style="color:${isInstalled ? '#f5a623' : 'transparent'}">${isInstalled ? '✓' : ''}</div>
-      ${isInstalled ? `<button class="modpack-update-btn" style="padding:4px 10px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:11px;cursor:pointer;white-space:nowrap;">↻ Update</button>` : ''}
+    <div class="mod-right">
+      <div class="mod-version"${isInstalled ? ' data-tone="accent"' : ''}>${isInstalled ? icon('check') : ''}</div>
+      ${isInstalled ? `<button class="modpack-update-btn btn btn-sm">${icon('refresh')}Update</button>` : ''}
       <label class="toggle">
         <input type="checkbox" ${isInstalled ? 'checked' : ''} />
         <span class="toggle-slider"></span>
@@ -1543,9 +1587,8 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
 
   updateBtn?.addEventListener('click', async () => {
     updateBtn.disabled = true;
-    updateBtn.textContent = '↻ …';
-    statusEl.textContent = '…';
-    statusEl.style.color = '#f6c356';
+    updateBtn.innerHTML = `${icon('refresh')}Updating…`;
+    setMark(statusEl, 'busy');
     modpackProgressEl = statusEl;
     try {
       // Clean up the previous version's files first — installModpack only
@@ -1562,10 +1605,9 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
       const updated = loadInstalledModpacks();
       updated[mod.project_id] = { projectId: mod.project_id, title: mod.title, mcVersion: result.mcVersion, filenames: result.filenames, versionId: result.versionId };
       saveInstalledModpacks(updated);
-      statusEl.textContent = '✓';
-      statusEl.style.color = '#f5a623';
-      updateBtn.textContent = '✓ Done';
-      setTimeout(() => { updateBtn.textContent = '↻ Update'; updateBtn.disabled = false; }, 2000);
+      setMark(statusEl, 'done');
+      updateBtn.innerHTML = `${icon('check')}Updated`;
+      setTimeout(() => { updateBtn.innerHTML = `${icon('refresh')}Update`; updateBtn.disabled = false; }, 2000);
     } catch (err: any) {
       // The old pack's files were already removed above before the reinstall
       // attempt — if the reinstall itself failed, the stale record must be
@@ -1576,9 +1618,8 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
       saveInstalledModpacks(updated);
       card.className = 'mod-card';
       input.checked = false;
-      statusEl.textContent = '✗';
-      statusEl.style.color = '#e05500';
-      updateBtn.textContent = '✗ Failed';
+      setMark(statusEl, 'failed');
+      updateBtn.innerHTML = `${icon('x')}Failed`;
       updateBtn.disabled = false;
     } finally {
       modpackProgressEl = null;
@@ -1589,8 +1630,7 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
     const checked = (e.target as HTMLInputElement).checked;
     input.disabled = true;
     if (checked) {
-      statusEl.style.color = '#f6c356';
-      statusEl.textContent = '…';
+      setMark(statusEl, 'busy');
       modpackProgressEl = statusEl;
       try {
         // Remove any currently installed modpacks before installing this one
@@ -1608,13 +1648,11 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
         updated[mod.project_id] = { projectId: mod.project_id, title: mod.title, mcVersion: result.mcVersion, filenames: result.filenames, versionId: result.versionId };
         saveInstalledModpacks(updated);
         card.className = 'mod-card enabled';
-        statusEl.textContent = '✓';
-        statusEl.style.color = '#f5a623';
+        setMark(statusEl, 'done');
       } catch (err: any) {
         input.checked = false;
         card.className = 'mod-card';
-        statusEl.textContent = '✗';
-        statusEl.style.color = '#e05500';
+        setMark(statusEl, 'failed');
         statusEl.title = err.message;
       } finally {
         modpackProgressEl = null;
@@ -1631,7 +1669,7 @@ function buildModpackCard(mod: ModrinthHit): HTMLElement {
       }
       card.className = 'mod-card';
       statusEl.textContent = '';
-      statusEl.style.color = 'transparent';
+      setTone(statusEl, '');
     }
     input.disabled = false;
   });
@@ -1657,7 +1695,7 @@ async function loadRecommendedMods() {
     modsList.appendChild(frag);
   } catch {
     modsLoading.style.display = 'none';
-    modsList.innerHTML = '<p style="color:#e05500;padding:20px;text-align:center">Could not reach Modrinth — check your connection</p>';
+    modsList.innerHTML = listMsg('Could not reach Modrinth. Check your connection and try again.', 'error');
   }
 }
 
@@ -1677,7 +1715,7 @@ async function searchModrinth(query: string) {
     const data = await res.json() as { hits: ModrinthHit[] };
     modsLoading.style.display = 'none';
     if (!data.hits.length) {
-      modsList.innerHTML = `<p style="color:#484f58;padding:20px;text-align:center">No ${modsTabType === 'modpack' ? 'modpacks' : 'mods'} found for Minecraft ${ver}</p>`;
+      modsList.innerHTML = listMsg(`No ${modsTabType === 'modpack' ? 'modpacks' : 'mods'} found for Minecraft ${ver}.`);
       return;
     }
     const frag = document.createDocumentFragment();
@@ -1689,7 +1727,7 @@ async function searchModrinth(query: string) {
     modsList.appendChild(frag);
   } catch {
     modsLoading.style.display = 'none';
-    modsList.innerHTML = '<p style="color:#e05500;padding:20px;text-align:center">Could not reach Modrinth — check your connection</p>';
+    modsList.innerHTML = listMsg('Could not reach Modrinth. Check your connection and try again.', 'error');
   }
 }
 
@@ -1700,88 +1738,83 @@ modsSearch.addEventListener('input', () => {
 
 // ── PvP Mods panel ────────────────────────────────────────────────────────────
 interface PvpModDef {
-  slug: string; emoji: string; name: string; desc: string;
+  slug: string; name: string; desc: string;
   group: 'HUD' | 'Visual' | 'Utility' | 'Performance';
   deps?: string[];
   conflicts?: string[];
 }
 
-const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
+const PVP_MOD_GROUPS: { label: string; mods: PvpModDef[] }[] = [
   {
     label: 'Required',
-    color: '#f6c356',
     mods: [
-      { slug: 'fabric-api',            emoji: '🔧', name: 'Fabric API',           desc: 'Required dependency — all Fabric mods need this', group: 'Utility' },
+      { slug: 'fabric-api',            name: 'Fabric API',           desc: 'Required dependency — all Fabric mods need this', group: 'Utility' },
     ],
   },
   {
     label: 'HUD & Info',
-    color: '#f5a623',
     mods: [
-      { slug: 'keystrokes',            emoji: '⌨️', name: 'Keystrokes',           desc: 'Live WASD + CPS overlay (Feather Keystrokes)', group: 'HUD' },
-      { slug: 'appleskin',             emoji: '🍎', name: 'AppleSkin',            desc: 'Saturation & exhaustion on the hunger bar', group: 'HUD' },
-      { slug: 'armor-status',          emoji: '🛡️', name: 'Armor Status',         desc: 'Armor & held item durability HUD', group: 'HUD' },
-      { slug: 'status-effect-bars',    emoji: '🧪', name: 'Status Effect Bars',   desc: 'Duration bars under every active potion effect', group: 'HUD' },
-      { slug: 'coordinates-display',   emoji: '📍', name: 'Coordinates',          desc: 'Clean XYZ + direction overlay — no F3 needed', group: 'HUD' },
-      { slug: 'xaeros-minimap',        emoji: '🗺️', name: "Xaero's Minimap",     desc: 'Minimap with player dots & waypoints', group: 'HUD' },
-      { slug: 'xaeros-world-map',      emoji: '🌍', name: "Xaero's World Map",    desc: 'Full world map — works with Xaero\'s Minimap', group: 'HUD', deps: ['xaeros-minimap'] },
-      { slug: 'betterf3',              emoji: '📊', name: 'BetterF3',             desc: 'Color-coded F3 with FPS, ping & TPS (Feather HUD)', group: 'HUD' },
-      { slug: 'zoomify',               emoji: '🔍', name: 'Zoomify',              desc: 'OptiFine-style smooth zoom key (Feather Zoom)', group: 'HUD' },
-      { slug: 'ping-wheel',            emoji: '📡', name: 'Ping Wheel',           desc: 'Quick radial ping menu to mark locations (like Apex)', group: 'HUD' },
-      { slug: 'fps-display',           emoji: '🖥️', name: 'FPS Display',          desc: 'Simple corner FPS counter overlay', group: 'HUD' },
-      { slug: 'held-item-info',        emoji: 'ℹ️', name: 'Held Item Info',       desc: 'Shows name & enchantments of held item', group: 'HUD' },
+      { slug: 'keystrokes',            name: 'Keystrokes',           desc: 'Live WASD + CPS overlay (Feather Keystrokes)', group: 'HUD' },
+      { slug: 'appleskin',             name: 'AppleSkin',            desc: 'Saturation & exhaustion on the hunger bar', group: 'HUD' },
+      { slug: 'armor-status',          name: 'Armor Status',         desc: 'Armor & held item durability HUD', group: 'HUD' },
+      { slug: 'status-effect-bars',    name: 'Status Effect Bars',   desc: 'Duration bars under every active potion effect', group: 'HUD' },
+      { slug: 'coordinates-display',   name: 'Coordinates',          desc: 'Clean XYZ + direction overlay — no F3 needed', group: 'HUD' },
+      { slug: 'xaeros-minimap',        name: "Xaero's Minimap",     desc: 'Minimap with player dots & waypoints', group: 'HUD' },
+      { slug: 'xaeros-world-map',      name: "Xaero's World Map",    desc: 'Full world map — works with Xaero\'s Minimap', group: 'HUD', deps: ['xaeros-minimap'] },
+      { slug: 'betterf3',              name: 'BetterF3',             desc: 'Color-coded F3 with FPS, ping & TPS (Feather HUD)', group: 'HUD' },
+      { slug: 'zoomify',               name: 'Zoomify',              desc: 'OptiFine-style smooth zoom key (Feather Zoom)', group: 'HUD' },
+      { slug: 'ping-wheel',            name: 'Ping Wheel',           desc: 'Quick radial ping menu to mark locations (like Apex)', group: 'HUD' },
+      { slug: 'fps-display',           name: 'FPS Display',          desc: 'Simple corner FPS counter overlay', group: 'HUD' },
+      { slug: 'held-item-info',        name: 'Held Item Info',       desc: 'Shows name & enchantments of held item', group: 'HUD' },
     ],
   },
   {
     label: 'Visual',
-    color: '#f5a623',
     mods: [
-      { slug: 'custom-crosshair-mod',  emoji: '🎯', name: 'Custom Crosshair',    desc: 'Crosshair style, size, color & gap (Feather Crosshair)', group: 'Visual' },
-      { slug: 'natural-motion-blur',   emoji: '💨', name: 'Motion Blur',         desc: 'Smooth camera motion blur (Feather Motion Blur)', group: 'Visual' },
-      { slug: 'not-enough-animations', emoji: '🏃', name: 'Not Enough Animations',desc: 'Restores eating, bow & item animations', group: 'Visual' },
-      { slug: 'damage-tilt',           emoji: '💥', name: 'Damage Tilt',         desc: 'Screen tilts when you take damage (Feather)', group: 'Visual' },
-      { slug: '3dskinlayers',          emoji: '🧍', name: '3D Skin Layers',      desc: 'Renders skin as 3D geometry like Feather Client', group: 'Visual' },
-      { slug: 'blur',                  emoji: '🌫️', name: 'Blur',               desc: 'Blurs the background when a menu is open', group: 'Visual' },
-      { slug: 'cit-resewn',            emoji: '🎨', name: 'CIT Resewn',          desc: 'Custom Item Textures — rename items to change their look', group: 'Visual' },
-      { slug: 'model-fix',             emoji: '🔲', name: 'Model Fix',           desc: 'Fixes gaps in held items & armor (like OptiFine)', group: 'Visual' },
-      { slug: 'entity-model-features', emoji: '🐾', name: 'Entity Model Features',desc: 'Custom entity models from resource packs (EMF)', group: 'Visual', deps: ['entity-texture-features'] },
-      { slug: 'entity-texture-features',emoji: '🖼️', name: 'Entity Texture Features',desc: 'Random & custom entity textures (ETF)', group: 'Visual' },
-      { slug: 'continuity',            emoji: '🧱', name: 'Continuity',          desc: 'Connected textures like OptiFine (glass, bookshelves)', group: 'Visual', deps: ['indium'] },
-      { slug: 'lambdynamiclights',     emoji: '💡', name: 'Dynamic Lights',      desc: 'Held torches & glowstone light up surroundings', group: 'Visual' },
+      { slug: 'custom-crosshair-mod',  name: 'Custom Crosshair',    desc: 'Crosshair style, size, color & gap (Feather Crosshair)', group: 'Visual' },
+      { slug: 'natural-motion-blur',   name: 'Motion Blur',         desc: 'Smooth camera motion blur (Feather Motion Blur)', group: 'Visual' },
+      { slug: 'not-enough-animations', name: 'Not Enough Animations',desc: 'Restores eating, bow & item animations', group: 'Visual' },
+      { slug: 'damage-tilt',           name: 'Damage Tilt',         desc: 'Screen tilts when you take damage (Feather)', group: 'Visual' },
+      { slug: '3dskinlayers',          name: '3D Skin Layers',      desc: 'Renders skin as 3D geometry like Feather Client', group: 'Visual' },
+      { slug: 'blur-plus',             name: 'Blur+',              desc: 'Blurs the background when a menu is open', group: 'Visual' },
+      { slug: 'cit-resewn',            name: 'CIT Resewn',          desc: 'Custom Item Textures — rename items to change their look', group: 'Visual' },
+      { slug: 'modelfix',              name: 'Model Gap Fix',         desc: 'Fixes gaps in held items & armor (like OptiFine)', group: 'Visual' },
+      { slug: 'entity-model-features', name: 'Entity Model Features',desc: 'Custom entity models from resource packs (EMF)', group: 'Visual', deps: ['entitytexturefeatures'] },
+      { slug: 'entitytexturefeatures', name: 'Entity Texture Features',desc: 'Random & custom entity textures (ETF)', group: 'Visual' },
+      { slug: 'continuity',            name: 'Continuity',          desc: 'Connected textures like OptiFine (glass, bookshelves)', group: 'Visual', deps: ['indium'] },
+      { slug: 'lambdynamiclights',     name: 'Dynamic Lights',      desc: 'Held torches & glowstone light up surroundings', group: 'Visual' },
     ],
   },
   {
     label: 'Utility',
-    color: '#f5a623',
     mods: [
-      { slug: 'sprinthop',             emoji: '🏃', name: 'Toggle Sprint',       desc: 'Toggle sprint & sneak — no need to hold Ctrl', group: 'Utility' },
-      { slug: 'no-chat-reports',       emoji: '🔇', name: 'No Chat Reports',     desc: 'Removes chat signing — blocks Microsoft reports', group: 'Utility' },
-      { slug: 'item-highlighter',      emoji: '🔆', name: 'Item Highlighter',    desc: 'Highlights newly picked up items in hotbar', group: 'Utility' },
-      { slug: 'shulkerboxtooltip',     emoji: '📦', name: 'Shulker Tooltips',    desc: 'Preview shulker box contents on hover', group: 'Utility' },
-      { slug: 'perspectivemod',        emoji: '📷', name: 'Perspective Mod',     desc: 'Feather Freelook — look around without turning body', group: 'Utility' },
-      { slug: 'mousewheelie',          emoji: '🖱️', name: 'Mouse Wheelie',       desc: 'Scroll to move items between inventory & chest', group: 'Utility' },
-      { slug: 'inventory-profiles-next',emoji: '🗂️', name: 'Inventory Profiles', desc: 'Auto-sort inventory, replace broken tools automatically', group: 'Utility' },
-      { slug: 'chat-heads',            emoji: '💬', name: 'Chat Heads',          desc: 'Shows player skin head next to their chat message', group: 'Utility' },
-      { slug: 'tooltipfix',            emoji: '🔤', name: 'ToolTip Fix',         desc: 'Stops tooltips from going off-screen', group: 'Utility' },
-      { slug: 'reeses-sodium-options', emoji: '⚙️', name: 'Reese\'s Sodium Options',desc: 'Better settings screen for Sodium video options', group: 'Utility', deps: ['sodium'] },
-      { slug: 'sodium-extra',          emoji: '➕', name: 'Sodium Extra',        desc: 'Extra options for Sodium (animations, particles)', group: 'Utility', deps: ['sodium'] },
+      { slug: 'toggle-sprint',           name: 'Toggle Sprint',       desc: 'Toggle sprint & sneak — no need to hold Ctrl', group: 'Utility' },
+      { slug: 'no-chat-reports',       name: 'No Chat Reports',     desc: 'Removes chat signing — blocks Microsoft reports', group: 'Utility' },
+      { slug: 'item-highlighter',      name: 'Item Highlighter',    desc: 'Highlights newly picked up items in hotbar', group: 'Utility' },
+      { slug: 'shulkerboxtooltip',     name: 'Shulker Tooltips',    desc: 'Preview shulker box contents on hover', group: 'Utility' },
+      { slug: 'perspectivemod',        name: 'Perspective Mod',     desc: 'Feather Freelook — look around without turning body', group: 'Utility' },
+      { slug: 'mouse-wheelie',         name: 'Mouse Wheelie',       desc: 'Scroll to move items between inventory & chest', group: 'Utility' },
+      { slug: 'inventory-profiles-next',name: 'Inventory Profiles', desc: 'Auto-sort inventory, replace broken tools automatically', group: 'Utility' },
+      { slug: 'chat-heads',            name: 'Chat Heads',          desc: 'Shows player skin head next to their chat message', group: 'Utility' },
+      { slug: 'tooltipfix',            name: 'ToolTip Fix',         desc: 'Stops tooltips from going off-screen', group: 'Utility' },
+      { slug: 'reeses-sodium-options', name: 'Reese\'s Sodium Options',desc: 'Better settings screen for Sodium video options', group: 'Utility', deps: ['sodium'] },
+      { slug: 'sodium-extra',          name: 'Sodium Extra',        desc: 'Extra options for Sodium (animations, particles)', group: 'Utility', deps: ['sodium'] },
     ],
   },
   {
     label: 'Performance',
-    color: '#f97316',
     mods: [
-      { slug: 'sodium',                emoji: '⚡', name: 'Sodium',              desc: 'Major FPS boost — better rendering engine', group: 'Performance' },
-      { slug: 'lithium',               emoji: '🪨', name: 'Lithium',             desc: 'Game logic & tick optimizations', group: 'Performance' },
-      { slug: 'iris',                  emoji: '🌈', name: 'Iris Shaders',        desc: 'Shader pack support (requires Sodium)', group: 'Performance', deps: ['sodium'] },
-      { slug: 'entityculling',         emoji: '👁️', name: 'Entity Culling',      desc: 'Skip rendering entities behind walls', group: 'Performance' },
-      { slug: 'memoryleakfix',         emoji: '🧠', name: 'Memory Leak Fix',     desc: 'Fixes Minecraft memory leaks — fewer crashes', group: 'Performance' },
-      { slug: 'ferrite-core',          emoji: '💾', name: 'Ferrite Core',        desc: 'Reduces RAM usage of block states (Feather perf)', group: 'Performance' },
-      { slug: 'indium',                emoji: '🔩', name: 'Indium',              desc: 'Sodium addon — enables Fabric Rendering API for other mods', group: 'Performance', deps: ['sodium'] },
-      { slug: 'starlight',             emoji: '⭐', name: 'Starlight',           desc: 'Rewrites light engine for massive chunk load speedup', group: 'Performance', conflicts: ['c2me-fabric'] },
-      { slug: 'c2me-fabric',           emoji: '🧵', name: 'C2ME',               desc: 'Multithreaded chunk generation & I/O', group: 'Performance', conflicts: ['starlight'] },
-      { slug: 'noxesium',              emoji: '🚀', name: 'Noxesium',            desc: 'Reduces server-side lag on large servers', group: 'Performance' },
-      { slug: 'immediatelyfast',       emoji: '💨', name: 'ImmediatelyFast',     desc: 'Optimizes immediate mode rendering (GUI, maps, text)', group: 'Performance' },
+      { slug: 'sodium',                name: 'Sodium',              desc: 'Major FPS boost — better rendering engine', group: 'Performance' },
+      { slug: 'lithium',               name: 'Lithium',             desc: 'Game logic & tick optimizations', group: 'Performance' },
+      { slug: 'iris',                  name: 'Iris Shaders',        desc: 'Shader pack support (requires Sodium)', group: 'Performance', deps: ['sodium'] },
+      { slug: 'entityculling',         name: 'Entity Culling',      desc: 'Skip rendering entities behind walls', group: 'Performance' },
+      { slug: 'memoryleakfix',         name: 'Memory Leak Fix',     desc: 'Fixes Minecraft memory leaks — fewer crashes', group: 'Performance' },
+      { slug: 'ferrite-core',          name: 'Ferrite Core',        desc: 'Reduces RAM usage of block states (Feather perf)', group: 'Performance' },
+      { slug: 'indium',                name: 'Indium',              desc: 'Sodium addon — enables Fabric Rendering API for other mods', group: 'Performance', deps: ['sodium'] },
+      { slug: 'starlight',             name: 'Starlight',           desc: 'Rewrites light engine for massive chunk load speedup', group: 'Performance', conflicts: ['c2me-fabric'] },
+      { slug: 'c2me-fabric',           name: 'C2ME',               desc: 'Multithreaded chunk generation & I/O', group: 'Performance', conflicts: ['starlight'] },
+      { slug: 'noxesium',              name: 'Noxesium',            desc: 'Reduces server-side lag on large servers', group: 'Performance' },
+      { slug: 'immediatelyfast',       name: 'ImmediatelyFast',     desc: 'Optimizes immediate mode rendering (GUI, maps, text)', group: 'Performance' },
     ],
   },
 ];
@@ -1789,6 +1822,26 @@ const PVP_MOD_GROUPS: { label: string; color: string; mods: PvpModDef[] }[] = [
 const PVP_MOD_BY_SLUG = new Map<string, PvpModDef>(
   PVP_MOD_GROUPS.flatMap(g => g.mods).map(m => [m.slug, m])
 );
+
+// Each curated mod shows its real Modrinth icon, all fetched in one request.
+const pvpIcons = new Map<string, string>();
+let pvpIconsLoading: Promise<void> | null = null;
+function loadPvpIcons(): Promise<void> {
+  if (!pvpIconsLoading) {
+    const ids = JSON.stringify([...PVP_MOD_BY_SLUG.keys()]);
+    pvpIconsLoading = fetch(`https://api.modrinth.com/v2/projects?ids=${encodeURIComponent(ids)}`)
+      .then(r => r.json())
+      .then((projects: any[]) => { for (const p of projects) if (p.icon_url) pvpIcons.set(p.slug, p.icon_url); })
+      .catch(() => {});
+  }
+  return pvpIconsLoading;
+}
+function pvpIconHtml(slug: string): string {
+  const url = pvpIcons.get(slug);
+  return url
+    ? `<img src="${url}" class="mod-icon-img" alt="" onerror="this.style.visibility='hidden'">`
+    : `<div class="mod-icon" data-pvp-icon="${slug}"></div>`;
+}
 
 async function installOneMod(mod: PvpModDef, ver: string): Promise<void> {
   async function queryModrinth(gameVer?: string): Promise<any[]> {
@@ -1838,31 +1891,29 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
 
   const depNames = (mod.deps || []).map(slug => PVP_MOD_BY_SLUG.get(slug)?.name ?? slug);
   const depsHtml = depNames.length
-    ? `<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;">${
-        depNames.map(n => `<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#21262d;color:#8b949e;border:1px solid #30363d;">Needs: ${n}</span>`).join('')
-      }</div>`
+    ? `<div class="mod-tags">${depNames.map(n => `<span class="mod-tag">Needs ${n}</span>`).join('')}</div>`
     : '';
 
   const verBadge = wrongVer
-    ? `<span style="font-size:10px;color:#f6c356;background:rgba(246,195,86,0.12);border:1px solid rgba(246,195,86,0.3);border-radius:10px;padding:1px 6px;">v${installedInfo!.mcVersion}</span>`
+    ? `<span class="pill pill-warn" title="Installed for a different Minecraft version">Built for ${installedInfo!.mcVersion}</span>`
     : on && installedInfo?.mcVersion
-      ? `<span style="font-size:10px;color:#484f58;">v${installedInfo.mcVersion}</span>`
+      ? `<span class="mod-meta">${installedInfo.mcVersion}</span>`
       : '';
 
   card.innerHTML = `
-    <div class="mod-icon" style="background:none;"></div>
+    ${pvpIconHtml(mod.slug)}
     <div class="mod-info">
-      <div style="display:flex;align-items:center;gap:6px;">
+      <div class="mod-name-row">
         <div class="mod-name">${mod.name}</div>
         ${verBadge}
       </div>
       <div class="mod-desc">${mod.desc}</div>
       ${depsHtml}
-      <div class="pvp-err" style="font-size:11px;color:#e05500;margin-top:4px;display:none;"></div>
+      <div class="pvp-err mod-err" data-tone="error"></div>
     </div>
     <div class="mod-right">
-      ${wrongVer ? '<button class="pvp-update-btn" style="padding:3px 9px;background:rgba(246,195,86,0.12);border:1px solid rgba(246,195,86,0.4);border-radius:5px;color:#f6c356;font-size:10px;font-weight:600;cursor:pointer;white-space:nowrap;">↻ Update</button>' : ''}
-      <div class="mod-version" style="color:${on ? (wrongVer ? 'transparent' : '#f5a623') : 'transparent'}">${on && !wrongVer ? '✓' : ''}</div>
+      ${wrongVer ? `<button class="pvp-update-btn btn btn-sm btn-soft">${icon('refresh')}Update</button>` : ''}
+      <div class="mod-version"${on && !wrongVer ? ' data-tone="accent"' : ''}>${on && !wrongVer ? icon('check') : ''}</div>
       <label class="toggle">
         <input type="checkbox" ${on ? 'checked' : ''} />
         <span class="toggle-slider"></span>
@@ -1881,7 +1932,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
       await installOneMod(mod, mcVersion.value || '26.1.2');
       renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
     } catch {
-      updateBtn.textContent = '✗ Failed';
+      updateBtn.innerHTML = `${icon('x')}Failed`;
       updateBtn.disabled = false;
     }
   });
@@ -1905,14 +1956,14 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
             enabledMods.delete(cSlug);
           }
         }
-        errEl.textContent = `⚠ Disabled ${conflictNames} — incompatible with ${mod.name}`;
-        errEl.style.color = '#f6c356';
+        errEl.textContent = `Turned off ${conflictNames}: it doesn't work alongside ${mod.name}.`;
+        setTone(errEl, 'pending');
         errEl.style.display = 'block';
         // Re-render so the conflicting cards update
         setTimeout(() => renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? ''), 50);
       }
 
-      statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
+      setMark(statusEl, 'busy');
       try {
         const ver = mcVersion.value || '26.1.2';
         const curInstalled = loadInstalledMods();
@@ -1925,18 +1976,18 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
             return !info || info.mcVersion !== ver;
           });
         for (const dep of depsToInstall) {
-          statusEl.textContent = dep.name; statusEl.style.color = '#f5a623';
+          setMark(statusEl, 'download', dep.name);
           await installOneMod(dep, ver);
         }
-        statusEl.textContent = '…'; statusEl.style.color = '#f5a623';
+        setMark(statusEl, 'busy');
         await installOneMod(mod, ver);
         card.className = 'mod-card enabled';
-        statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+        setMark(statusEl, 'done');
         if (depsToInstall.length) renderPvpMods((document.getElementById('pvp-search') as HTMLInputElement)?.value ?? '');
       } catch (err: any) {
         input.checked = false;
         card.className = 'mod-card';
-        statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+        setMark(statusEl, 'failed');
         errEl.textContent = err.message;
         errEl.style.display = 'block';
       }
@@ -1948,7 +1999,7 @@ function buildPvpCard(mod: PvpModDef): HTMLElement {
       saveInstalledMods(installed);
       enabledMods.delete(mod.slug);
       card.className = 'mod-card';
-      statusEl.textContent = ''; statusEl.style.color = 'transparent';
+      statusEl.textContent = ''; setTone(statusEl, '');
       updateModsBadge();
     }
     input.disabled = false;
@@ -1969,16 +2020,22 @@ function renderPvpMods(query: string) {
     if (!filtered.length) continue;
     anyVisible = true;
     const section = document.createElement('div');
-    section.innerHTML = `<div style="font-size:13px;font-weight:700;color:${group.color};letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #21262d;">${group.label}</div>`;
+    section.innerHTML = `<div class="list-group-title">${group.label}</div>`;
     const grid = document.createElement('div');
-    grid.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+    grid.className = 'list-group';
     for (const mod of filtered) grid.appendChild(buildPvpCard(mod));
     section.appendChild(grid);
     list.appendChild(section);
   }
   if (!anyVisible) {
-    list.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:40px 0;">No mods match your search</div>';
+    list.innerHTML = listMsg('No mods match your search.');
   }
+  // swap the placeholder boxes for real icons once they arrive
+  if (!pvpIcons.size) loadPvpIcons().then(() => {
+    list.querySelectorAll<HTMLElement>('[data-pvp-icon]').forEach(el => {
+      if (pvpIcons.has(el.dataset.pvpIcon!)) el.outerHTML = pvpIconHtml(el.dataset.pvpIcon!);
+    });
+  });
 }
 
 function countStaleMods(): number {
@@ -1991,7 +2048,7 @@ async function reinstallAllMods(btn: HTMLElement) {
   const ver = mcVersion.value;
   const installed = loadInstalledMods();
   const stale = Object.entries(installed).filter(([, m]) => !(m as any).mcVersion || (m as any).mcVersion !== ver);
-  if (!stale.length) { btn.textContent = '✓ Up to date'; return; }
+  if (!stale.length) { btn.textContent = 'All mods are up to date'; return; }
   btn.textContent = `Updating 0/${stale.length}…`;
   btn.setAttribute('disabled', '');
   let done = 0;
@@ -2055,12 +2112,12 @@ function renderModProfiles() {
     info.innerHTML = `<div class="mod-name">${profile.name}</div><div class="mod-desc">${profile.slugs.length} mod${profile.slugs.length !== 1 ? 's' : ''}</div>`;
 
     const updateProfileBtn = document.createElement('button');
-    updateProfileBtn.textContent = '↻ Update';
-    updateProfileBtn.style.cssText = 'padding:4px 9px;background:rgba(246,195,86,0.1);border:1px solid rgba(246,195,86,0.35);border-radius:5px;color:#f6c356;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.15s;';
+    updateProfileBtn.className = 'btn btn-sm';
+    updateProfileBtn.innerHTML = `${icon('refresh')}Update`;
 
     const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-sm btn-ghost';
     delBtn.textContent = 'Delete';
-    delBtn.style.cssText = 'padding:4px 10px;background:none;border:1px solid rgba(248,81,73,0.25);border-radius:5px;color:#666;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.15s;';
 
     const right = document.createElement('div');
     right.className = 'mod-right';
@@ -2150,12 +2207,12 @@ function renderModProfiles() {
       for (const slug of profile.slugs) {
         const mod = PVP_MOD_BY_SLUG.get(slug);
         if (!mod) continue;
-        updateProfileBtn.textContent = `↻ ${done}/${profile.slugs.length}`;
+        updateProfileBtn.innerHTML = `${icon('refresh')}${done}/${profile.slugs.length}`;
         try { await installOneMod(mod, ver); done++; } catch {}
       }
-      updateProfileBtn.textContent = `✓ ${done} updated`;
+      updateProfileBtn.innerHTML = `${icon('check')}${done} updated`;
       updateProfileBtn.disabled = false;
-      setTimeout(() => { updateProfileBtn.textContent = '↻ Update'; }, 2000);
+      setTimeout(() => { updateProfileBtn.innerHTML = `${icon('refresh')}Update`; }, 2000);
     });
 
     let confirmPending = false;
@@ -2163,14 +2220,12 @@ function renderModProfiles() {
     delBtn.addEventListener('click', () => {
       if (!confirmPending) {
         confirmPending = true;
-        delBtn.textContent = 'Sure?';
-        delBtn.style.color = '#f85149';
-        delBtn.style.borderColor = 'rgba(248,81,73,0.7)';
+        delBtn.textContent = 'Delete it?';
+        delBtn.className = 'btn btn-sm btn-danger';
         confirmTimer = setTimeout(() => {
           confirmPending = false;
           delBtn.textContent = 'Delete';
-          delBtn.style.color = '#666';
-          delBtn.style.borderColor = 'rgba(248,81,73,0.25)';
+          delBtn.className = 'btn btn-sm btn-ghost';
         }, 3000);
       } else {
         if (confirmTimer) clearTimeout(confirmTimer);
@@ -2195,7 +2250,7 @@ document.getElementById('mod-profile-save-btn')?.addEventListener('click', () =>
   if (nameEl) nameEl.value = '';
   renderModProfiles();
   const btn = document.getElementById('mod-profile-save-btn') as HTMLButtonElement;
-  if (btn) { btn.textContent = '✓ Saved!'; setTimeout(() => { btn.textContent = 'Save Current Mods'; }, 1500); }
+  if (btn) { btn.innerHTML = `${icon('check')}Saved`; setTimeout(() => { btn.textContent = 'Save current mods'; }, 1500); }
 });
 
 renderModProfiles();
@@ -2246,7 +2301,7 @@ async function flushCfBuildVerQueue() {
       const res = await cf.getDownload({ modId, mcVersion, contentType });
       if (res?.ok && res.filename) {
         el.textContent = res.filename.replace(/\.(jar|zip)$/i, '');
-        el.style.color = '#f5a623';
+        setTone(el, 'accent');
       } else {
         el.textContent = '';
       }
@@ -2261,19 +2316,18 @@ function fmtCfDownloads(n: number): string {
 function cfCardShell(mod: any): { card: HTMLElement; statusEl: HTMLElement; buildVerEl: HTMLElement | null } {
   const card = document.createElement('div');
   card.className = 'mod-card';
-  const icon = mod.logo?.thumbnailUrl
+  const logoHtml = mod.logo?.thumbnailUrl
     ? `<img src="${mod.logo.thumbnailUrl}" class="mod-icon-img" alt="" onerror="this.style.display='none'">`
-    : `<div class="mod-icon" style="background:#1a0a00;border:1px solid #331100;"></div>`;
+    : `<div class="mod-icon"></div>`;
   const showBuildVer = cfContentType === 'mod' || cfContentType === 'modpack';
   card.innerHTML = `
-    ${icon}
+    ${logoHtml}
     <div class="mod-info">
       <div class="mod-name">${mod.name}</div>
       <div class="mod-desc">${mod.summary}</div>
       <div class="mod-tags">
-        <span class="mod-tag" style="background:rgba(241,100,54,0.1);color:#f16436;border-color:rgba(241,100,54,0.3);">CurseForge</span>
-        ${showBuildVer ? `<span class="mod-tag cf-build-ver" style="margin-left:auto;color:#666666;">…</span>` : ''}
-        <span class="mod-tag" style="${showBuildVer ? '' : 'margin-left:auto;'}">⬇ ${fmtCfDownloads(mod.downloadCount)}</span>
+        ${showBuildVer ? `<span class="mod-tag cf-build-ver push">…</span>` : ''}
+        <span class="mod-tag dl${showBuildVer ? '' : ' push'}">${icon('download')}${fmtCfDownloads(mod.downloadCount)}</span>
       </div>
     </div>
     <div class="mod-right" id="cf-right-${mod.id}"></div>`;
@@ -2292,29 +2346,29 @@ function buildCfModCard(mod: any, ver: string): HTMLElement {
   right.appendChild(statusEl);
   right.innerHTML += `<label class="toggle"><input type="checkbox" ${isOn ? 'checked' : ''} /><span class="toggle-slider"></span></label>`;
   const input = right.querySelector('input') as HTMLInputElement;
-  if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+  if (isOn) { setMark(statusEl, 'done'); }
   if (buildVerEl) queueCfBuildVersion(mod.id, ver, 'mod', buildVerEl);
 
   input.addEventListener('change', async e => {
     const checked = (e.target as HTMLInputElement).checked;
     input.disabled = true;
     if (checked) {
-      statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
+      setMark(statusEl, 'busy');
       try {
         const dlRes = await cf.getDownload({ modId: mod.id, mcVersion: ver, contentType: 'mod' });
         if (!dlRes.ok) throw new Error(dlRes.error);
-        statusEl.textContent = '⬇';
+        setMark(statusEl, 'download');
         const installRes = await mc.installMod({ url: dlRes.url, filename: dlRes.filename, mcVersion: ver });
         if (!installRes.ok) throw new Error(installRes.error);
         const ins = loadInstalledMods();
         ins[`cf_${mod.id}`] = { filename: dlRes.filename, name: mod.name, mcVersion: ver, cfId: mod.id, fileId: dlRes.fileId };
         saveInstalledMods(ins);
         card.className = 'mod-card enabled';
-        statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+        setMark(statusEl, 'done');
         updateModsBadge();
       } catch (err: any) {
         input.checked = false; card.className = 'mod-card';
-        statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+        setMark(statusEl, 'failed');
         statusEl.title = err.message;
       }
     } else {
@@ -2342,14 +2396,14 @@ function buildCfModpackCard(mod: any, ver: string): HTMLElement {
   right.appendChild(statusEl);
   right.innerHTML += `<label class="toggle"><input type="checkbox" ${isOn ? 'checked' : ''} /><span class="toggle-slider"></span></label>`;
   const input = right.querySelector('input') as HTMLInputElement;
-  if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+  if (isOn) { setMark(statusEl, 'done'); }
   if (buildVerEl) queueCfBuildVersion(mod.id, ver, 'modpack', buildVerEl);
 
   input.addEventListener('change', async e => {
     const checked = (e.target as HTMLInputElement).checked;
     input.disabled = true;
     if (checked) {
-      statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
+      setMark(statusEl, 'busy');
       modpackProgressEl = statusEl;
       try {
         // Remove any currently installed modpacks first — mirrors the
@@ -2368,11 +2422,11 @@ function buildCfModpackCard(mod: any, ver: string): HTMLElement {
         updated[key] = { projectId: '', title: mod.name, mcVersion: result.mcVersion, filenames: result.filenames, cfId: mod.id, fileId: result.fileId };
         saveInstalledModpacks(updated);
         card.className = 'mod-card enabled';
-        statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+        setMark(statusEl, 'done');
         updateModsBadge();
       } catch (err: any) {
         input.checked = false; card.className = 'mod-card';
-        statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+        setMark(statusEl, 'failed');
         statusEl.title = err.message;
       } finally {
         modpackProgressEl = null;
@@ -2410,7 +2464,7 @@ function buildCfResourceOrShaderCard(mod: any, ver: string, kind: 'resourcepack'
     const isOn = !!filename && disk.includes(filename);
     input.checked = isOn;
     card.className = 'mod-card' + (isOn ? ' enabled' : '');
-    if (isOn) { statusEl.textContent = '✓'; statusEl.style.color = '#f5a623'; }
+    if (isOn) { setMark(statusEl, 'done'); }
     input.dataset.filename = filename ?? '';
   })();
 
@@ -2418,22 +2472,22 @@ function buildCfResourceOrShaderCard(mod: any, ver: string, kind: 'resourcepack'
     const checked = (e.target as HTMLInputElement).checked;
     input.disabled = true;
     if (checked) {
-      statusEl.textContent = '…'; statusEl.style.color = '#f6c356';
+      setMark(statusEl, 'busy');
       try {
         const dlRes = await cf.getDownload({ modId: mod.id, mcVersion: ver, contentType: kind });
         if (!dlRes.ok) throw new Error(dlRes.error);
-        statusEl.textContent = '⬇';
+        setMark(statusEl, 'download');
         const installRes = kind === 'resourcepack'
           ? await mc.installResourcePack({ url: dlRes.url, filename: dlRes.filename })
           : await mc.installShaderpack({ url: dlRes.url, filename: dlRes.filename });
         if (!installRes.ok) throw new Error(installRes.error);
         input.dataset.filename = dlRes.filename;
         card.className = 'mod-card enabled';
-        statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+        setMark(statusEl, 'done');
         if (kind === 'shader') refreshShaderpackDropdown();
       } catch (err: any) {
         input.checked = false; card.className = 'mod-card';
-        statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+        setMark(statusEl, 'failed');
         statusEl.title = err.message;
       }
     } else {
@@ -2457,23 +2511,23 @@ function buildCfWorldCard(mod: any, ver: string): HTMLElement {
   const right = card.querySelector(`#cf-right-${mod.id}`)!;
   right.appendChild(statusEl);
   const btn = document.createElement('button');
+  btn.className = 'btn btn-sm btn-soft';
   btn.textContent = 'Import';
-  btn.style.cssText = 'padding:6px 16px;background:rgba(241,100,54,0.12);border:1px solid rgba(241,100,54,0.4);border-radius:7px;color:#f16436;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;';
   right.appendChild(btn);
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    statusEl.textContent = '⬇'; statusEl.style.color = '#f6c356';
+    setMark(statusEl, 'download'); setTone(statusEl, 'pending');
     btn.textContent = 'Importing…';
     try {
       const res = await cf.installWorld({ modId: mod.id, mcVersion: ver });
       if (!res.ok) throw new Error(res.error);
-      statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
-      btn.textContent = '✓ Imported';
+      setMark(statusEl, 'done');
+      btn.innerHTML = `${icon('check')}Imported`;
       setTimeout(() => { btn.textContent = 'Import'; btn.disabled = false; }, 2000);
     } catch (err: any) {
-      statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+      setMark(statusEl, 'failed');
       statusEl.title = err.message;
-      btn.textContent = '✗ Failed';
+      btn.innerHTML = `${icon('x')}Failed`;
       setTimeout(() => { btn.textContent = 'Import'; btn.disabled = false; }, 2500);
     }
   });
@@ -2494,15 +2548,18 @@ async function searchCurseForge(query: string) {
       mod: 'mc-mods', modpack: 'modpacks', resourcepack: 'texture-packs', shader: 'shaders', world: 'worlds',
     };
     const url = `https://www.curseforge.com/minecraft/search?search=${q}&class=${classSlug[cfContentType]}`;
-    list.innerHTML = `<div style="text-align:center;padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;">
-      <p style="color:#666;font-size:13px;">CurseForge API unavailable. Browse on the website:</p>
-      <a href="${url}" style="background:#f16436;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;cursor:pointer;"
-         onclick="event.preventDefault();(window as any).electron?.openExternal?.('${url}')||window.open('${url}')">Browse on CurseForge →</a>
+    list.innerHTML = `<div class="list-msg">
+      <p>CurseForge can't be reached from the launcher right now.</p>
+      <a class="btn btn-soft" href="${url}" data-external>Browse on curseforge.com${icon('external')}</a>
     </div>`;
+    list.querySelector<HTMLAnchorElement>('[data-external]')?.addEventListener('click', e => {
+      e.preventDefault();
+      (window as any).electron?.openExternal?.(url) || window.open(url);
+    });
     return;
   }
   if (!res.data?.length) {
-    list.innerHTML = '<p style="color:#484f58;font-size:13px;padding:20px;text-align:center">No results found</p>';
+    list.innerHTML = listMsg('No results. Try a different search.');
     return;
   }
   const frag = document.createDocumentFragment();
@@ -2533,7 +2590,7 @@ function initPvpMods() {
     if (!reinstallBtn) return;
     const stale = countStaleMods();
     reinstallBtn.style.display = stale > 0 ? 'inline-flex' : 'none';
-    reinstallBtn.textContent = `↻ Update ${stale} mod${stale !== 1 ? 's' : ''} to MC ${mcVersion.value}`;
+    reinstallBtn.innerHTML = `${icon('refresh')}Update ${stale} mod${stale !== 1 ? 's' : ''} for ${mcVersion.value}`;
   }
   reinstallBtn?.addEventListener('click', () => reinstallAllMods(reinstallBtn));
   updateReinstallBtn();
@@ -2558,18 +2615,18 @@ async function fetchRPDownloadUrl(projectId: string): Promise<{ url: string; fil
   return { url: file.url, filename: file.filename };
 }
 
-function buildRPCard(name: string, slug: string, projectId: string, icon: string, desc: string, installed: boolean): HTMLElement {
+function buildRPCard(name: string, slug: string, projectId: string, iconUrl: string, desc: string, installed: boolean): HTMLElement {
   const card = document.createElement('div');
   card.className = 'mod-card' + (installed ? ' enabled' : '');
   card.innerHTML = `
-    <div class="mod-icon" style="font-size:22px;background:none;">${icon}</div>
+    ${iconUrl ? `<img src="${iconUrl}" class="mod-icon-img" alt="" onerror="this.style.visibility='hidden'">` : '<div class="mod-icon"></div>'}
     <div class="mod-info">
       <div class="mod-name">${name}</div>
       <div class="mod-desc">${desc}</div>
-      <div class="pvp-err" style="font-size:11px;color:#e05500;margin-top:4px;display:none;"></div>
+      <div class="pvp-err mod-err" data-tone="error"></div>
     </div>
     <div class="mod-right">
-      <div class="mod-version" style="color:${installed ? '#f5a623' : 'transparent'}">✓</div>
+      <div class="mod-version"${installed ? ' data-tone="accent"' : ''}>${installed ? icon('check') : ''}</div>
       <label class="toggle"><input type="checkbox" ${installed ? 'checked' : ''} /><span class="toggle-slider"></span></label>
     </div>`;
   const input    = card.querySelector('input') as HTMLInputElement;
@@ -2581,7 +2638,7 @@ function buildRPCard(name: string, slug: string, projectId: string, icon: string
     errEl.style.display = 'none';
     const rps = loadInstalledRPs();
     if (checked) {
-      statusEl.textContent = '…'; statusEl.style.color = '#f5a623';
+      setMark(statusEl, 'busy');
       try {
         const { url, filename } = await fetchRPDownloadUrl(projectId);
         const res = await mc.installResourcePack({ url, filename });
@@ -2589,11 +2646,11 @@ function buildRPCard(name: string, slug: string, projectId: string, icon: string
         rps[slug] = filename;
         saveInstalledRPs(rps);
         card.className = 'mod-card enabled';
-        statusEl.textContent = '✓'; statusEl.style.color = '#f5a623';
+        setMark(statusEl, 'done');
       } catch (err: any) {
         input.checked = false;
         card.className = 'mod-card';
-        statusEl.textContent = '✗'; statusEl.style.color = '#e05500';
+        setMark(statusEl, 'failed');
         errEl.textContent = err.message; errEl.style.display = 'block';
       }
     } else {
@@ -2601,7 +2658,7 @@ function buildRPCard(name: string, slug: string, projectId: string, icon: string
       delete rps[slug];
       saveInstalledRPs(rps);
       card.className = 'mod-card';
-      statusEl.textContent = ''; statusEl.style.color = 'transparent';
+      statusEl.textContent = ''; setTone(statusEl, '');
     }
     input.disabled = false;
   });
@@ -2622,11 +2679,11 @@ async function searchResourcePacks(query: string) {
     rpLoading.style.display = 'none';
     for (const hit of (data.hits || [])) {
       const installed = !!rps[hit.slug];
-      const card = buildRPCard(hit.title, hit.slug, hit.project_id, '', hit.description, installed);
+      const card = buildRPCard(hit.title, hit.slug, hit.project_id, hit.icon_url || '', hit.description, installed);
       rpList.appendChild(card);
     }
-    if (!data.hits?.length) rpList.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:20px 0;">No results</div>';
-  } catch { rpLoading.style.display = 'none'; rpList.innerHTML = '<div style="color:#e05500;font-size:13px;text-align:center;padding:20px 0;">Search failed</div>'; }
+    if (!data.hits?.length) rpList.innerHTML = listMsg('No resource packs match that search.');
+  } catch { rpLoading.style.display = 'none'; rpList.innerHTML = listMsg('Could not reach Modrinth. Check your connection and try again.', 'error'); }
 }
 
 function initResourcePacks() {
@@ -2635,14 +2692,15 @@ function initResourcePacks() {
   installedEl.innerHTML = '';
   if (Object.keys(rps).length) {
     const label = document.createElement('div');
-    label.style.cssText = 'font-size:13px;font-weight:700;color:#f5a623;margin-bottom:8px;';
-    label.textContent = '✓ Installed';
+    label.className = 'list-group-title';
+    label.textContent = 'Installed';
     installedEl.appendChild(label);
     for (const [slug, filename] of Object.entries(rps)) {
-      installedEl.appendChild(buildRPCard(filename.replace('.zip',''), slug, '', filename, true, '', filename));
+      installedEl.appendChild(buildRPCard(filename.replace(/\.zip$/i, ''), slug, '', '', filename, true));
     }
     const sep = document.createElement('div');
-    sep.style.cssText = 'border-top:1px solid #21262d;margin:8px 0 4px;';
+    sep.className = 'list-group-title';
+    sep.textContent = 'Browse';
     installedEl.appendChild(sep);
   }
   const searchEl = document.getElementById('rp-search') as HTMLInputElement;
@@ -2685,11 +2743,11 @@ async function initShaderpackSettings() {
   for (const pack of SHADERPACK_CATALOG) {
     const existing = installed.find(f => f.toLowerCase().includes(pack.match));
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;background:#080808;border:1px solid #2a2a2a;border-radius:6px;padding:9px 12px;';
+    row.className = 'item-row';
     row.innerHTML = `
-      <span style="flex:1;font-size:13px;color:#ffffff;">${pack.name}</span>
-      <span class="sp-status" style="font-size:12px;color:#f5a623;${existing ? '' : 'display:none;'}">✓ Installed</span>
-      <button class="sp-btn" style="padding:6px 14px;background:${existing ? '#1e1e1e' : 'rgba(245,166,35,0.15)'};border:1px solid ${existing ? '#2a2a2a' : 'rgba(245,166,35,0.4)'};border-radius:6px;color:#ffffff;font-size:12px;cursor:pointer;white-space:nowrap;">${existing ? 'Remove' : 'Install'}</button>`;
+      <span class="item-row-name">${pack.name}</span>
+      <span class="sp-status" data-tone="accent"${existing ? '' : ' style="display:none"'}>${icon('check')}Installed</span>
+      <button class="sp-btn btn btn-sm${existing ? '' : ' btn-soft'}">${existing ? 'Remove' : 'Install'}</button>`;
     const btn = row.querySelector('.sp-btn') as HTMLButtonElement;
     const statusEl = row.querySelector('.sp-status') as HTMLElement;
     let currentFile = existing;
@@ -2701,7 +2759,7 @@ async function initShaderpackSettings() {
         currentFile = undefined;
         statusEl.style.display = 'none';
         btn.textContent = 'Install';
-        btn.style.background = 'rgba(245,166,35,0.15)'; btn.style.borderColor = 'rgba(245,166,35,0.4)';
+        btn.classList.add('btn-soft');
       } else {
         btn.textContent = 'Installing…';
         try {
@@ -2713,12 +2771,14 @@ async function initShaderpackSettings() {
           if (!res.ok) throw new Error(res.error);
           currentFile = file.filename;
           statusEl.style.display = '';
+          setTone(statusEl, 'accent');
+          statusEl.innerHTML = `${icon('check')}Installed`;
           btn.textContent = 'Remove';
-          btn.style.background = '#1e1e1e'; btn.style.borderColor = '#2a2a2a';
+          btn.classList.remove('btn-soft');
         } catch (err: any) {
           btn.textContent = 'Failed';
           statusEl.style.display = '';
-          statusEl.style.color = '#e05500';
+          setTone(statusEl, 'error');
           statusEl.textContent = err.message;
           setTimeout(() => { btn.textContent = 'Install'; statusEl.style.display = 'none'; }, 2500);
         }
@@ -2913,15 +2973,15 @@ function initSkins() {
     card.addEventListener('click', async () => {
       wardrobeGrid.querySelectorAll('.wardrobe-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
-      statusEl.textContent = `Loading ${preset.name}…`; statusEl.style.color = '#f6c356';
+      statusEl.textContent = `Loading ${preset.name}…`; setTone(statusEl, 'pending');
       applyBtn.style.display = 'none';
       const b64 = await fetchSkinBase64(preset.user);
       if (b64) {
         await setPreviewSkin(b64, preset.name, preset.variant as 'classic' | 'slim');
         applyBtn.style.display = 'inline-block';
-        statusEl.textContent = `${preset.name} ready — click Apply`; statusEl.style.color = '#aaaaaa';
+        statusEl.textContent = `${preset.name} ready — click Apply`; setTone(statusEl, 'muted');
       } else {
-        statusEl.textContent = `Could not load ${preset.name} skin`; statusEl.style.color = '#e05500';
+        statusEl.textContent = `Could not load ${preset.name} skin`; setTone(statusEl, 'error');
       }
     });
     wardrobeGrid.appendChild(card);
@@ -2932,7 +2992,7 @@ function initSkins() {
     const name = lookupInput.value.trim();
     if (!name) return;
     lookupBtn.disabled = true; lookupBtn.textContent = '…';
-    statusEl.textContent = `Loading ${name}…`; statusEl.style.color = '#f6c356';
+    statusEl.textContent = `Loading ${name}…`; setTone(statusEl, 'pending');
     applyBtn.style.display = 'none';
     wardrobeGrid.querySelectorAll('.wardrobe-card').forEach(c => c.classList.remove('selected'));
     const b64 = await fetchSkinBase64(name);
@@ -2940,9 +3000,9 @@ function initSkins() {
     if (b64) {
       await setPreviewSkin(b64, name, 'classic');
       applyBtn.style.display = 'inline-block';
-      statusEl.textContent = `${name}'s skin ready — click Apply`; statusEl.style.color = '#aaaaaa';
+      statusEl.textContent = `${name}'s skin ready — click Apply`; setTone(statusEl, 'muted');
     } else {
-      statusEl.textContent = `Player "${name}" not found`; statusEl.style.color = '#e05500';
+      statusEl.textContent = `Player "${name}" not found`; setTone(statusEl, 'error');
     }
   };
   lookupBtn.addEventListener('click', doLookup);
@@ -2962,7 +3022,7 @@ function initSkins() {
       await setPreviewSkin(b64, file.name, variant);
       wardrobeGrid.querySelectorAll('.wardrobe-card').forEach(c => c.classList.remove('selected'));
       applyBtn.style.display = 'inline-block';
-      statusEl.textContent = 'Custom skin loaded — click Apply'; statusEl.style.color = '#aaaaaa';
+      statusEl.textContent = 'Custom skin loaded — click Apply'; setTone(statusEl, 'muted');
     };
     reader.readAsDataURL(file);
   });
@@ -2977,16 +3037,16 @@ function initSkins() {
   applyBtn.addEventListener('click', async () => {
     if (!selectedBase64) return;
     applyBtn.disabled = true;
-    statusEl.textContent = 'Uploading…'; statusEl.style.color = '#f6c356';
+    statusEl.textContent = 'Uploading…'; setTone(statusEl, 'pending');
     const res = await mc.uploadSkin({ base64: selectedBase64, variant: selectedVariant });
     applyBtn.disabled = false;
     if (res.ok) {
-      statusEl.textContent = '✓ Skin applied!'; statusEl.style.color = '#f5a623';
+      statusEl.textContent = 'Skin applied. It shows in-game the next time you join a world.'; setTone(statusEl, 'accent');
     } else if (res.error?.includes('401') || res.error?.includes('Unauthorized') || res.error?.includes('Not authenticated')) {
-      statusEl.textContent = '✗ Session expired — go to Settings and click Re-authenticate';
-      statusEl.style.color = '#e05500';
+      statusEl.textContent = 'Your Microsoft session expired. Sign in again from Accounts, then try once more.';
+      setTone(statusEl, 'error');
     } else {
-      statusEl.textContent = `✗ ${res.error}`; statusEl.style.color = '#e05500';
+      statusEl.textContent = `Couldn't apply the skin: ${res.error}`; setTone(statusEl, 'error');
     }
   });
 }
@@ -2996,26 +3056,25 @@ function initScreenshots() {
   const listEl = document.getElementById('screenshots-list')!;
   document.getElementById('screenshots-open-folder')!.addEventListener('click', () => mc.showScreenshotsFolder());
 
-  listEl.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:30px 0;">Loading...</div>';
+  listEl.innerHTML = listMsg('Loading screenshots…');
   mc.listScreenshots().then((shots: { name: string; path: string; mtime: number; sizeKb: number }[]) => {
     listEl.innerHTML = '';
     if (!shots.length) {
-      listEl.innerHTML = '<div style="color:#6e7681;font-size:13px;text-align:center;padding:40px 0;">No screenshots yet — press <strong style="color:#e6edf3;">F2</strong> in-game to take one</div>';
+      listEl.innerHTML = listMsg('No screenshots yet. Press <kbd>F2</kbd> in-game to take one.');
       return;
     }
     for (const s of shots) {
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:14px;background:rgba(13,17,23,0.6);border:1px solid #21262d;border-radius:10px;padding:12px 16px;cursor:pointer;transition:background 0.15s;';
+      row.className = 'item-row is-clickable';
       row.innerHTML = `
-        <div style="flex:1;min-width:0;">
-          <div style="color:#e6edf3;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
-          <div style="color:#6e7681;font-size:11px;margin-top:2px;">${new Date(s.mtime).toLocaleString()} · ${s.sizeKb} KB</div>
+        ${icon('image')}
+        <div class="item-row-text">
+          <div class="item-row-name">${s.name}</div>
+          <div class="item-row-meta">${new Date(s.mtime).toLocaleString()} · ${s.sizeKb} KB</div>
         </div>
-        <button style="background:#21262d;border:1px solid #30363d;color:#8b949e;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;">Open</button>`;
+        <button class="btn btn-sm">Open</button>`;
       row.querySelector('button')!.addEventListener('click', e => { e.stopPropagation(); mc.openScreenshot(s.path); });
       row.addEventListener('click', () => mc.openScreenshot(s.path));
-      row.addEventListener('mouseover', () => row.style.background = 'rgba(33,38,45,0.6)');
-      row.addEventListener('mouseout',  () => row.style.background = 'rgba(13,17,23,0.6)');
       listEl.appendChild(row);
     }
   });
@@ -3035,22 +3094,22 @@ function renderAccountsList() {
   const accounts = loadAccounts();
   listEl.innerHTML = '';
   if (!accounts.length) {
-    listEl.innerHTML = '<div style="color:#6e7681;font-size:13px;">No saved accounts yet — add one above</div>';
+    listEl.innerHTML = '<div class="empty">No offline profiles yet. Add a username above.</div>';
     return;
   }
   const offlineInput = document.getElementById('offline-username') as HTMLInputElement | null;
   for (const acc of accounts) {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:12px;background:rgba(13,17,23,0.6);border:1px solid #21262d;border-radius:10px;padding:11px 16px;';
+    row.className = 'item-row' + (offlineInput?.value === acc.name ? ' is-active' : '');
     const isActive = offlineInput?.value === acc.name;
     row.innerHTML = `
-      <img src="https://mc-heads.net/avatar/${encodeURIComponent(acc.name)}/32" onerror="this.src=''" style="width:32px;height:32px;border-radius:4px;image-rendering:pixelated;background:#21262d;" />
-      <div style="flex:1;">
-        <div style="color:#e6edf3;font-size:13px;font-weight:600;">${acc.name}</div>
-        <div style="color:#6e7681;font-size:11px;">Added ${new Date(acc.added).toLocaleDateString()}</div>
+      <img class="item-row-avatar" src="https://mc-heads.net/avatar/${encodeURIComponent(acc.name)}/32" alt="" onerror="this.style.visibility='hidden'" />
+      <div class="item-row-text">
+        <div class="item-row-name">${acc.name}</div>
+        <div class="item-row-meta">Added ${new Date(acc.added).toLocaleDateString()}</div>
       </div>
-      ${isActive ? '<span style="color:#f5a623;font-size:12px;font-weight:600;">● Active</span>' : '<button class="switch-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;">Switch</button>'}
-      <button class="remove-btn" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:16px;padding:0 4px;" title="Remove">✕</button>`;
+      ${isActive ? '<span class="pill">Active</span>' : '<button class="switch-btn btn btn-sm">Use</button>'}
+      <button class="remove-btn btn btn-ghost btn-icon btn-sm" title="Remove" aria-label="Remove ${acc.name}">${icon('x')}</button>`;
     row.querySelector('.switch-btn')?.addEventListener('click', () => {
       if (offlineInput) { offlineInput.value = acc.name; offlineInput.dispatchEvent(new Event('input')); }
       (document.getElementById('offline-toggle') as HTMLInputElement | null)?.dispatchEvent(new Event('change'));
@@ -3122,10 +3181,10 @@ function initTokens(uid: string) {
     if (btn) {
       const today = new Date().toISOString().slice(0, 10);
       if (data.lastClaim === today) {
-        btn.textContent = '✓ Claimed today';
+        btn.textContent = 'Claimed today';
         btn.disabled = true;
       } else {
-        btn.textContent = 'Claim Daily (+50)';
+        btn.textContent = 'Claim daily +50';
         btn.disabled = false;
       }
     }
@@ -3142,13 +3201,13 @@ async function claimDailyTokens(uid: string) {
   try {
     const snap = await get(ref(rtdb, `voxel_tokens/${uid}/lastClaim`));
     if (snap.val() === today) {
-      if (claimBtn) claimBtn.textContent = '✓ Claimed today';
+      if (claimBtn) claimBtn.textContent = 'Claimed today';
       return;
     }
     await update(ref(rtdb, `voxel_tokens/${uid}`), { balance: increment(50), lastClaim: today });
     if (claimBtn) {
-      claimBtn.textContent = '+50 Tokens claimed!';
-      setTimeout(() => { claimBtn.textContent = '✓ Claimed today'; }, 2500);
+      claimBtn.textContent = '+50 tokens';
+      setTimeout(() => { claimBtn.textContent = 'Claimed today'; }, 2500);
     }
   } catch (err: any) {
     if (claimBtn) {
@@ -3191,16 +3250,18 @@ function renderFriendsList(uid: string, data: Record<string, any>) {
     const card = document.createElement('div');
     card.className = 'friend-card';
     card.dataset.fuid = fuid;
+    // names come from other players' data — always escape before inserting
+    const friendName = escHtml(info.name || fuid);
     card.innerHTML = `
-      <div class="friend-avatar"></div>
+      <img class="friend-avatar" src="https://mc-heads.net/avatar/${encodeURIComponent(info.name || '')}/32" alt="" onerror="this.style.visibility='hidden'">
       <div class="friend-dot" id="fdot-${fuid}"></div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;color:#e6edf3;">${info.name || fuid}</div>
-        <div id="fstatus-${fuid}" style="font-size:11px;color:#484f58;margin-top:2px;">Offline</div>
+      <div class="item-row-text">
+        <div class="item-row-name">${friendName}</div>
+        <div class="item-row-meta" id="fstatus-${fuid}">Offline</div>
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0;">
-        <span id="fsrv-${fuid}" style="display:none;font-family:monospace;font-size:11px;color:#f5a623;background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.15);padding:4px 8px;border-radius:6px;cursor:pointer;" title="Click to copy"></span>
-        <button data-fuid="${fuid}" class="friend-remove-btn" style="padding:4px 10px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#484f58;font-size:11px;cursor:pointer;">Remove</button>
+      <div class="row-control">
+        <button id="fsrv-${fuid}" class="server-chip" style="display:none" title="Copy server address"></button>
+        <button data-fuid="${fuid}" class="friend-remove-btn btn btn-sm btn-ghost">Remove</button>
       </div>`;
     card.querySelector('.friend-remove-btn')!.addEventListener('click', async () => {
       await set(ref(rtdb, `voxel_friends/${uid}/list/${fuid}`), null);
@@ -3222,9 +3283,9 @@ function renderFriendsList(uid: string, data: Record<string, any>) {
       if (srvEl) {
         const addr = p?.server;
         if (online && addr) {
-          srvEl.style.display = 'inline';
+          srvEl.style.display = 'inline-flex';
           srvEl.textContent   = addr;
-          srvEl.onclick       = () => { (window as any).electron?.copyText(addr); srvEl.textContent = '✓ Copied!'; setTimeout(() => { srvEl.textContent = addr; }, 1500); };
+          srvEl.onclick       = () => { (window as any).electron?.copyText(addr); srvEl.innerHTML = `${icon('check')}Copied`; setTimeout(() => { srvEl.textContent = addr; }, 1500); };
         } else {
           srvEl.style.display = 'none';
         }
@@ -3244,10 +3305,10 @@ function renderFriendRequests(uid: string, data: Record<string, any>) {
     const card = document.createElement('div');
     card.className = 'req-card';
     card.innerHTML = `
-      <div class="friend-avatar"></div>
-      <div style="flex:1;font-size:13px;color:#e6edf3;font-weight:500;">${info.name || fromUid}</div>
-      <button class="req-accept" style="padding:5px 12px;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.4);border-radius:6px;color:#f5a623;font-size:12px;cursor:pointer;font-weight:600;">Accept</button>
-      <button class="req-decline" style="padding:5px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#484f58;font-size:12px;cursor:pointer;margin-left:6px;">Decline</button>`;
+      <img class="friend-avatar" src="https://mc-heads.net/avatar/${encodeURIComponent(info.name || '')}/32" alt="" onerror="this.style.visibility='hidden'">
+      <div class="item-row-text"><div class="item-row-name">${escHtml(info.name || fromUid)}</div><div class="item-row-meta">Wants to be friends</div></div>
+      <button class="req-accept btn btn-sm btn-primary">Accept</button>
+      <button class="req-decline btn btn-sm btn-ghost">Decline</button>`;
     card.querySelector('.req-accept')!.addEventListener('click', async () => {
       // Add to each other's list
       await set(ref(rtdb, `voxel_friends/${uid}/list/${fromUid}`), { name: info.name, addedAt: serverTimestamp() });
@@ -3268,29 +3329,29 @@ async function sendFriendRequest(uid: string, targetName: string) {
   const statusEl = document.getElementById('friend-add-status');
   const addBtn   = document.getElementById('friend-add-btn') as HTMLButtonElement;
   if (!statusEl || !addBtn) return;
-  if (!uid) { statusEl.style.color = '#e05500'; statusEl.textContent = 'Sign in first'; return; }
+  if (!uid) { setTone(statusEl, 'error'); statusEl.textContent = 'Sign in first'; return; }
   const name = targetName.trim().toLowerCase();
   if (!name) return;
   addBtn.disabled = true;
-  statusEl.style.color = '#484f58';
+  setTone(statusEl, 'muted');
   statusEl.textContent = 'Searching…';
   const snap = await get(ref(rtdb, `voxel_user_index/${name}`));
   const target = snap.val();
   if (!target) {
-    statusEl.style.color = '#e05500';
+    setTone(statusEl, 'error');
     statusEl.textContent = `"${targetName}" hasn't used Voxel Client yet`;
     addBtn.disabled = false;
     return;
   }
   const targetUid = target.uid;
-  if (targetUid === uid) { statusEl.style.color = '#e05500'; statusEl.textContent = "That's you!"; addBtn.disabled = false; return; }
+  if (targetUid === uid) { setTone(statusEl, 'error'); statusEl.textContent = "That's you!"; addBtn.disabled = false; return; }
   // Check if already friends
   const alreadySnap = await get(ref(rtdb, `voxel_friends/${uid}/list/${targetUid}`));
-  if (alreadySnap.exists()) { statusEl.style.color = '#f6c356'; statusEl.textContent = 'Already friends'; addBtn.disabled = false; return; }
+  if (alreadySnap.exists()) { setTone(statusEl, 'pending'); statusEl.textContent = 'Already friends'; addBtn.disabled = false; return; }
   // Send request
   await set(ref(rtdb, `voxel_friends/${targetUid}/requests/incoming/${uid}`), { name: myDisplayName(), sentAt: serverTimestamp() });
   await set(ref(rtdb, `voxel_friends/${uid}/requests/outgoing/${targetUid}`), { name: target.name, sentAt: serverTimestamp() });
-  statusEl.style.color = '#f5a623';
+  setTone(statusEl, 'accent');
   statusEl.textContent = `Request sent to ${target.name}`;
   (document.getElementById('friend-add-input') as HTMLInputElement).value = '';
   addBtn.disabled = false;
@@ -3486,86 +3547,123 @@ async function initCosmetics() {
   });
 }
 
-// ── Auto-updater UI ────────────────────────────────────────────────────────────
+// ── Updates ──────────────────────────────────────────────────────────────────
+// The main process checks at start-up and every 30 minutes and downloads new
+// versions in the background. Here: a toast shows the download, then offers
+// Restart now / Later. With Minecraft closed the launcher restarts by itself
+// after a 10-second countdown; with it running, the update waits and installs
+// when the launcher closes.
 const updater = (window as any).updater;
 if (updater) {
-  const banner         = document.getElementById('update-banner')!;
-  const updateText     = document.getElementById('update-text')!;
-  const progressWrap2  = document.getElementById('update-progress-wrap')!;
-  const progressBar2   = document.getElementById('update-progress-bar')!;
-  const installBtn     = document.getElementById('update-install-btn')!;
   const checkBtn       = document.getElementById('check-updates-btn') as HTMLButtonElement | null;
   const restartBtn     = document.getElementById('restart-update-btn') as HTMLButtonElement | null;
   const titlebarUpdate = document.getElementById('titlebar-update-btn') as HTMLButtonElement | null;
   const updateSub      = document.getElementById('update-settings-sub');
+  const DEFAULT_SUB    = 'Checks for updates every 30 minutes and downloads them in the background';
 
-  function enableRestartButtons(label = '↺ Restart & Update') {
-    if (restartBtn) {
-      restartBtn.disabled = false;
-      restartBtn.style.cursor = 'pointer';
-      restartBtn.style.opacity = '1';
-      restartBtn.textContent = label;
-      restartBtn.onclick = () => updater.install();
-    }
-    if (titlebarUpdate) {
-      titlebarUpdate.style.display = 'inline-block';
-      titlebarUpdate.onclick = () => updater.install();
-    }
+  let toast: HTMLElement | null = null;
+  let countdown: ReturnType<typeof setInterval> | null = null;
+  let readyVersion = '';
+  let manualCheck = false;
+
+  const stopCountdown = () => { if (countdown) { clearInterval(countdown); countdown = null; } };
+  function installNow() {
+    if (running) { setStatus('Close Minecraft first — the update installs when the launcher restarts', 'yellow'); return; }
+    stopCountdown();
+    updater.install();
   }
 
   updater.onChecking(() => {
     if (checkBtn) { checkBtn.textContent = 'Checking…'; checkBtn.disabled = true; }
     if (updateSub) updateSub.textContent = 'Checking for updates…';
   });
+
   updater.onNotAvailable(() => {
-    if (checkBtn) { checkBtn.textContent = 'Up to date ✓'; setTimeout(() => { checkBtn.textContent = 'Check for Updates'; checkBtn.disabled = false; }, 2500); }
-    if (updateSub) updateSub.textContent = 'You\'re on the latest version';
-    setTimeout(() => { if (updateSub) updateSub.textContent = 'Updates download automatically in the background'; }, 3000);
+    if (checkBtn) { checkBtn.textContent = 'Check for updates'; checkBtn.disabled = false; }
+    if (updateSub) updateSub.textContent = `You're on the latest version (${__APP_VERSION__})`;
+    if (manualCheck) showToast({ title: "You're up to date", text: `Voxel Client ${__APP_VERSION__} is the latest version.`, icon: 'check', tone: 'ok', timeout: 3500 });
+    manualCheck = false;
   });
+
   updater.onAvailable((ver: string) => {
-    // Download silently — don't interrupt the user until it's ready
     if (checkBtn) { checkBtn.textContent = 'Downloading…'; checkBtn.disabled = true; }
-    if (updateSub) updateSub.textContent = `Downloading v${ver} in background…`;
+    if (updateSub) updateSub.textContent = `Downloading version ${ver}…`;
+    toast = showToast({
+      id: 'update-toast',
+      title: `Downloading Voxel Client ${ver}`,
+      text: 'Keep playing — it installs on the next restart.<div class="toast-progress"><div class="toast-progress-bar"></div></div>',
+      icon: 'download',
+      tone: 'pending',
+    });
   });
+
   updater.onProgress((pct: number) => {
     if (updateSub) updateSub.textContent = `Downloading update… ${pct}%`;
+    const bar = toast?.querySelector<HTMLElement>('.toast-progress-bar');
+    if (bar) bar.style.width = `${pct}%`;
   });
-  updater.onDownloaded(() => {
-    // Update downloaded — auto-installs in 10s if Minecraft isn't running
-    banner.style.display = 'flex';
-    progressWrap2.style.display = 'none';
-    installBtn.style.display = 'inline-block';
-    if (checkBtn) { checkBtn.textContent = 'Check for Updates'; checkBtn.disabled = false; }
-    if (updateSub) updateSub.textContent = 'Update downloaded — restarting automatically';
+
+  updater.onDownloaded((ver: string) => {
+    readyVersion = ver || readyVersion;
+    const label = readyVersion ? `Voxel Client ${readyVersion}` : 'The update';
+    if (checkBtn) { checkBtn.textContent = 'Check for updates'; checkBtn.disabled = false; }
+    if (updateSub) updateSub.textContent = `${label} is ready — restart to install it`;
+    if (restartBtn) { restartBtn.disabled = false; restartBtn.onclick = installNow; }
+    if (titlebarUpdate) { titlebarUpdate.style.display = 'inline-flex'; titlebarUpdate.onclick = installNow; }
+
+    toast = showToast({
+      id: 'update-toast',
+      title: `${label} is ready`,
+      text: running ? 'It installs when you close the launcher.' : '<span class="toast-countdown"></span>',
+      icon: 'download',
+      tone: 'accent',
+      actions: [
+        { label: 'Later', onClick: stopCountdown },
+        { label: 'Restart now', primary: true, onClick: installNow },
+      ],
+    });
+    toast.querySelector('.toast-close')?.addEventListener('click', stopCountdown);
+    if (running) return;
+    const countdownEl = toast.querySelector('.toast-countdown')!;
     let secs = 10;
-    updateText.textContent = `Update ready — installing in ${secs}s`;
-    const cd = setInterval(() => {
-      secs--;
-      if (secs <= 0) {
-        clearInterval(cd);
-        updateText.textContent = 'Installing update…';
-        updater.install();
-      } else {
-        updateText.textContent = `Update ready — installing in ${secs}s`;
-      }
+    const tick = () => { countdownEl.textContent = `Restarting to install in ${secs}s.`; };
+    tick();
+    stopCountdown();
+    countdown = setInterval(() => {
+      if (running) { stopCountdown(); countdownEl.textContent = 'It installs when you close the launcher.'; return; }
+      if (--secs <= 0) { stopCountdown(); countdownEl.textContent = 'Restarting…'; updater.install(); return; }
+      tick();
     }, 1000);
-    enableRestartButtons();
   });
 
   updater.onError?.((msg: string) => {
-    if (checkBtn) { checkBtn.textContent = 'Retry'; checkBtn.disabled = false; }
-    if (updateSub) updateSub.textContent = `Update failed: ${msg}`;
+    if (checkBtn) { checkBtn.textContent = 'Try again'; checkBtn.disabled = false; }
+    if (updateSub) updateSub.textContent = `Couldn't update: ${msg}`;
+    // background checks fail quietly (offline etc.); say something only when asked or mid-download
+    if (manualCheck || document.getElementById('update-toast')) {
+      showToast({ id: 'update-toast', title: "Couldn't check for updates", text: 'Check your connection and try again from Settings.', icon: 'x', tone: 'error', timeout: 6000 });
+    }
+    manualCheck = false;
   });
 
-  installBtn.addEventListener('click', () => updater.install());
-  checkBtn?.addEventListener('click', () => updater.check());
+  checkBtn?.addEventListener('click', () => { manualCheck = true; updater.check(); });
+  if (updateSub) updateSub.textContent = DEFAULT_SUB;
+
+  // First launch after an update: say which version this is, once.
+  try {
+    const last = localStorage.getItem('voxel_last_version');
+    if (last && last !== __APP_VERSION__) {
+      showToast({ title: `Updated to ${__APP_VERSION__}`, text: 'Voxel Client is on the latest version.', icon: 'check', tone: 'ok', timeout: 6000 });
+    }
+    localStorage.setItem('voxel_last_version', __APP_VERSION__);
+  } catch { /* storage unavailable */ }
 }
 
 // ── Files panel ───────────────────────────────────────────────────────────────
 function makeDropZone(zoneId: string, accept: string[], onDrop: (paths: string[]) => void) {
   const zone = document.getElementById(zoneId)!;
-  const highlight = () => { zone.style.borderColor = '#f5a623'; zone.style.background = 'rgba(245,166,35,0.06)'; };
-  const unhighlight = () => { zone.style.borderColor = '#30363d'; zone.style.background = 'rgba(13,17,23,0.5)'; };
+  const highlight = () => zone.classList.add('is-over');
+  const unhighlight = () => zone.classList.remove('is-over');
   zone.addEventListener('dragover',  e => { e.preventDefault(); highlight(); });
   zone.addEventListener('dragleave', () => unhighlight());
   zone.addEventListener('drop', e => {
@@ -3596,13 +3694,13 @@ function renderFileList(listId: string, items: string[]) {
   const list = document.getElementById(listId)!;
   list.innerHTML = '';
   if (!items.length) {
-    list.innerHTML = `<div style="color:#484f58;font-size:12px;padding:4px 0;">No files yet — drop one above</div>`;
+    list.innerHTML = '<div class="empty" style="padding:4px 0">Nothing here yet. Drop a file above.</div>';
     return;
   }
   for (const name of items) {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(13,17,23,0.6);border:1px solid #21262d;border-radius:8px;';
-    row.innerHTML = `<span style="flex:1;font-size:12px;color:#e6edf3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>`;
+    row.className = 'item-row is-compact';
+    row.innerHTML = `${icon('folder')}<span class="item-row-name">${name}</span>`;
     list.appendChild(row);
   }
 }
@@ -3723,9 +3821,9 @@ function appendChatMessage(m: { user: string; text: string; ts: number; type?: s
     div.className = 'chat-announcement';
     if (fireKey) div.dataset.fireKey = fireKey;
     div.innerHTML =
-      `<span style="font-size:10px;color:#8b949e;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Announcement</span>` +
-      `<div style="color:#ffffff;font-size:13px;margin-top:5px;word-break:break-word;">${escHtml(m.text)}</div>` +
-      `<span style="font-size:10px;color:#484f58;margin-top:4px;display:block;">— ${escHtml(m.user)} · ${time}</span>`;
+      `<div class="chat-announcement-title">${icon('info')}Announcement</div>` +
+      `<div class="chat-announcement-text">${escHtml(m.text)}</div>` +
+      `<div class="chat-announcement-meta">${escHtml(m.user)} · ${time}</div>`;
     container.appendChild(div);
     return;
   }
@@ -3736,28 +3834,29 @@ function appendChatMessage(m: { user: string; text: string; ts: number; type?: s
   const row = document.createElement('div');
   if (fireKey) row.dataset.fireKey = fireKey;
   // My messages: bubble pushed to right. Others: avatar + bubble on left.
-  row.style.cssText = `display:flex;align-items:flex-end;gap:7px;${isMe ? 'justify-content:flex-end;' : ''}`;
+  row.className = 'chat-msg' + (isMe ? ' is-me' : '');
 
   const bubble = document.createElement('div');
-  bubble.style.cssText = `display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};gap:2px;max-width:75%;`;
+  bubble.className = 'chat-msg-body';
   bubble.innerHTML =
-    `<span style="font-size:10px;color:#484f58;">${isMe ? '' : escHtml(m.user) + adminBadge + ' · '}${time}</span>` +
-    `<div style="background:${isMe ? 'rgba(245,166,35,0.15)' : '#141414'};border:1px solid ${isMe ? 'rgba(245,166,35,0.28)' : '#222222'};border-radius:10px;padding:6px 11px;font-size:13px;color:#ffffff;word-break:break-word;">${escHtml(m.text)}</div>`;
+    `<span class="chat-msg-meta">${isMe ? '' : escHtml(m.user) + adminBadge + ' · '}${time}</span>` +
+    `<div class="chat-bubble">${escHtml(m.text)}</div>`;
 
   // Show a chat head for every message, including your own (previously only
   // other players' messages got an avatar).
   const avatarColor = usernameColor(m.user);
   const initial = (m.user[0] || '?').toUpperCase();
   const avatarWrap = document.createElement('div');
-  avatarWrap.style.cssText = 'flex-shrink:0;width:24px;height:24px;position:relative;';
+  avatarWrap.className = 'chat-msg-head';
   const img = document.createElement('img');
-  img.src = `https://minotar.net/avatar/${encodeURIComponent(m.user)}/24`;
-  img.style.cssText = 'width:24px;height:24px;border-radius:50%;image-rendering:pixelated;display:block;';
+  img.src = `https://mc-heads.net/avatar/${encodeURIComponent(m.user)}/24`;
+  img.alt = '';
   const fallback = document.createElement('span');
   fallback.className = 'chat-msg-avatar';
-  fallback.style.cssText = `display:none;background:${avatarColor};`;
+  fallback.hidden = true;
+  fallback.style.background = avatarColor;
   fallback.textContent = initial;
-  img.onerror = () => { img.style.display = 'none'; fallback.style.display = 'flex'; };
+  img.onerror = () => { img.hidden = true; fallback.hidden = false; };
   avatarWrap.appendChild(img);
   avatarWrap.appendChild(fallback);
 
@@ -3778,20 +3877,20 @@ function renderChatUsers(val: Record<string, any>, container: HTMLElement) {
   selfRow.className = 'chat-user-row';
   const selfBadge = amIAdmin ? ` <span class="chat-admin-badge">ADMIN</span>` : '';
   selfRow.innerHTML =
-    `<span style="width:7px;height:7px;background:#3fb950;border-radius:50%;flex-shrink:0;"></span>` +
-    `<span style="font-size:12px;color:#f5a623;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">${escHtml(myName)}${selfBadge}</span>`;
+    `<span class="online-dot"></span>` +
+    `<span class="chat-user-name is-self">${escHtml(myName)}${selfBadge}</span>`;
   container.appendChild(selfRow);
 
   Object.entries(val).forEach(([id, v]: [string, any]) => {
     if (id === myId) return;
     const isThisAdmin = adminList.has(v.name);
     const adminBadge = isThisAdmin ? ` <span class="chat-admin-badge">ADMIN</span>` : '';
-    const timeoutBtn = (amIAdmin && !isThisAdmin) ? `<button class="chat-timeout-btn" title="Timeout ${escHtml(v.name)}">⏱</button>` : '';
+    const timeoutBtn = (amIAdmin && !isThisAdmin) ? `<button class="chat-timeout-btn" title="Time out ${escHtml(v.name)}" aria-label="Time out ${escHtml(v.name)}">${icon('clock')}</button>` : '';
     const row = document.createElement('div');
     row.className = 'chat-user-row';
     row.innerHTML =
-      `<span style="width:7px;height:7px;background:#3fb950;border-radius:50%;flex-shrink:0;"></span>` +
-      `<span style="font-size:12px;color:#ffffff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(v.name)}${adminBadge}</span>` +
+      `<span class="online-dot"></span>` +
+      `<span class="chat-user-name">${escHtml(v.name)}${adminBadge}</span>` +
       timeoutBtn;
     if (amIAdmin && !isThisAdmin) {
       row.querySelector<HTMLButtonElement>('.chat-timeout-btn')!.addEventListener('click', (e) => {
@@ -3872,23 +3971,17 @@ async function joinVoiceChannel() {
     }
 
     // Show a small "Try Again" toast — settings window is already open
-    const existing = document.getElementById('mic-blocked-toast');
-    if (existing) existing.remove();
-    const toast = document.createElement('div');
-    toast.id = 'mic-blocked-toast';
-    toast.style.cssText = 'position:fixed;bottom:80px;right:24px;background:#141414;border:1px solid rgba(248,81,73,0.5);border-radius:10px;padding:14px 18px;z-index:9999;max-width:280px;font-family:inherit;box-shadow:0 8px 32px rgba(0,0,0,0.7);';
-    toast.innerHTML = `<div style="color:#f85149;font-weight:700;font-size:13px;margin-bottom:6px;">Microphone blocked</div>
-      <div style="color:#f6c356;font-size:11px;font-family:monospace;background:#0d0d0d;border-radius:5px;padding:6px 8px;margin-bottom:8px;">${reason}</div>
-      <div style="color:#aaaaaa;font-size:11px;line-height:1.6;margin-bottom:10px;">If you just enabled it in Windows Settings,<br><strong style="color:#ffffff;">you must restart the app</strong> for it to take effect.</div>
-      <div style="display:flex;gap:8px;">
-        <button id="mic-restart" style="flex:1;padding:7px;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.4);border-radius:6px;color:#f5a623;font-size:12px;cursor:pointer;font-weight:600;">↺ Restart App</button>
-        <button id="mic-retry" style="flex:1;padding:7px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);border-radius:6px;color:#3fb950;font-size:12px;cursor:pointer;font-weight:600;">Try Again</button>
-        <button id="mic-dismiss" style="padding:7px 10px;background:none;border:1px solid #2a2a2a;border-radius:6px;color:#777777;font-size:12px;cursor:pointer;">✕</button>
-      </div>`;
-    document.body.appendChild(toast);
-    toast.querySelector('#mic-restart')!.addEventListener('click', () => (window as any).electron?.relaunch());
-    toast.querySelector('#mic-retry')!.addEventListener('click', () => { toast.remove(); joinVoiceChannel(); });
-    toast.querySelector('#mic-dismiss')!.addEventListener('click', () => toast.remove());
+    showToast({
+      id: 'mic-blocked-toast',
+      title: 'Microphone blocked',
+      text: `<code>${escHtml(String(reason))}</code> If you just allowed it in Windows Settings, restart the launcher for it to take effect.`,
+      icon: 'mic',
+      tone: 'error',
+      actions: [
+        { label: 'Restart launcher', onClick: () => (window as any).electron?.relaunch() },
+        { label: 'Try again', primary: true, onClick: () => joinVoiceChannel() },
+      ],
+    });
     return;
   }
 
@@ -4039,7 +4132,7 @@ function initChat() {
     feedbackCountBadge.style.display = items.length > 0 ? 'inline' : 'none';
     feedbackList.innerHTML = '';
     if (items.length === 0) {
-      feedbackList.innerHTML = '<div style="color:#484f58;font-size:12px;text-align:center;padding:16px 0;">No feedback yet.</div>';
+      feedbackList.innerHTML = listMsg('No feedback yet.');
       return;
     }
     items.forEach(([id, fb]: [string, any]) => {
@@ -4047,7 +4140,7 @@ function initChat() {
       d.className = 'feedback-item';
       const ago = Math.round((Date.now() - fb.ts) / 60000);
       const timeStr = ago < 60 ? `${ago}m ago` : ago < 1440 ? `${Math.round(ago/60)}h ago` : `${Math.round(ago/1440)}d ago`;
-      d.innerHTML = `<div class="feedback-item-body"><span class="feedback-cat-chip">${fb.category || 'other'}</span><span style="color:#e6edf3;font-size:12px;">${fb.text.replace(/</g,'&lt;')}</span><div style="font-size:10px;color:#484f58;margin-top:4px;">${fb.user} · ${timeStr}</div></div><button class="feedback-item-del" title="Delete">✕</button>`;
+      d.innerHTML = `<div class="feedback-item-body"><span class="feedback-cat-chip">${escHtml(fb.category || 'other')}</span><span class="feedback-item-text">${escHtml(fb.text)}</span><div class="feedback-item-meta">${escHtml(fb.user)} · ${timeStr}</div></div><button class="feedback-item-del btn btn-ghost btn-icon btn-sm" title="Delete" aria-label="Delete feedback">${icon('trash')}</button>`;
       d.querySelector<HTMLButtonElement>('.feedback-item-del')!.addEventListener('click', () => {
         remove(ref(rtdb, `voxel_feedback/${id}`)).catch(() => {});
       });
@@ -4095,7 +4188,7 @@ function initChat() {
     const atBottom = msgsEl.scrollHeight - msgsEl.scrollTop <= msgsEl.clientHeight + 60;
     msgsEl.innerHTML = '';
     if (entries.length === 0) {
-      msgsEl.innerHTML = '<div style="color:#2a2a2a;font-size:12px;text-align:center;margin:auto;">No messages yet — say hi!</div>';
+      msgsEl.innerHTML = '<p class="list-msg" style="margin:auto">No messages yet. Say hi!</p>';
     } else {
       entries.forEach(([key, m]) => appendChatMessage(m, msgsEl, myName, key));
     }
@@ -4182,11 +4275,11 @@ function initChat() {
     if (!clearChatArmed) {
       clearChatArmed = true;
       clearChatBtn.textContent = 'Click again to confirm';
-      clearChatBtn.style.color = '#f85149';
+      setTone(clearChatBtn, 'error');
       clearChatArmTimer = setTimeout(() => {
         clearChatArmed = false;
         clearChatBtn.textContent = 'Clear Chat';
-        clearChatBtn.style.color = '#aaaaaa';
+        setTone(clearChatBtn, 'muted');
       }, 3000);
       return;
     }
@@ -4201,7 +4294,7 @@ function initChat() {
     }
     clearChatBtn.disabled = false;
     clearChatBtn.textContent = 'Clear Chat';
-    clearChatBtn.style.color = '#aaaaaa';
+    setTone(clearChatBtn, 'muted');
   });
 
   // Voice channel buttons
@@ -4309,14 +4402,9 @@ function initChat() {
                  (document.getElementById('offline-username') as HTMLInputElement | null)?.value?.trim() ||
                  localStorage.getItem('voxel_guest_name') || 'Anonymous';
     await push(ref(rtdb, 'voxel_feedback'), { user, text, category: selectedCat, ts: Date.now() }).catch(() => {});
-    submitBtn.disabled = false; submitBtn.textContent = 'Submit';
+    submitBtn.disabled = false; submitBtn.textContent = 'Send';
     modal.style.display = 'none';
-    // Brief success toast
-    const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:70px;right:24px;background:#238636;border:1px solid #2ea043;color:#fff;font-size:12px;border-radius:7px;padding:8px 16px;z-index:900;';
-    toast.textContent = 'Feedback sent!';
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2500);
+    showToast({ title: 'Feedback sent', text: 'Thanks. It goes straight to the developer.', icon: 'check', tone: 'ok', timeout: 3000 });
   });
 })();
 
@@ -4807,7 +4895,7 @@ function initGuide() {
     const label = name || url.split('Invicon_')[1]?.replace('.png','').replace(/_/g,' ') || '';
     const short = label.split(' ').map((w: string) => w[0]).join('').slice(0,3).toUpperCase();
     const tip = label ? `<span class="rc-tip">${escHtml(label)}</span>` : '';
-    return `<div class="recipe-cell">${tip}<img src="${url}" loading="lazy" alt="${escHtml(label)}" onerror="this.style.display='none';(this.nextElementSibling as HTMLElement).style.display='flex'"><span class="rc-fallback" title="${escHtml(label)}">${escHtml(short)}</span></div>`;
+    return `<div class="recipe-cell">${tip}<img src="${url}" alt="${escHtml(label)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="rc-fallback" title="${escHtml(label)}">${escHtml(short)}</span></div>`;
   }
 
   function showRecipeDetail(r: MCRecipe) {
@@ -4822,30 +4910,24 @@ function initGuide() {
     const cells = r.grid.map(url => itemCell(url || null, url ? names[url] : undefined)).join('');
     const ingredients = [...new Set(r.grid.filter(Boolean))].map(url => {
       const n = url!.split('Invicon_')[1]?.replace('.png','').replace(/_/g,' ') || url;
-      return `<span style="display:inline-flex;align-items:center;gap:4px;background:#1a1a1a;border:1px solid #222;border-radius:5px;padding:2px 7px;font-size:11px;"><img src="${url}" loading="lazy" style="width:16px;height:16px;image-rendering:pixelated;" onerror="this.style.display='none'"> ${escHtml(n!)}</span>`;
+      return `<span class="ingredient"><img src="${url}" loading="lazy" alt="" onerror="this.style.display='none'">${escHtml(n!)}</span>`;
     }).join('');
     contentEl.innerHTML = `
-      <button id="guide-back" style="background:none;border:none;color:#f5a623;font-size:12px;cursor:pointer;padding:0 0 10px;display:flex;align-items:center;gap:4px;">← ${t('crafting')}</button>
-      <div style="font-size:16px;font-weight:700;color:#ffffff;margin-bottom:14px;">${t('recipe_for')} ${escHtml(r.name)}</div>
-      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
-        <div>
-          <div style="font-size:10px;color:#484f58;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">${t('ingredients')}</div>
+      <button id="guide-back" class="guide-back-btn">${icon('left')}${t('crafting')}</button>
+      <h2 class="recipe-title">${t('recipe_for')} ${escHtml(r.name)}</h2>
+      <div class="recipe-layout">
+        <figure class="recipe-part">
           <div class="recipe-grid">${cells}</div>
-        </div>
-        <div style="font-size:24px;color:#484f58;">→</div>
-        <div>
-          <div style="font-size:10px;color:#484f58;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">${t('result')}</div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
-            <div class="recipe-cell" style="width:52px;height:52px;">${itemCell(WIKI(r.img), r.name)}</div>
-            ${r.count && r.count > 1 ? `<span style="font-size:11px;color:#f5a623;">×${r.count}</span>` : ''}
-            <span style="font-size:11px;color:#aaaaaa;">${escHtml(r.name)}</span>
-          </div>
-        </div>
+          <figcaption>${t('ingredients')}</figcaption>
+        </figure>
+        <span class="recipe-arrow">${icon('right')}</span>
+        <figure class="recipe-part">
+          <div class="recipe-cell recipe-result">${itemCell(WIKI(r.img), r.name)}${r.count && r.count > 1 ? `<span class="recipe-count">×${r.count}</span>` : ''}</div>
+          <figcaption>${escHtml(r.name)}</figcaption>
+        </figure>
       </div>
-      <div style="margin-top:8px;">
-        <div style="font-size:10px;color:#484f58;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">${t('ingredients')}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px;">${ingredients}</div>
-      </div>`;
+      <div class="section-title" style="margin-top:20px;">${t('ingredients')}</div>
+      <div class="ingredients">${ingredients}</div>`;
     document.getElementById('guide-back')!.addEventListener('click', () => renderRecipes(searchEl.value.toLowerCase().trim()));
   }
 
@@ -4853,14 +4935,13 @@ function initGuide() {
     const filtered = RECIPES.filter(r =>
       !q || r.name.toLowerCase().includes(q) || (r.tags || '').includes(q) || r.cat.includes(q)
     );
-    if (!filtered.length) { contentEl.innerHTML = `<div style="color:#484f58;text-align:center;padding:30px 0;font-size:13px;">No recipes found for "${escHtml(q)}"</div>`; return; }
+    if (!filtered.length) { contentEl.innerHTML = listMsg(`No recipes match "${escHtml(q)}".`); return; }
     const frag = document.createDocumentFragment();
     filtered.forEach(r => {
       const card = document.createElement('div');
       card.className = 'recipe-card';
-      card.style.marginBottom = '6px';
       const initials = r.name.split(' ').map((w:string)=>w[0]).join('').slice(0,3).toUpperCase();
-      card.innerHTML = `<div class="recipe-card-icon"><img src="${WIKI(r.img)}" loading="lazy" alt="${escHtml(r.name)}" style="width:30px;height:30px;image-rendering:pixelated;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:8px;font-weight:700;color:#8b949e;\\'>${initials}</span>'"></div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#ffffff;">${escHtml(r.name)}</div><div style="font-size:10px;color:#484f58;text-transform:uppercase;letter-spacing:0.5px;">${r.cat}</div></div><span style="font-size:11px;color:#484f58;">▶</span>`;
+      card.innerHTML = `<div class="recipe-card-icon" data-initials="${initials}"><img src="${WIKI(r.img)}" loading="lazy" alt="" onerror="this.remove()"></div><div class="item-row-text"><div class="item-row-name">${escHtml(r.name)}</div><div class="item-row-meta">${r.cat}</div></div>${icon('right')}`;
       card.addEventListener('click', () => showRecipeDetail(r));
       frag.appendChild(card);
     });
@@ -4871,37 +4952,34 @@ function initGuide() {
   // ── Mobs tab ────
   function statBar(val: number, max: number, color: string): string {
     const pct = Math.min(100, Math.round((val / max) * 100));
-    return `<div class="stat-bar"><div class="stat-fill" style="width:${pct}%;background:${color};"></div></div>`;
+    return `<div class="stat-bar"><div class="stat-fill ${color}" style="width:${pct}%"></div></div>`;
   }
 
   function renderMobs(q: string) {
     const filtered = MOBS.filter(m => !q || m.name.toLowerCase().includes(q) || m.spawn.toLowerCase().includes(q) || m.type.includes(q));
-    if (!filtered.length) { contentEl.innerHTML = `<div style="color:#484f58;text-align:center;padding:30px 0;font-size:13px;">No mobs found</div>`; return; }
-    const typeColors: Record<string, string> = { passive: '#3fb950', neutral: '#f5a623', hostile: '#f85149', boss: '#d2a8ff' };
+    if (!filtered.length) { contentEl.innerHTML = listMsg('No mobs match that search.'); return; }
     const frag = document.createDocumentFragment();
     filtered.forEach(m => {
       const card = document.createElement('div');
       card.className = 'mob-card';
-      card.style.marginBottom = '8px';
-      const tc = typeColors[m.type] || '#aaaaaa';
       card.innerHTML = `
-        <div style="display:flex;gap:12px;align-items:flex-start;">
-          <img src="${m.img}" loading="lazy" alt="${escHtml(m.name)}" style="width:52px;height:52px;image-rendering:pixelated;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'">
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-              <span style="font-size:14px;font-weight:700;color:#ffffff;">${escHtml(m.name)}</span>
-              <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${tc}22;color:${tc};border:1px solid ${tc}44;font-weight:600;">${t('type_'+m.type.slice(0,4))}</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;">
-              <div><div style="font-size:10px;color:#484f58;">${t('hp')} ${m.hp}</div>${statBar(m.hp, 500, '#3fb950')}</div>
-              <div><div style="font-size:10px;color:#484f58;">${t('atk')} ${m.atk}</div>${statBar(m.atk, 40, '#f85149')}</div>
-              <div><div style="font-size:10px;color:#484f58;">${t('armor')} ${m.armor}</div>${statBar(m.armor, 20, '#58a6ff')}</div>
-              <div><div style="font-size:10px;color:#484f58;">${t('xp')} ${m.xp}</div>${statBar(m.xp, 50, '#f6c356')}</div>
-            </div>
-            <div style="margin-top:8px;font-size:11px;color:#484f58;">${t('spawn')}: <span style="color:#aaaaaa;">${escHtml(m.spawn)}</span></div>
-            <div style="margin-top:4px;font-size:11px;color:#484f58;">${t('drops')}: <span style="color:#aaaaaa;">${m.drops.map(d => escHtml(d)).join(', ')}</span></div>
-            ${m.tips.length ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">${m.tips.map(tip => `<div style="font-size:11px;color:#8b949e;padding-left:10px;border-left:2px solid #21262d;">${escHtml(tip)}</div>`).join('')}</div>` : ''}
+        <img class="mob-img" src="${m.img}" loading="lazy" alt="" onerror="this.style.visibility='hidden'">
+        <div class="mob-body">
+          <div class="mob-head">
+            <span class="mob-name">${escHtml(m.name)}</span>
+            <span class="mob-type" data-type="${m.type}">${t('type_'+m.type.slice(0,4))}</span>
           </div>
+          <div class="mob-stats">
+            <div><span>${t('hp')} ${m.hp}</span>${statBar(m.hp, 500, 'hp')}</div>
+            <div><span>${t('atk')} ${m.atk}</span>${statBar(m.atk, 40, 'atk')}</div>
+            <div><span>${t('armor')} ${m.armor}</span>${statBar(m.armor, 20, 'armor')}</div>
+            <div><span>${t('xp')} ${m.xp}</span>${statBar(m.xp, 50, 'xp')}</div>
+          </div>
+          <dl class="mob-facts">
+            <dt>${t('spawn')}</dt><dd>${escHtml(m.spawn)}</dd>
+            <dt>${t('drops')}</dt><dd>${m.drops.map(d => escHtml(d)).join(', ')}</dd>
+          </dl>
+          ${m.tips.length ? `<ul class="mob-tips">${m.tips.map(tip => `<li>${escHtml(tip)}</li>`).join('')}</ul>` : ''}
         </div>`;
       frag.appendChild(card);
     });
@@ -4913,7 +4991,7 @@ function initGuide() {
   function renderTips(q: string) {
     const cats = ['all','mine','combat','farm','build','surv','red'];
     const catBar = document.createElement('div');
-    catBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;';
+    catBar.className = 'cat-bar';
     cats.forEach(c => {
       const btn = document.createElement('button');
       btn.className = 'cat-btn' + (tipCat === c ? ' active' : '');
@@ -4927,12 +5005,11 @@ function initGuide() {
     );
     contentEl.innerHTML = '';
     contentEl.appendChild(catBar);
-    if (!filtered.length) { contentEl.insertAdjacentHTML('beforeend', `<div style="color:#484f58;text-align:center;padding:30px 0;font-size:13px;">No tips found</div>`); return; }
+    if (!filtered.length) { contentEl.insertAdjacentHTML('beforeend', listMsg('No tips match that search.')); return; }
     const frag = document.createDocumentFragment();
     filtered.forEach(tip => {
       const card = document.createElement('div');
       card.className = 'tip-card';
-      card.style.marginBottom = '7px';
       card.innerHTML = tip.text;
       frag.appendChild(card);
     });
@@ -4955,9 +5032,9 @@ function initGuide() {
       const tab = document.createElement('button');
       tab.className = 'ai-stab' + (sess.id === activeSessId ? ' active' : '');
       tab.innerHTML = `<span class="ai-stab-name">${sess.name}</span>` +
-        (sessions.length > 1 ? `<span class="ai-stab-x" data-del="${sess.id}">✕</span>` : '');
+        (sessions.length > 1 ? `<span class="ai-stab-x" data-del="${sess.id}" title="Close chat">${icon('x')}</span>` : '');
       tab.addEventListener('click', e => {
-        const del = (e.target as HTMLElement).dataset.del;
+        const del = (e.target as HTMLElement).closest<HTMLElement>('[data-del]')?.dataset.del;
         if (del) { deleteSession(del); return; }
         switchSession(sess.id);
       });

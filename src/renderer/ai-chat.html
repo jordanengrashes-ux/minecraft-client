@@ -4,64 +4,200 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Chat — Voxel Client</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" />
   <style>
-    * { margin:0;padding:0;box-sizing:border-box; }
-    body { background:#0a0a0a;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden; }
+    /* ── Tokens (same as game.html) ─────────────────────────────────────────── */
+    :root {
+      --font: 'Archivo', system-ui, 'Segoe UI', sans-serif;
+      --mono: 'Cascadia Mono', Consolas, monospace;
 
-    #session-bar { display:flex;align-items:center;gap:3px;padding:4px 8px;border-bottom:1px solid #1a1a1a;background:#060606;flex-shrink:0;overflow-x:auto;scrollbar-width:none; }
-    #session-bar::-webkit-scrollbar { display:none; }
-    .stab { background:none;border:1px solid transparent;border-radius:5px;color:#484f58;font-size:10px;cursor:pointer;padding:3px 9px;white-space:nowrap;font-family:inherit;display:flex;align-items:center;gap:4px; }
-    .stab:hover { color:#8b949e;border-color:#1e1e1e; }
-    .stab.active { color:#e6edf3;border-color:#2a2a2a;background:#111; }
-    .stab-x { color:#484f58;font-size:9px; }
-    .stab-x:hover { color:#f85149; }
-    #new-sess { background:none;border:1px solid transparent;border-radius:5px;color:#484f58;font-size:16px;cursor:pointer;padding:0 8px;line-height:1.5;font-family:inherit;flex-shrink:0; }
-    #new-sess:hover { color:#8b949e;border-color:#1e1e1e; }
+      --bg:          #0c0c0d;
+      --bg-sunk:     #08080a;
+      --surface:     #141416;
+      --surface-2:   #1b1b1e;
+      --surface-3:   #232327;
+      --line:        #222226;
+      --line-strong: #323238;
 
-    #messages { flex:1;overflow-y:auto;padding:12px;scrollbar-width:thin;scrollbar-color:#222 transparent;display:flex;flex-direction:column;gap:8px; }
-    .bubble { max-width:85%;padding:8px 12px;border-radius:10px;font-size:12px;line-height:1.6;word-break:break-word; }
-    .bubble.user { background:#1e1e1e;border:1px solid #2a2a2a;align-self:flex-end;color:#e6edf3; }
-    .bubble.ai { background:#0d1117;border:1px solid #21262d;align-self:flex-start;color:#e6edf3; }
-    .bubble.ai strong { color:#79c0ff; }
-    .bubble.ai em { color:#d2a679; }
-    .bubble.ai code { background:#161b22;padding:1px 5px;border-radius:3px;font-size:11px;color:#79c0ff;font-family:monospace; }
-    .bubble.ai pre { background:#161b22;padding:8px 10px;border-radius:6px;overflow-x:auto;margin:4px 0;font-size:11px; }
-    .bubble.ai ul,.bubble.ai ol { padding-left:16px;margin:4px 0; }
-    .bubble.typing { color:#484f58;font-style:italic; }
+      --text:   #f3f1ed;
+      --text-2: #b0aca5;
+      --text-3: #85817a;
 
-    #input-row { padding:8px 10px;border-top:1px solid #1e1e1e;background:#080808;flex-shrink:0;display:flex;gap:6px;align-items:center; }
-    #ai-input { flex:1;background:#0d0d0d;border:1px solid #222;border-radius:5px;padding:7px 10px;color:#fff;font-size:12px;outline:none;font-family:inherit; }
-    #ai-input:focus { border-color:#333; }
-    #web-badge { display:none;font-size:9px;color:#58a6ff;border:1px solid #1e3a5f;border-radius:3px;padding:1px 5px;flex-shrink:0; }
-    #clear-btn { background:none;border:none;color:#484f58;font-size:11px;cursor:pointer;padding:4px 6px;font-family:inherit; }
-    #clear-btn:hover { color:#8b949e; }
-    #send-btn { background:#1e1e1e;border:1px solid #333;border-radius:5px;padding:7px 14px;color:#fff;font-size:12px;cursor:pointer;white-space:nowrap; }
-    #send-btn:hover:not(:disabled) { background:#252525; }
-    #send-btn:disabled { opacity:0.4;cursor:default; }
+      --amber:      #f5a623;
+      --amber-hi:   #ffbe4d;
+      --amber-ink:  #1c1203;
+      --amber-wash: rgba(245, 166, 35, 0.12);
+      --amber-line: rgba(245, 166, 35, 0.38);
+      --danger:      #f0574b;
+      --danger-wash: rgba(240, 87, 75, 0.12);
+      --ok:          #4cc38a;
+      --ok-wash:     rgba(76, 195, 138, 0.13);
 
-    /* Crafting grid */
-    .craft-grid { display:inline-flex;flex-direction:column;gap:0;background:#8b8b8b;border:3px solid #373737;border-right-color:#fff;border-bottom-color:#fff;padding:4px;margin:8px 0;border-radius:2px; }
-    .craft-label { font-size:9px;font-weight:700;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;padding:0 2px; }
-    .craft-row { display:flex;gap:0; }
-    .craft-slot { width:44px;height:44px;background:#8b8b8b;border:2px solid #fff;border-right-color:#373737;border-bottom-color:#373737;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#000;text-align:center;line-height:1.2;padding:2px; }
-    .craft-slot:empty::after { content:''; }
+      --radius:    8px;
+      --radius-sm: 6px;
+      --ease-out:  cubic-bezier(.16, 1, .3, 1);
+      color-scheme: dark;
+    }
+
+    /* ── Base ───────────────────────────────────────────────────────────────── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg); color: var(--text);
+      font: 400 13px/1.45 var(--font);
+      height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: rgba(245, 166, 35, 0.35); color: #fff; }
+    :focus { outline: none; }
+    :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 4px; }
+    input, button { font: inherit; color: inherit; }
+    input { caret-color: var(--amber); }
+    strong { font-weight: 600; }
+    #top-bar, #input-row, button { user-select: none; -webkit-user-select: none; }
+
+    * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+    ::-webkit-scrollbar-thumb:hover { background-color: #45454c; }
+    ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+
+    .sprite { position: absolute; }
+    .icon { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── Controls ───────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      height: 32px; padding: 0 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--line-strong); background: var(--surface); color: var(--text);
+      font-weight: 500; font-size: 13px; line-height: 1; cursor: pointer; white-space: nowrap;
+      transition: background .15s, border-color .15s, color .15s, transform .1s;
+    }
+    .btn:hover:not(:disabled) { background: var(--surface-2); border-color: #45454c; }
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); font-weight: 600; }
+    .btn-primary:hover:not(:disabled) { background: var(--amber-hi); border-color: var(--amber-hi); }
+    .btn-ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+    .btn-ghost:hover:not(:disabled) { background: var(--surface); border-color: transparent; color: var(--text); }
+    .btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
+
+    .field {
+      width: 100%; height: 34px; padding: 0 11px;
+      background: var(--bg-sunk); border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+      color: var(--text); font-size: 13px; transition: border-color .15s, background .15s;
+    }
+    .field::placeholder { color: var(--text-3); }
+    .field:hover { border-color: #45454c; }
+    .field:focus { border-color: var(--amber); background: #0a0a0b; }
+
+    /* ── Top bar: brand, chat tabs, clear ───────────────────────────────────── */
+    #top-bar {
+      flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+      height: 44px; padding: 0 8px 0 14px;
+      background: var(--bg-sunk); border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding-right: 12px; border-right: 1px solid var(--line); height: 20px; }
+    .brand-mark { width: 18px; height: 18px; flex-shrink: 0; }
+    .wordmark { font-size: 13px; font-weight: 800; font-stretch: 125%; letter-spacing: .02em; line-height: 1; }
+
+    /* ai-chat.ts inserts each tab right after #new-sess, newest first. Reversing the
+       row shows them oldest-to-newest with the + at the end; the auto margin on
+       #new-sess packs them to the left without hiding overflow. */
+    #session-bar {
+      flex: 1; min-width: 0; height: 100%;
+      display: flex; flex-direction: row-reverse; align-items: center; gap: 4px;
+      overflow-x: auto; scrollbar-width: none;
+    }
+    #session-bar::-webkit-scrollbar { display: none; }
+    #new-sess {
+      margin-right: auto; flex-shrink: 0;
+      width: 26px; height: 26px; display: grid; place-items: center;
+      border: 0; border-radius: 5px; background: none; color: var(--text-2); cursor: pointer;
+      transition: background .12s, color .12s;
+    }
+    #new-sess:hover { background: var(--surface); color: var(--text); }
+    .stab {
+      display: flex; align-items: center; gap: 5px; flex-shrink: 0; max-width: 130px;
+      height: 26px; padding: 0 9px; border-radius: 5px; border: 1px solid transparent;
+      background: none; color: var(--text-3); font-size: 12px; cursor: pointer; white-space: nowrap;
+      transition: color .12s, border-color .12s, background .12s;
+    }
+    .stab > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+    .stab:hover { color: var(--text-2); border-color: var(--line); }
+    .stab.active { color: var(--text); background: var(--surface); border-color: var(--line-strong); }
+    .stab:has(.stab-x) { padding-right: 3px; }
+    .stab-x { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; color: var(--text-3); }
+    .stab-x .icon { width: 12px; height: 12px; pointer-events: none; }  /* clicks must land on the span's data-del */
+    .stab-x:hover { color: var(--danger); background: var(--danger-wash); }
+    #clear-btn { flex-shrink: 0; }
+
+    /* ── Messages ───────────────────────────────────────────────────────────── */
+    #messages { flex: 1; overflow-y: auto; padding: 16px 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+    .bubble { max-width: 85%; padding: 9px 13px; font-size: 13px; line-height: 1.6; word-break: break-word; user-select: text; -webkit-user-select: text; }
+    .bubble.user { align-self: flex-end; border-radius: 12px 12px 4px 12px; background: var(--amber-wash); border: 1px solid var(--amber-line); color: var(--text); line-height: 1.5; }
+    .bubble.ai { align-self: flex-start; max-width: 90%; padding: 10px 14px; border-radius: 12px 12px 12px 4px; background: var(--surface); border: 1px solid var(--line); color: var(--text); line-height: 1.65; }
+    .bubble.ai strong { color: var(--amber-hi); }
+    .bubble.ai em { color: var(--text); font-style: italic; }
+    .bubble.ai code { padding: 1px 5px; border-radius: 4px; background: var(--bg-sunk); border: 1px solid var(--line); font: 12px var(--mono); color: #f6c356; }
+    .bubble.ai pre { margin: 6px 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-sunk); border: 1px solid var(--line); font: 12px var(--mono); white-space: pre-wrap; overflow-x: auto; }
+    .bubble.ai pre code { padding: 0; border: 0; background: none; color: var(--text-2); }
+    .bubble.ai ul, .bubble.ai ol { padding-left: 18px; margin: 4px 0; }
+    .bubble.intro { max-width: 100%; padding: 2px 2px 0; background: none; border: 0; color: var(--text-2); }
+    .bubble.typing { padding: 4px 2px; background: none; border: 0; color: var(--text-3); font-style: italic; }
+    .bubble.error { background: var(--danger-wash); border-color: rgba(240,87,75,.32); }
+
+    /* Crafting grid (built by ai-chat.ts) */
+    .craft-grid { display: inline-flex; flex-direction: column; gap: 3px; margin: 8px 0; }
+    .craft-label { font-size: 12px; font-weight: 500; color: var(--text-3); margin-bottom: 3px; }
+    .craft-row { display: flex; gap: 3px; }
+    .craft-slot {
+      width: 48px; height: 48px; padding: 2px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line);
+      font-size: 9px; font-weight: 600; line-height: 1.15; color: var(--text-2); text-align: center; overflow-wrap: anywhere;
+    }
+    .craft-slot:empty { background: var(--bg-sunk); }
 
     /* AI-generated images */
-    .ai-img-wrap { margin:8px 0; }
-    .ai-img { max-width:100%;border-radius:8px;border:1px solid #21262d;display:block; }
-    .ai-img-caption { font-size:10px;color:#484f58;margin-top:4px;font-style:italic; }
+    .ai-img-wrap { margin: 8px 0; }
+    .ai-img { display: block; max-width: 100%; border-radius: var(--radius); border: 1px solid var(--line); }
+    .ai-img-caption { margin-top: 4px; font-size: 12px; color: var(--text-3); }
+
+    /* ── Composer ───────────────────────────────────────────────────────────── */
+    #input-row {
+      flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px; background: var(--bg-sunk); border-top: 1px solid var(--line);
+    }
+    #ai-input { flex: 1; min-width: 0; }
+    #web-badge { display: none; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px; border: 1px solid var(--amber-line); color: var(--amber-hi); font-size: 11px; flex-shrink: 0; }
+    #send-btn { height: 34px; }
   </style>
 </head>
 <body>
-  <div id="session-bar">
-    <button id="new-sess" title="New chat">+</button>
-  </div>
-  <div id="messages"></div>
+  <!-- Icons: one stroke weight, 24px grid (from game.html) -->
+  <svg width="0" height="0" class="sprite" aria-hidden="true">
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  </svg>
+
+  <header id="top-bar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 20.5 7.25 12 12 3.5 7.25Z" fill="#ffc35a"/><path d="M3.5 7.25 12 12v9.5l-8.5-4.75Z" fill="#f5a623"/><path d="M20.5 7.25 12 12v9.5l8.5-4.75Z" fill="#a8680b"/></svg>
+      <span class="wordmark">VOXEL</span>
+    </div>
+    <div id="session-bar">
+      <button id="new-sess" title="New chat" aria-label="New chat"><svg class="icon"><use href="#i-plus"/></svg></button>
+    </div>
+    <button id="clear-btn" class="btn btn-ghost btn-sm" title="Clear this chat">Clear chat</button>
+  </header>
+  <div id="messages" aria-live="polite"></div>
   <div id="input-row">
-    <input id="ai-input" type="text" maxlength="500" placeholder="Ask anything about Minecraft…" />
+    <input id="ai-input" class="field" type="text" maxlength="500" placeholder="Ask anything about Minecraft…" aria-label="Message" />
     <span id="web-badge">Web</span>
-    <button id="clear-btn">Clear</button>
-    <button id="send-btn">Send</button>
+    <button id="send-btn" class="btn btn-primary">Send</button>
   </div>
   <script type="module" src="./ai-chat.ts"></script>
 </body>

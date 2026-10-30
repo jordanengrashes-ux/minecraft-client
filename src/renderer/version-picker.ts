@@ -109,21 +109,27 @@ function ingestFeed(entries: FeedEntry[]) {
 
 // The stage wants a wide screenshot: the thumbnails are small squares (only
 // 240px before 1.20.5) and go soft when stretched across it. The patch-notes
-// articles carry 1280×720 screenshots, but only big updates have them — a
-// hotfix's notes are text, so it borrows from the other releases of its
-// update (1.21.10 shows The Copper Age art from 1.21.9).
+// articles carry 1280×720 screenshots, but mostly only an update's main
+// release has them; its hotfixes' notes are text. So the screenshots of a
+// whole update are pooled and each release in it takes a different one:
+// 1.21.9 gets The Copper Age's first screenshot, 1.21.10 its second.
+const groupKey = (id: string) => { const p = parseVer(id); return p ? `${p.a}.${p.b}|${updateName(id) ?? ''}` : null; };
+function cmpVer(a: string, b: string): number {
+  const pa = parseVer(a)!, pb = parseVer(b)!;
+  return pa.a - pb.a || pa.b - pb.b || pa.c - pb.c;
+}
+
+// The update's releases, oldest first, and this version's place among them.
+function updateMembers(v: PickerVersion): { members: string[]; rank: number } {
+  if (v.type !== 'release') return { members: [v.id], rank: 0 };
+  const g = groupKey(v.id);
+  if (!g) return { members: [v.id], rank: 0 };
+  const members = [...new Set([...releaseOrder.filter(id => groupKey(id) === g), v.id])].sort(cmpVer);
+  return { members, rank: members.indexOf(v.id) };
+}
+
 function articleCandidates(v: PickerVersion): string[] {
-  const own = articles.get(v.id);
-  const out = own ? [own] : [];
-  if (v.type !== 'release') return out;
-  const group = (id: string) => { const p = parseVer(id); return p ? `${p.a}.${p.b}|${updateName(id) ?? ''}` : null; };
-  const g = group(v.id);
-  if (!g) return out;
-  const at = releaseOrder.indexOf(v.id);
-  const siblings = releaseOrder.filter(id => id !== v.id && group(id) === g);
-  if (at >= 0) siblings.sort((a, b) => Math.abs(releaseOrder.indexOf(a) - at) - Math.abs(releaseOrder.indexOf(b) - at));
-  for (const id of siblings) { const p = articles.get(id); if (p) out.push(p); }
-  return out.slice(0, 4);
+  return updateMembers(v).members.map(id => articles.get(id)).filter((p): p is string => !!p);
 }
 
 const articleImageCache = new Map<string, Promise<string[]>>();
@@ -142,50 +148,55 @@ function articleImages(path: string): Promise<string[]> {
 
 // Filenames don't reliably say the size, so measure. A decoded image is
 // cached by the browser, so the winner shows instantly afterwards.
-async function isWide(src: string): Promise<boolean> {
-  const img = new Image();
-  img.src = src;
-  try { await img.decode(); } catch { return false; }
-  return img.naturalWidth >= 720 && img.naturalWidth > img.naturalHeight * 1.3;
+const wideCache = new Map<string, Promise<boolean>>();
+function isWide(src: string): Promise<boolean> {
+  let p = wideCache.get(src);
+  if (!p) {
+    const img = new Image();
+    img.src = src;
+    p = img.decode().then(() => img.naturalWidth >= 720 && img.naturalWidth > img.naturalHeight * 1.3, () => false);
+    wideCache.set(src, p);
+  }
+  return p;
 }
 
-async function findWide(paths: string[]): Promise<string | null> {
-  let probes = 0;
+// The n-th wide screenshot across these articles (0 = the first).
+async function nthWide(paths: string[], n: number): Promise<string | null> {
+  let found = 0, probes = 0;
   for (const path of paths) {
     for (const src of await articleImages(path)) {
-      if (probes++ >= 6) return null;
-      if (await isWide(src)) return src;
+      if (/thumb|_tn\./i.test(src)) continue;
+      if (probes++ >= 14) return null;
+      if (await isWide(src)) { if (found === n) return src; found++; }
     }
   }
   return null;
 }
+const findWide = (paths: string[]) => nthWide(paths, 0);
 
+// No two releases share a screenshot: when the update has run out of them,
+// the version falls back to its own thumbnail instead.
 const heroCache = new Map<string, Promise<string | null>>();
 function heroFor(v: PickerVersion): Promise<string | null> {
   let p = heroCache.get(v.id);
   if (!p) {
-    p = findWide(articleCandidates(v));
+    p = nthWide(articleCandidates(v), updateMembers(v).rank);
     heroCache.set(v.id, p);
   }
   return p;
 }
 
-// Exact match first; a release the feed skips (e.g. 1.14.4) borrows the art
-// of the closest earlier release in its line.
+// Only a version's own thumbnail. Versions Mojang made none for (1.13.1,
+// 1.14.4, everything before 1.13 …) get drawn art in their update's colours
+// rather than a copy of a neighbour's picture.
 function artFor(v: PickerVersion): string | null {
-  const exact = art.get(v.id);
-  if (exact) return exact;
-  const p = parseVer(v.id);
-  if (!p) return null;
-  for (let c = p.c; c >= 0; c--) {
-    const hit = art.get(c === 0 ? `${p.a}.${p.b}` : `${p.a}.${p.b}.${c}`);
-    if (hit) return hit;
-  }
-  return null;
+  return art.get(v.id) ?? null;
 }
 
 // Fallback art: a 16×16 block face drawn in colours from that update.
 const PIXEL_PALETTES: Record<string, string[]> = {
+  '14': ['#8a6a3c', '#a6824a', '#6b4f2a', '#7d5e34'],
+  '13': ['#2a7f86', '#36a3a6', '#1d5f69', '#4fc3c4'],
   '12': ['#e9ecec', '#f07613', '#bd44b3', '#3aafd9', '#f8c627', '#70b919', '#ed8dac', '#3e4447',
          '#8e8e86', '#158991', '#792aac', '#35399d', '#724728', '#546d1b', '#a12722', '#141519'],
   '11': ['#3e2912', '#4f3218', '#5c3d1e', '#2a1b0b'],

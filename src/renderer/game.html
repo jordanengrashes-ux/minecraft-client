@@ -169,15 +169,6 @@
     .tbtn:hover { background: var(--surface-2); color: var(--text); }
     #close-btn:hover { background: #c42b1c; color: #fff; }
 
-    #update-banner {
-      display: none; position: fixed; top: var(--titlebar-h); left: 0; right: 0; z-index: 200;
-      align-items: center; gap: 12px; padding: 7px 16px;
-      background: #1a1408; border-bottom: 1px solid var(--amber-line); font-size: 12.5px;
-    }
-    #update-text { flex: 1; }
-    #update-progress-wrap { display: none; width: 120px; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
-    #update-progress-bar { height: 100%; width: 0%; background: var(--amber); transition: width .3s; }
-    #update-install-btn { display: none; }
 
     #launcher { display: flex; height: 100vh; padding-top: var(--titlebar-h); }
 
@@ -615,6 +606,123 @@
     .files-folder-btn:hover { border-color: var(--amber-line); color: var(--text); }
     .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
 
+    /* ── Generated content (built by game.ts) ───────────────────────────────── */
+    .btn-sm .icon { width: 13px; height: 13px; }
+    kbd { font: 600 11.5px var(--mono); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line-strong); border-bottom-width: 2px; background: var(--surface-2); color: var(--text); }
+    .list-msg { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 16px; margin: 0; text-align: center; color: var(--text-3); }
+    .list-msg p { margin: 0; }
+    .list-group { display: flex; flex-direction: column; gap: 2px; }
+    .list-group-title { padding: 14px 10px 6px; font-size: 13px; font-weight: 600; }
+    .mod-version { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+    .mod-version .icon { width: 15px; height: 15px; }
+    .mod-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .mod-meta { font-size: 11.5px; color: var(--text-3); }
+    .mod-err { display: none; margin-top: 4px; font-size: 12px; }
+    .mod-tag.push { margin-left: auto; }
+    .mod-tag.dl { display: inline-flex; align-items: center; gap: 3px; }
+    .mod-tag .icon { width: 11px; height: 11px; }
+    .mod-build-ver, .cf-build-ver { color: var(--text-3); }
+    .pill-warn { color: #f6c356; background: rgba(246,195,86,.1); border-color: rgba(246,195,86,.35); }
+
+    .item-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
+    .item-row > .icon { color: var(--text-3); }
+    .item-row.is-clickable { cursor: pointer; transition: background .12s, border-color .12s; }
+    .item-row.is-clickable:hover { background: var(--surface-2); border-color: var(--line-strong); }
+    .item-row.is-compact { padding: 7px 12px; }
+    .item-row.is-active { border-color: var(--amber-line); }
+    .item-row-text { flex: 1; min-width: 0; }
+    .item-row-name { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .item-row-meta { margin-top: 1px; font-size: 12px; color: var(--text-3); }
+    .item-row-avatar { width: 32px; height: 32px; border-radius: 6px; image-rendering: pixelated; background: var(--surface-2); flex-shrink: 0; }
+    .sp-status { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+    .dropzone.is-over { border-color: var(--amber); background: var(--amber-wash); }
+
+    img.friend-avatar { object-fit: cover; image-rendering: pixelated; }
+    .server-chip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 6px; border: 1px solid var(--amber-line); background: var(--amber-wash); color: var(--amber-hi); font: 500 11.5px var(--mono); cursor: pointer; }
+    .server-chip .icon { width: 12px; height: 12px; }
+
+    .online-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
+    .chat-user-name { flex: 1; min-width: 0; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chat-user-name.is-self { color: var(--amber-hi); font-weight: 600; }
+    .chat-timeout-btn .icon { width: 14px; height: 14px; }
+    .chat-msg { display: flex; align-items: flex-end; gap: 8px; }
+    .chat-msg.is-me { justify-content: flex-end; }
+    .chat-msg-body { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 75%; }
+    .chat-msg.is-me .chat-msg-body { align-items: flex-end; }
+    .chat-msg-meta { font-size: 11px; color: var(--text-3); }
+    .chat-bubble { padding: 7px 12px; border-radius: 12px 12px 12px 4px; background: var(--surface-2); border: 1px solid var(--line); line-height: 1.45; word-break: break-word; user-select: text; }
+    .chat-msg.is-me .chat-bubble { border-radius: 12px 12px 4px 12px; background: var(--amber-wash); border-color: var(--amber-line); }
+    .chat-msg-head { width: 24px; height: 24px; flex-shrink: 0; }
+    .chat-msg-head img { display: block; width: 24px; height: 24px; border-radius: 6px; image-rendering: pixelated; }
+    .chat-msg-avatar { border-radius: 6px; }
+    .chat-announcement-title { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: #f5913a; }
+    .chat-announcement-text { margin-top: 4px; word-break: break-word; }
+    .chat-announcement-meta { margin-top: 4px; font-size: 11.5px; color: var(--text-3); }
+    .feedback-item-text { font-size: 12.5px; }
+    .feedback-item-meta { margin-top: 4px; font-size: 11.5px; color: var(--text-3); }
+
+    .recipe-card { margin-bottom: 6px; }
+    .recipe-card > .icon { color: var(--text-3); }
+    .recipe-card-icon:empty::after { content: attr(data-initials); font-size: 9px; font-weight: 700; color: var(--text-3); }
+    .guide-back-btn .icon { width: 14px; height: 14px; }
+    .recipe-title { margin: 2px 0 16px; font-size: 17px; font-weight: 700; }
+    .recipe-layout { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+    .recipe-part { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .recipe-part figcaption { font-size: 12px; color: var(--text-3); }
+    .recipe-arrow { color: var(--text-3); }
+    .recipe-arrow .icon { width: 22px; height: 22px; }
+    .recipe-result { width: 56px; height: 56px; }
+    .recipe-count { position: absolute; right: 3px; bottom: 1px; font-size: 12px; font-weight: 700; text-shadow: 1px 1px 0 #000; }
+    .ingredients { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .ingredient { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px 0 5px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); font-size: 12px; }
+    .ingredient img { width: 16px; height: 16px; image-rendering: pixelated; }
+    .mob-card { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 8px; }
+    .mob-img { width: 56px; height: 56px; image-rendering: pixelated; object-fit: contain; flex-shrink: 0; }
+    .mob-body { flex: 1; min-width: 0; }
+    .mob-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .mob-name { font-size: 14.5px; font-weight: 700; }
+    .mob-type { padding: 1px 8px; border-radius: 10px; border: 1px solid currentColor; font-size: 11px; font-weight: 600; }
+    .mob-type[data-type="passive"] { color: var(--ok); }
+    .mob-type[data-type="neutral"] { color: var(--amber-hi); }
+    .mob-type[data-type="hostile"] { color: #ff8a80; }
+    .mob-type[data-type="boss"]    { color: #c7a6ff; }
+    .mob-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; font-size: 11.5px; color: var(--text-3); }
+    .stat-fill.hp { background: var(--ok); }
+    .stat-fill.atk { background: var(--danger); }
+    .stat-fill.armor { background: #5aa9ff; }
+    .stat-fill.xp { background: #f6c356; }
+    .mob-facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 10px 0 0; font-size: 12px; }
+    .mob-facts dt { color: var(--text-3); }
+    .mob-facts dd { margin: 0; color: var(--text-2); }
+    .mob-tips { display: flex; flex-direction: column; gap: 3px; margin: 10px 0 0; padding-left: 18px; font-size: 12px; color: var(--text-2); }
+    .cat-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .tip-card { margin-bottom: 7px; }
+
+    /* ── Corner notifications (showToast in game.ts) ────────────────────────── */
+    #toasts { position: fixed; right: 18px; bottom: 44px; z-index: 900; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: none; }
+    .toast { pointer-events: auto; width: 340px; display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px 14px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line-strong); box-shadow: 0 16px 40px rgba(0,0,0,.55); animation: toast-in .28s var(--ease-out); }
+    /* On the Play page the launch controls own the bottom-right, so notices sit over the artwork instead */
+    body:has(#content:not([style*="none"])) #toasts { top: calc(var(--titlebar-h) + 12px); bottom: auto; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } }
+    @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+    .toast-icon { margin-top: 1px; color: var(--text-2); }
+    .toast-icon .icon { width: 18px; height: 18px; }
+    .toast-body { flex: 1; min-width: 0; }
+    .toast-title { font-weight: 600; }
+    .toast-text { margin-top: 3px; font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
+    .toast-text code { display: block; margin-bottom: 6px; padding: 5px 8px; border-radius: 5px; background: var(--bg-sunk); font: 11.5px var(--mono); color: #f6c356; }
+    .toast-actions { display: flex; gap: 6px; margin-top: 12px; }
+    .toast-close { margin: -4px -4px 0 0; }
+    .toast-progress { height: 4px; margin-top: 10px; border-radius: 2px; background: var(--line); overflow: hidden; }
+    .toast-progress-bar { height: 100%; width: 0; background: var(--amber); transition: width .3s; }
+
+    /* Status colours (setTone in game.ts) — kept last so they win over component defaults */
+    [data-tone="accent"]  { color: var(--amber-hi); }
+    [data-tone="ok"]      { color: var(--ok); }
+    [data-tone="pending"] { color: #f6c356; }
+    [data-tone="error"]   { color: #ff8a80; }
+    [data-tone="muted"]   { color: var(--text-3); }
+
     /* ── Narrow windows ─────────────────────────────────────────────────────── */
     @media (max-width: 1000px) {
       :root { --sidebar-w: 190px; }
@@ -675,14 +783,16 @@
     <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
   </svg>
 
-  <!-- Update banner -->
-  <div id="update-banner">
-    <span id="update-text"></span>
-    <div id="update-progress-wrap"><div id="update-progress-bar"></div></div>
-    <button id="update-install-btn" class="btn btn-primary btn-sm">Restart and update</button>
-  </div>
+  <!-- Corner notifications: updates, confirmations, errors -->
+  <div id="toasts" aria-live="polite"></div>
 
   <div id="titlebar">
     <span id="titlebar-title">Voxel Client</span>
@@ -1334,7 +1444,7 @@
             <div class="row">
               <div class="row-text">
                 <div class="row-title">Updates</div>
-                <div class="row-desc" id="update-settings-sub">Updates download automatically in the background</div>
+                <div class="row-desc" id="update-settings-sub">Checks for updates every 30 minutes and downloads them in the background</div>
               </div>
               <div class="row-control">
                 <button id="check-updates-btn" class="btn">Check for updates</button>

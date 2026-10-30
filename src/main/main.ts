@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker, dialog, session } from 'electron';
+import { app, BrowserWindow, ipcMain, net, shell, globalShortcut, screen, powerSaveBlocker, dialog, session, Notification } from 'electron';
 import { GEMINI_KEY, CF_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from './ai-key';
 import { startControlServer, watchPanelServers, readPanelServers, javaForMc, quickPlayFor, type PanelLaunchRequest } from './mscc';
 import { autoUpdater } from 'electron-updater';
@@ -2179,17 +2179,18 @@ function setupAutoUpdater() {
     if (info.version === app.getVersion()) { return; }
     setAckedVersion(info.version);
     updateReady = true;
-    gameWin?.webContents.send('update-downloaded');
-    // Auto-install after 10s if Minecraft isn't running.
-    // Reset updateReady BEFORE calling quitAndInstall so the gameWin 'closed'
-    // handler doesn't trigger a second quitAndInstall call (which would throw and
-    // fall through to app.quit() without installing).
-    setTimeout(() => {
-      if (updateReady && !mcProcess && !mcStarting) {
-        updateReady = false;
-        try { autoUpdater.quitAndInstall(true, true); } catch { app.quit(); }
-      }
-    }, 10000);
+    // The launcher window shows "Restart now / Later" and, when Minecraft isn't
+    // running, restarts itself after a short countdown. If the window is in the
+    // background, also tell the player with a system notification.
+    gameWin?.webContents.send('update-downloaded', info.version);
+    if (Notification.isSupported() && gameWin && !gameWin.isFocused()) {
+      const note = new Notification({
+        title: `Voxel Client ${info.version} is ready`,
+        body: 'It installs the next time the launcher restarts.',
+      });
+      note.on('click', () => { gameWin?.show(); gameWin?.focus(); });
+      note.show();
+    }
   });
   autoUpdater.on('error', err => {
     console.error('[updater] error:', err?.message);
@@ -2197,9 +2198,19 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.checkForUpdates().catch(() => {});
+  // Keep checking while the launcher stays open, so a long session still
+  // hears about new releases instead of only at start-up.
+  setInterval(() => { if (!updateReady) autoUpdater.checkForUpdates().catch(() => {}); }, 30 * 60 * 1000);
 }
 
-ipcMain.on('install-update',    () => autoUpdater.quitAndInstall(true, true));
+// Never restart the launcher out from under a running game; the update then
+// installs when the launcher closes (autoInstallOnAppQuit). updateReady is
+// cleared first so the window's 'closed' handler doesn't install a second time.
+ipcMain.on('install-update', () => {
+  if (mcProcess || mcStarting) return;
+  updateReady = false;
+  try { autoUpdater.quitAndInstall(true, true); } catch { app.quit(); }
+});
 ipcMain.on('check-for-updates', () => { autoUpdater.checkForUpdates().catch(() => {}); });
 
 // ── AI Assistant ───────────────────────────────────────────────────────────────

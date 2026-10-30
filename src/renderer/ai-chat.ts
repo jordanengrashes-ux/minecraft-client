@@ -20,7 +20,7 @@ function renderTabs() {
     const btn = document.createElement('button');
     btn.className = 'stab' + (sess.id === activeSessId ? ' active' : '');
     btn.innerHTML = `<span>${sess.name}</span>` +
-      (sessions.length > 1 ? `<span class="stab-x" data-del="${sess.id}">✕</span>` : '');
+      (sessions.length > 1 ? `<span class="stab-x" data-del="${sess.id}" title="Close chat"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></span>` : '');
     btn.addEventListener('click', e => {
       const del = (e.target as HTMLElement).dataset.del;
       if (del) deleteSession(del); else switchSession(sess.id);
@@ -33,7 +33,7 @@ function renderMessages() {
   messagesEl.innerHTML = '';
   const sess = currentSess();
   if (sess.history.length === 0) {
-    addBubble('Ask me anything about Minecraft — crafting recipes, ore locations, mobs, enchantments, potions, commands, and more!', false);
+    addBubble('Ask anything about Minecraft: crafting recipes, where to find ores, mobs, enchantments, potions or commands.', false).classList.add('intro');
     return;
   }
   sess.history.forEach(m => addBubble(m.content, m.role === 'user'));
@@ -62,10 +62,14 @@ function escHtml(s: string) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function renderCraftingGrids(text: string): string {
+// Turns 3×3 "[a][b][c]" rows into grid HTML. Each grid is returned separately
+// and left in the text as a placeholder, so the markdown pass below can't cut
+// into it (finding a grid's end by its closing tags stopped after the first row).
+function renderCraftingGrids(text: string): { text: string; grids: string[] } {
   const rowPat = /^\s*(\[[^\]]*\]){3}\s*$/;
   const lines = text.split('\n');
   const out: string[] = [];
+  const grids: string[] = [];
   let i = 0;
   while (i < lines.length) {
     if (rowPat.test(lines[i]) && rowPat.test(lines[i+1] ?? '') && rowPat.test(lines[i+2] ?? '')) {
@@ -76,11 +80,12 @@ function renderCraftingGrids(text: string): string {
         while ((m = re.exec(row)) !== null) cells.push(m[1].trim());
         return `<div class="craft-row">${cells.map(c => `<div class="craft-slot">${escHtml(c)}</div>`).join('')}</div>`;
       }).join('');
-      out.push(`<div class="craft-grid"><div class="craft-label">Crafting</div>${html}</div>`);
+      grids.push(`<div class="craft-grid"><div class="craft-label">Crafting</div>${html}</div>`);
+      out.push(`\u0000GRID${grids.length - 1}\u0000`);
       i += 3;
     } else { out.push(lines[i]); i++; }
   }
-  return out.join('\n');
+  return { text: out.join('\n'), grids };
 }
 
 function addBubble(text: string, isUser: boolean): HTMLElement {
@@ -89,10 +94,10 @@ function addBubble(text: string, isUser: boolean): HTMLElement {
   if (isUser) {
     div.textContent = text;
   } else {
-    const withGrids = renderCraftingGrids(text);
-    const parts = withGrids.split(/(<div class="craft-grid">[\s\S]*?<\/div><\/div>)/);
-    div.innerHTML = parts.map(p => {
-      if (p.startsWith('<div class="craft-grid">')) return p;
+    const { text: withGrids, grids } = renderCraftingGrids(text);
+    const parts = withGrids.split(/\u0000GRID(\d+)\u0000/);
+    div.innerHTML = parts.map((p, i) => {
+      if (i % 2 === 1) return grids[Number(p)];
       return escHtml(p)
         .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -114,7 +119,7 @@ async function sendChat(q: string) {
   sendBtn.disabled = true;
 
   addBubble(q, true);
-  const typing = addBubble('…', false);
+  const typing = addBubble('Thinking…', false);
   typing.classList.add('typing');
 
   const sess = currentSess();
@@ -129,7 +134,7 @@ async function sendChat(q: string) {
     addBubble(res.text, false);
   } catch (err: any) {
     typing.remove();
-    addBubble('Sorry, something went wrong. Try again.', false);
+    addBubble("The assistant didn't answer. Wait a moment, then send your question again.", false).classList.add('error');
   }
 
   chatBusy = false;

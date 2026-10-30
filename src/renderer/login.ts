@@ -102,13 +102,13 @@ tabRegister.addEventListener('click', () => {
 btnLogin.addEventListener('click', async () => {
   const email    = (document.getElementById('l-email')    as HTMLInputElement).value.trim();
   const password = (document.getElementById('l-password') as HTMLInputElement).value;
-  if (!email || !password) { showErr('Fill in all fields.'); return; }
-  setLoading(btnLogin, true, 'PLAY');
+  if (!email || !password) { showErr('Enter your email and password to sign in.'); return; }
+  setLoading(btnLogin, true, 'Sign in');
   try {
     onSuccess(await loginEmail(email, password));
   } catch (e: any) {
     showErr(friendlyError(e.code));
-    setLoading(btnLogin, false, 'PLAY');
+    setLoading(btnLogin, false, 'Sign in');
   }
 });
 
@@ -117,14 +117,14 @@ btnRegister.addEventListener('click', async () => {
   const name     = (document.getElementById('r-name')     as HTMLInputElement).value.trim();
   const email    = (document.getElementById('r-email')    as HTMLInputElement).value.trim();
   const password = (document.getElementById('r-password') as HTMLInputElement).value;
-  if (!name || !email || !password) { showErr('Fill in all fields.'); return; }
-  if (password.length < 6) { showErr('Password must be at least 6 characters.'); return; }
-  setLoading(btnRegister, true, 'CREATE ACCOUNT');
+  if (!name || !email || !password) { showErr('Enter a username, email and password to create your account.'); return; }
+  if (password.length < 6) { showErr('Your password is too short. Use at least 6 characters.'); return; }
+  setLoading(btnRegister, true, 'Create account');
   try {
     onSuccess(await registerEmail(email, password, name));
   } catch (e: any) {
     showErr(friendlyError(e.code));
-    setLoading(btnRegister, false, 'CREATE ACCOUNT');
+    setLoading(btnRegister, false, 'Create account');
   }
 });
 
@@ -138,13 +138,13 @@ btnGoogle.addEventListener('click', async () => {
       // so it opens in the system browser and we catch the redirect there.
       btnGoogle.textContent = 'Waiting for browser…';
       const res = await window.electron.googleAuth();
-      if (!res.ok) throw new Error(res.error);
+      if (!res.ok || !res.idToken) throw new Error(res.error);
       onSuccess(await loginGoogleWithIdToken(res.idToken));
     } else {
       onSuccess(await loginGoogle());
     }
   } catch (e: any) {
-    showErr(e.code ? friendlyError(e.code) : (e.message || 'Google sign-in failed.'));
+    showErr(e.code ? friendlyError(e.code) : (e.message || "Google sign-in didn't finish. Try again."));
     btnGoogle.disabled = false;
     btnGoogle.textContent = label || 'Continue with Google';
   }
@@ -172,14 +172,16 @@ document.addEventListener('keydown', e => {
 
 function friendlyError(code: string): string {
   const map: Record<string, string> = {
-    'auth/invalid-credential':   'Wrong email or password.',
-    'auth/email-already-in-use': 'Email already registered.',
-    'auth/weak-password':        'Password too weak.',
-    'auth/invalid-email':        'Invalid email address.',
-    'auth/user-not-found':       'No account with that email.',
-    'auth/popup-closed-by-user': 'Sign-in cancelled.',
+    'auth/invalid-credential':     "That email and password don't match. Check them and try again.",
+    'auth/email-already-in-use':   'An account with this email already exists. Sign in instead.',
+    'auth/weak-password':          'That password is too weak. Use at least 6 characters.',
+    'auth/invalid-email':          "That email address isn't valid. Check it and try again.",
+    'auth/user-not-found':         'No account uses that email. Check it, or create an account.',
+    'auth/popup-closed-by-user':   'The Google window was closed before sign-in finished. Try again.',
+    'auth/network-request-failed': "Couldn't reach the sign-in server. Check your internet connection and try again.",
+    'auth/too-many-requests':      'Too many attempts. Wait a minute, then try again.',
   };
-  return map[code] ?? 'Something went wrong. Try again.';
+  return map[code] ?? 'Something went wrong. Check your internet connection and try again.';
 }
 
 // suppress unused warning

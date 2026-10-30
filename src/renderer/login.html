@@ -3,128 +3,243 @@
 <head>
   <meta charset="UTF-8" />
   <title>Voxel Client</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" />
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #0d0d0d; color: #ffffff;
-      font-family: 'Roboto', sans-serif;
-      height: 100vh; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; user-select: none;
-    }
-    #titlebar {
-      position: fixed; top: 0; left: 0; right: 0; height: 32px;
-      display: flex; align-items: center; justify-content: flex-end;
-      padding: 0 8px; -webkit-app-region: drag; z-index: 100;
-      background: #080808; border-bottom: 1px solid #1e1e1e;
-    }
-    .tbtn {
-      -webkit-app-region: no-drag; background: none; border: none;
-      color: #444444; font-size: 16px; cursor: pointer; padding: 4px 10px; border-radius: 4px;
-      transition: background 0.1s, color 0.1s;
-    }
-    .tbtn:hover { background: #1e1e1e; color: #ffffff; }
-    #close:hover { background: #f5a623; color: #000000; }
+    /* ── Tokens (same as game.html) ─────────────────────────────────────────── */
+    :root {
+      --font: 'Archivo', system-ui, 'Segoe UI', sans-serif;
+      --mono: 'Cascadia Mono', Consolas, monospace;
 
-    .logo {
-      font-size: 48px; font-weight: 900; letter-spacing: 4px;
-      color: #f5a623;
-      margin-bottom: 8px;
+      --bg:          #0c0c0d;
+      --bg-sunk:     #08080a;
+      --surface:     #141416;
+      --surface-2:   #1b1b1e;
+      --surface-3:   #232327;
+      --line:        #222226;
+      --line-strong: #323238;
+
+      --text:   #f3f1ed;
+      --text-2: #b0aca5;
+      --text-3: #85817a;
+
+      --amber:      #f5a623;
+      --amber-hi:   #ffbe4d;
+      --amber-ink:  #1c1203;
+      --amber-wash: rgba(245, 166, 35, 0.12);
+      --amber-line: rgba(245, 166, 35, 0.38);
+      --danger:      #f0574b;
+      --danger-wash: rgba(240, 87, 75, 0.12);
+      --ok:          #4cc38a;
+      --ok-wash:     rgba(76, 195, 138, 0.13);
+
+      --radius:    8px;
+      --radius-sm: 6px;
+      --ease-out:  cubic-bezier(.16, 1, .3, 1);
+      --titlebar-h: 30px;
+      color-scheme: dark;
     }
-    .subtitle { color: #444444; font-size: 13px; margin-bottom: 40px; letter-spacing: 1px; }
-    .card {
-      background: #111111; border: 1px solid #222222; border-radius: 12px;
-      padding: 36px 40px; width: 360px;
+
+    /* ── Base ───────────────────────────────────────────────────────────────── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg); color: var(--text);
+      font: 400 13px/1.45 var(--font);
+      height: 100vh; overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      user-select: none; -webkit-user-select: none;
     }
-    .tab-row { display: flex; margin-bottom: 28px; gap: 4px; }
-    .tab {
-      flex: 1; padding: 8px; background: none; border: 1px solid #222222;
-      color: #444444; font-size: 13px; cursor: pointer; border-radius: 6px; transition: all 0.2s;
-    }
-    .tab.active { background: #1a1a1a; border-color: #f5a623; color: #f5a623; }
-    input {
-      width: 100%; padding: 12px 14px; background: #080808;
-      border: 1px solid #222222; border-radius: 6px; color: #ffffff;
-      font-size: 14px; margin-bottom: 14px; outline: none; transition: border-color 0.2s;
-    }
-    input:focus { border-color: #f5a623; }
+    ::selection { background: rgba(245, 166, 35, 0.35); color: #fff; }
+    :focus { outline: none; }
+    :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 4px; }
+    input, button { font: inherit; color: inherit; }
+    input { caret-color: var(--amber); user-select: text; -webkit-user-select: text; }
+
+    * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+    ::-webkit-scrollbar-thumb:hover { background-color: #45454c; }
+    ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+
+    .sprite { position: absolute; }
+    .icon { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── Controls ───────────────────────────────────────────────────────────── */
     .btn {
-      width: 100%; padding: 13px;
-      background: #f5a623;
-      border: none; border-radius: 7px; color: #000000; font-weight: 700;
-      font-size: 15px; cursor: pointer; margin-top: 4px; transition: opacity 0.2s;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      height: 32px; padding: 0 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--line-strong); background: var(--surface); color: var(--text);
+      font-weight: 500; font-size: 13px; line-height: 1; cursor: pointer; white-space: nowrap;
+      transition: background .15s, border-color .15s, color .15s, transform .1s;
     }
-    .btn:hover { opacity: 0.9; }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .err { color: #f5a623; font-size: 13px; margin-top: 12px; text-align: center; min-height: 20px; font-weight: 500; }
-    .divider { border: none; border-top: 1px solid #222222; margin: 20px 0; }
-    .google-btn {
-      width: 100%; padding: 11px; background: #141414; border: 1px solid #222222;
-      border-radius: 7px; color: #ffffff; font-size: 14px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      transition: background 0.2s;
+    .btn:hover:not(:disabled) { background: var(--surface-2); border-color: #45454c; }
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); font-weight: 600; }
+    .btn-primary:hover:not(:disabled) { background: var(--amber-hi); border-color: var(--amber-hi); }
+    .btn-soft { background: var(--amber-wash); border-color: var(--amber-line); color: var(--amber-hi); font-weight: 600; }
+    .btn-soft:hover:not(:disabled) { background: rgba(245,166,35,.2); border-color: var(--amber); }
+    .btn-ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+    .btn-ghost:hover:not(:disabled) { background: var(--surface); border-color: transparent; color: var(--text); }
+    .btn-lg { height: 36px; font-size: 13.5px; }
+    .btn-block { display: flex; width: 100%; }
+
+    .field {
+      width: 100%; height: 34px; padding: 0 11px;
+      background: var(--bg-sunk); border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+      color: var(--text); font-size: 13px; transition: border-color .15s, background .15s;
     }
-    .google-btn:hover { background: #1a1a1a; }
-    .guest-btn {
-      width: 100%; padding: 11px; background: none; border: 1px solid #222222;
-      border-radius: 7px; color: #444444; font-size: 13px; cursor: pointer;
-      transition: border-color 0.2s, color 0.2s; margin-top: 8px;
+    .field::placeholder { color: var(--text-3); }
+    .field:hover { border-color: #45454c; }
+    .field:focus { border-color: var(--amber); background: #0a0a0b; }
+
+    .tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); }
+    .tab { position: relative; height: 38px; padding: 0; border: 0; background: none; color: var(--text-2); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: color .15s; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--text); }
+    .tab.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--amber); }
+
+    /* ── Window chrome ──────────────────────────────────────────────────────── */
+    #titlebar {
+      position: fixed; inset: 0 0 auto 0; height: var(--titlebar-h); z-index: 100;
+      display: flex; align-items: center; justify-content: flex-end;
+      -webkit-app-region: drag;
     }
-    .guest-btn:hover { border-color: #444444; color: #ffffff; }
-    #guest-name-wrap { display: none; margin-top: 10px; }
+    #titlebar-btns { -webkit-app-region: no-drag; display: flex; align-items: center; height: 100%; }
+    .tbtn { width: 44px; height: 100%; display: grid; place-items: center; background: none; border: 0; color: var(--text-3); cursor: pointer; transition: background .12s, color .12s; }
+    .tbtn .icon { width: 14px; height: 14px; }
+    .tbtn:hover { background: var(--surface-2); color: var(--text); }
+    #close:hover { background: #c42b1c; color: #fff; }
+
     #loading-veil {
-      position: fixed; inset: 0; background: #0d0d0d; z-index: 9999;
-      transition: opacity 0.25s; pointer-events: all;
+      position: fixed; inset: 0; background: var(--bg); z-index: 9999;
+      transition: opacity .25s; pointer-events: all;
     }
     #loading-veil.done { opacity: 0; pointer-events: none; }
+
+    /* ── Sign-in panel ──────────────────────────────────────────────────────── */
+    .card { height: 100vh; padding: 42px 44px 14px; display: flex; flex-direction: column; overflow-y: auto; }
+
+    .brand { display: flex; align-items: center; gap: 9px; }
+    .brand-mark { width: 24px; height: 24px; flex-shrink: 0; }
+    .wordmark { font-size: 18px; font-weight: 800; font-stretch: 125%; letter-spacing: .02em; line-height: 1; }
+    .beta { font-size: 10.5px; font-weight: 600; color: var(--text-3); border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 5px; }
+    .lede { margin-top: 10px; color: var(--text-2); }
+
+    .tabs { margin-top: 20px; }
+    .form { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+
+    .fld { display: flex; flex-direction: column; gap: 6px; }
+    .fld-label { font-size: 12px; font-weight: 500; color: var(--text-2); }
+    .fld-hint { font-size: 12px; color: var(--text-3); }
+
+    #btn-login, #btn-register { margin-top: 4px; }
+    .alt { display: flex; flex-direction: column; gap: 8px; }
+    .or { display: flex; align-items: center; gap: 12px; color: var(--text-3); font-size: 12px; }
+    .or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+    /* login.ts rewrites this button's text, so the logo lives in CSS */
+    #btn-google::before {
+      content: ''; width: 16px; height: 16px; flex-shrink: 0;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%23EA4335' d='M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z'/%3E%3Cpath fill='%234285F4' d='M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z'/%3E%3Cpath fill='%23FBBC05' d='M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z'/%3E%3Cpath fill='%2334A853' d='M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+    #btn-guest .icon { color: var(--text-3); transition: color .15s; }
+    #btn-guest:hover .icon { color: var(--text-2); }
+
+    /* Shown by login.ts (inline display: block) */
+    #guest-name-wrap { display: none; margin-top: 2px; }
+    .guest-row { display: flex; gap: 8px; }
+    .guest-row .field { flex: 1; min-width: 0; }
+    .guest-row .btn { height: 34px; }
+
+    .err-wrap {
+      display: flex; align-items: flex-start; gap: 9px; margin-top: 14px; padding: 9px 12px;
+      border-radius: var(--radius-sm); background: var(--danger-wash); border: 1px solid rgba(240,87,75,.32);
+      font-size: 12.5px; line-height: 1.4;
+    }
+    .err-wrap .icon { margin-top: 1px; color: var(--danger); }
+    .err-wrap:has(.err:empty) { display: none; }
+    .err { color: var(--text); user-select: text; -webkit-user-select: text; }
   </style>
 </head>
 <body>
+  <!-- Icons: one stroke weight, 24px grid (from game.html) -->
+  <svg width="0" height="0" class="sprite" aria-hidden="true">
+    <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+  </svg>
+
   <div id="loading-veil"></div>
   <div id="titlebar">
-    <button class="tbtn" id="btn-minimize">─</button>
-    <button class="tbtn" id="close">✕</button>
+    <div id="titlebar-btns">
+      <button class="tbtn" id="btn-minimize" aria-label="Minimize"><svg class="icon"><use href="#i-min"/></svg></button>
+      <button class="tbtn" id="close" aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
   </div>
 
-  <div class="logo">VOXEL <span style="font-size:14px;font-weight:800;letter-spacing:1px;color:#f5a623;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.4);border-radius:5px;padding:3px 8px;vertical-align:middle;">BETA</span></div>
-  <div class="subtitle">COMMUNITY CLIENT</div>
+  <main class="card">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 20.5 7.25 12 12 3.5 7.25Z" fill="#ffc35a"/><path d="M3.5 7.25 12 12v9.5l-8.5-4.75Z" fill="#f5a623"/><path d="M20.5 7.25 12 12v9.5l8.5-4.75Z" fill="#a8680b"/></svg>
+      <span class="wordmark">VOXEL</span>
+      <span class="beta">Beta</span>
+    </div>
+    <p class="lede">One account for friends, chat and cosmetics.</p>
 
-  <div class="card">
-    <div class="tab-row">
-      <button class="tab active" id="tab-login">Sign In</button>
-      <button class="tab"        id="tab-register">Register</button>
+    <div class="tabs" role="tablist">
+      <button class="tab active" id="tab-login" role="tab">Sign in</button>
+      <button class="tab" id="tab-register" role="tab">Create account</button>
     </div>
 
-    <div id="form-login">
-      <input id="l-email"    type="email"    placeholder="Email" autocomplete="email" />
-      <input id="l-password" type="password" placeholder="Password" autocomplete="current-password" />
-      <button class="btn" id="btn-login">PLAY</button>
-      <hr class="divider" />
-      <button class="google-btn" id="btn-google">
-        <svg width="18" height="18" viewBox="0 0 48 48">
-          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-        </svg>
-        Continue with Google
-      </button>
-      <button class="guest-btn" id="btn-guest">Play as Guest</button>
-      <div id="guest-name-wrap">
-        <input id="guest-name" type="text" placeholder="Enter display name" style="margin-bottom:8px;" />
-        <button class="btn" id="btn-guest-go" style="background:#333;color:#fff;">Enter</button>
+    <div id="form-login" class="form">
+      <label class="fld">
+        <span class="fld-label">Email</span>
+        <input id="l-email" class="field" type="email" autocomplete="email" spellcheck="false" />
+      </label>
+      <label class="fld">
+        <span class="fld-label">Password</span>
+        <input id="l-password" class="field" type="password" autocomplete="current-password" />
+      </label>
+      <button class="btn btn-primary btn-lg btn-block" id="btn-login">Sign in</button>
+      <div class="or">or</div>
+      <div class="alt">
+        <button class="btn btn-lg btn-block" id="btn-google">Continue with Google</button>
+        <button class="btn btn-ghost btn-lg btn-block" id="btn-guest"><svg class="icon"><use href="#i-user"/></svg>Continue as guest</button>
+        <div id="guest-name-wrap">
+          <div class="guest-row">
+            <input id="guest-name" class="field" type="text" placeholder="Display name (optional)" aria-label="Guest display name, optional" spellcheck="false" />
+            <button class="btn btn-soft" id="btn-guest-go">Continue</button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div id="form-register" style="display:none">
-      <input id="r-name"     type="text"     placeholder="Username" autocomplete="username" />
-      <input id="r-email"    type="email"    placeholder="Email" autocomplete="email" />
-      <input id="r-password" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" />
-      <button class="btn" id="btn-register">CREATE ACCOUNT</button>
+    <!-- login.ts switches forms with inline display, so the hidden state stays inline -->
+    <div id="form-register" class="form" style="display:none">
+      <label class="fld">
+        <span class="fld-label">Username</span>
+        <input id="r-name" class="field" type="text" autocomplete="username" spellcheck="false" />
+      </label>
+      <label class="fld">
+        <span class="fld-label">Email</span>
+        <input id="r-email" class="field" type="email" autocomplete="email" spellcheck="false" />
+      </label>
+      <label class="fld">
+        <span class="fld-label">Password</span>
+        <input id="r-password" class="field" type="password" autocomplete="new-password" aria-describedby="r-password-hint" />
+        <span class="fld-hint" id="r-password-hint">At least 6 characters</span>
+      </label>
+      <button class="btn btn-primary btn-lg btn-block" id="btn-register">Create account</button>
     </div>
 
-    <div class="err" id="err-msg"></div>
-  </div>
+    <div class="err-wrap">
+      <svg class="icon"><use href="#i-alert"/></svg>
+      <div class="err" id="err-msg" aria-live="polite"></div>
+    </div>
+  </main>
 
   <script type="module" src="./login.ts"></script>
 </body>
